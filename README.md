@@ -2,9 +2,7 @@
 
 A flexible, **generic** Slint component library for building visual graph editors. Supports data flow diagrams, state machines, shader graphs, and any visual node-based interface.
 
-
-https://github.com/user-attachments/assets/f2aeba1a-ebdb-4708-9c22-f620084a1bf5
-
+https://github.com/user-attachments/assets/b9f23dab-3296-444b-990d-e2fa837052bb
 
 ## Key Features
 
