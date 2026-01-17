@@ -36,6 +36,77 @@ pub fn generate_bezier_path(
     )
 }
 
+/// Generate SVG path command for a partial bezier link (for animation)
+///
+/// Uses de Casteljau's algorithm to compute the sub-curve from t=0 to t=progress.
+/// This creates a "growing" animation effect where the curve snakes from start to end.
+///
+/// # Arguments
+/// * `start_x`, `start_y` - Start point (pin center)
+/// * `end_x`, `end_y` - End point (pin center)
+/// * `zoom` - Current zoom level (affects control point offset)
+/// * `min_offset` - Minimum control point offset (default: 50.0)
+/// * `progress` - Animation progress from 0.0 to 1.0
+///
+/// # Returns
+/// SVG path command string for the partial curve
+pub fn generate_partial_bezier_path(
+    start_x: f32,
+    start_y: f32,
+    end_x: f32,
+    end_y: f32,
+    zoom: f32,
+    min_offset: f32,
+    progress: f32,
+) -> String {
+    // Clamp progress to valid range
+    let t = progress.clamp(0.0, 1.0);
+
+    if t <= 0.0 {
+        // No curve visible yet - just return a point
+        return format!("M {} {} L {} {}", start_x, start_y, start_x, start_y);
+    }
+
+    if t >= 1.0 {
+        // Full curve - use standard function
+        return generate_bezier_path(start_x, start_y, end_x, end_y, zoom, min_offset);
+    }
+
+    // Calculate full bezier control points
+    let dx = (end_x - start_x).abs();
+    let offset = (dx * 0.5).max(min_offset * zoom);
+
+    let p0 = (start_x, start_y);
+    let p1 = (start_x + offset, start_y);
+    let p2 = (end_x - offset, end_y);
+    let p3 = (end_x, end_y);
+
+    // De Casteljau's algorithm to split at t
+    // Level 1: lerp between adjacent points
+    let q0 = lerp_point(p0, p1, t);
+    let q1 = lerp_point(p1, p2, t);
+    let q2 = lerp_point(p2, p3, t);
+
+    // Level 2: lerp between level 1 points
+    let r0 = lerp_point(q0, q1, t);
+    let r1 = lerp_point(q1, q2, t);
+
+    // Level 3: the point on the curve at t
+    let s = lerp_point(r0, r1, t);
+
+    // The partial curve from 0 to t uses:
+    // P0' = P0, P1' = Q0, P2' = R0, P3' = S
+    format!(
+        "M {} {} C {} {} {} {} {} {}",
+        p0.0, p0.1, q0.0, q0.1, r0.0, r0.1, s.0, s.1
+    )
+}
+
+/// Linear interpolation between two points
+fn lerp_point(a: (f32, f32), b: (f32, f32), t: f32) -> (f32, f32) {
+    (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t)
+}
+
 /// Cubic bezier curve for distance calculations
 pub struct CubicBezier {
     pub p0: (f32, f32), // Start point

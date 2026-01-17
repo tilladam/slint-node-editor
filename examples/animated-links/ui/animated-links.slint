@@ -166,8 +166,8 @@ component SimpleNode inherits BaseNode {
 
 export component MainWindow inherits Window {
     title: "Animated Link Creation";
-    width: 900px;
-    height: 700px;
+    width: 1000px;
+    height: 600px;
     background: #1a1a2e;
 
     in property <[NodeData]> nodes;
@@ -200,50 +200,8 @@ export component MainWindow inherits Window {
     callback compute-pin-at <=> editor.compute-pin-at;
     callback compute-link-preview-path <=> editor.compute-link-preview-path;
     callback add-animated-link(/* from-pin */ int, /* to-pin */ int);
-
-    // Instructions panel
-    Rectangle {
-        x: 20px;
-        y: 20px;
-        width: 280px;
-        height: 130px;
-        background: #2a2a4080;
-        border-radius: 8px;
-        border-color: #4a4a6a;
-        border-width: 1px;
-
-        VerticalLayout {
-            padding: 12px;
-            spacing: 6px;
-
-            Text {
-                text: "Animated Link Creation Demo";
-                color: #ffffff;
-                font-size: 14px;
-                font-weight: 700;
-            }
-            Text {
-                text: "Drag from output pin (right) to input pin (left)";
-                color: #aaaacc;
-                font-size: 11px;
-            }
-            Text {
-                text: "Watch the link grow with glow effect!";
-                color: #88aaff;
-                font-size: 11px;
-            }
-            Text {
-                text: "New links pulse and fade to normal";
-                color: #aaaacc;
-                font-size: 11px;
-            }
-            Text {
-                text: "Pan: middle mouse | Zoom: scroll";
-                color: #888899;
-                font-size: 10px;
-            }
-        }
-    }
+    // Animated link path with progress (0.0-1.0)
+    pure callback compute-animated-link-path(/* start-pin */ int, /* end-pin */ int, /* progress */ float, /* version */ int) -> string;
 
     editor := NodeEditor {
         width: 100%;
@@ -261,7 +219,8 @@ export component MainWindow inherits Window {
 
         // Render animated links with effects
         for link in root.animated-links: AnimatedLink {
-            path-commands: root.compute-link-path(link.start-pin-id, link.end-pin-id, editor.geometry-version);
+            // Use animated path that grows based on progress
+            path-commands: root.compute-animated-link-path(link.start-pin-id, link.end-pin-id, link.progress, editor.geometry-version);
             link-color: link.color;
             line-width: link.line-width > 0 ? link.line-width * 1px : 2px;
             progress: link.progress;
@@ -310,6 +269,76 @@ export component MainWindow inherits Window {
             drag-ended(id, dx, dy) => {
                 root.dragged-node-id = 0;
                 editor.end-node-drag(dx, dy);
+            }
+        }
+    }
+
+    // Instructions overlay (rendered on top of editor)
+    Rectangle {
+        x: 12px;
+        y: 12px;
+        width: 280px;
+        height: 220px;
+        background: #1a1a2eee;
+        border-radius: 10px;
+        border-color: #4a4a6a;
+        border-width: 1px;
+        drop-shadow-blur: 16px;
+        drop-shadow-color: #00000060;
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 10px;
+
+            // Title
+            Text {
+                text: "Animated Link Creation";
+                color: #ffffff;
+                font-size: 15px;
+                font-weight: 700;
+            }
+
+            // Description
+            Text {
+                text: "This example demonstrates creative link animations using de Casteljau's algorithm to draw partial bezier curves.";
+                color: #aaaacc;
+                font-size: 10px;
+                wrap: word-wrap;
+            }
+
+            // Features section
+            Rectangle {
+                background: #ffffff10;
+                border-radius: 6px;
+                height: 58px;
+
+                VerticalLayout {
+                    padding: 8px;
+                    spacing: 3px;
+
+                    Text { text: "Features"; color: #88aaff; font-size: 10px; font-weight: 600; }
+                    Text { text: "- Links snake/grow from source to target"; color: #cccccc; font-size: 9px; }
+                    Text { text: "- Glow effect on new connections"; color: #cccccc; font-size: 9px; }
+                    Text { text: "- Color cycling for each new link"; color: #cccccc; font-size: 9px; }
+                }
+            }
+
+            // Controls section
+            Rectangle {
+                background: #ffffff10;
+                border-radius: 6px;
+                height: 70px;
+
+                VerticalLayout {
+                    padding: 8px;
+                    spacing: 3px;
+
+                    Text { text: "Controls"; color: #88aaff; font-size: 10px; font-weight: 600; }
+                    Text { text: "Create link: Drag output pin to input pin"; color: #cccccc; font-size: 9px; }
+                    Text { text: "Pan view: Middle mouse button drag"; color: #cccccc; font-size: 9px; }
+                    Text { text: "Zoom: Mouse scroll wheel"; color: #cccccc; font-size: 9px; }
+                    Text { text: "Move node: Left mouse drag on node"; color: #cccccc; font-size: 9px; }
+                }
             }
         }
     }

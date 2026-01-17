@@ -63,7 +63,7 @@ pub use hit_test::{
     NodeGeometry, PinGeometry, SimpleNodeGeometry,
 };
 pub use grid::generate_grid_commands;
-pub use path::generate_bezier_path;
+pub use path::{generate_bezier_path, generate_partial_bezier_path};
 pub use state::{GeometryCache, StoredPin};
 pub use selection::SelectionManager;
 pub use graph::{
