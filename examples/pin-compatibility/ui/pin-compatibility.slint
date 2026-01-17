@@ -1,0 +1,404 @@
+import { NodeEditor, BaseNode, Pin, PinTypes, LinkData } from "@slint-node-editor/node-editor.slint";
+
+export struct NodeData {
+    id: int,
+    title: string,
+    x: float,
+    y: float,
+}
+
+export { LinkData }
+
+export global DataTypes {
+    out property <int> execute: 0;
+    out property <int> integer: 1;
+    out property <int> float_: 2;
+    out property <int> string: 3;
+    out property <int> boolean: 4;
+    out property <int> object: 5;
+    out property <int> array: 6;
+    out property <int> any: 7;
+}
+
+global PinColors {
+    out property <color> execute: #ffffff;
+    out property <color> integer: #4fc3f7;
+    out property <color> float_: #81c784;
+    out property <color> string: #ffb74d;
+    out property <color> boolean: #e57373;
+    out property <color> object: #ba68c8;
+    out property <color> array: #f06292;
+    out property <color> any: #90a4ae;
+}
+
+// Layout constants
+global L {
+    out property <length> pin-spacing: 24px;
+    out property <length> first-pin-y: 36px;
+    out property <length> node-width: 140px;
+    out property <length> node-height: 228px;
+}
+
+// Source node with output pins (right side)
+component SourceNode inherits BaseNode {
+    in property <string> title: "Source";
+    in property <int> pin-refresh-trigger: 0;
+    width: L.node-width * self.zoom;
+    height: L.node-height * self.zoom;
+
+    callback report-position(int, int, int, length, length);
+
+    Rectangle {
+        background: root.selected ? #4a6a9a : #2d2d2d;
+        border-radius: 6px * root.zoom;
+        border-width: 1px * root.zoom;
+        border-color: #555;
+
+        // Title
+        Text {
+            x: 8px * root.zoom;
+            y: 6px * root.zoom;
+            text: root.title;
+            color: white;
+            font-size: 12px * root.zoom;
+            font-weight: 600;
+        }
+
+        // Pin labels
+        for label[idx] in ["Execute", "Integer", "Float", "String", "Boolean", "Object", "Array", "Any"]: Text {
+            x: 8px * root.zoom;
+            y: (L.first-pin-y + idx * L.pin-spacing) * root.zoom;
+            text: label;
+            color: #aaa;
+            font-size: 10px * root.zoom;
+        }
+    }
+
+    // Output pins - direct children of node
+    Pin {
+        x: parent.width - self.width;
+        y: (L.first-pin-y + 0 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 100; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.execute;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+    Pin {
+        x: parent.width - self.width;
+        y: (L.first-pin-y + 1 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 101; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.integer;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+    Pin {
+        x: parent.width - self.width;
+        y: (L.first-pin-y + 2 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 102; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.float_;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+    Pin {
+        x: parent.width - self.width;
+        y: (L.first-pin-y + 3 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 103; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.string;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+    Pin {
+        x: parent.width - self.width;
+        y: (L.first-pin-y + 4 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 104; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.boolean;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+    Pin {
+        x: parent.width - self.width;
+        y: (L.first-pin-y + 5 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 105; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.object;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+    Pin {
+        x: parent.width - self.width;
+        y: (L.first-pin-y + 6 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 106; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.array;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+    Pin {
+        x: parent.width - self.width;
+        y: (L.first-pin-y + 7 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 107; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.any;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+}
+
+// Sink node with input pins (left side)
+component SinkNode inherits BaseNode {
+    in property <string> title: "Sink";
+    in property <int> pin-refresh-trigger: 0;
+    width: L.node-width * self.zoom;
+    height: L.node-height * self.zoom;
+
+    callback report-position(int, int, int, length, length);
+
+    Rectangle {
+        background: root.selected ? #4a6a9a : #2d2d2d;
+        border-radius: 6px * root.zoom;
+        border-width: 1px * root.zoom;
+        border-color: #555;
+
+        // Title
+        Text {
+            x: 8px * root.zoom;
+            y: 6px * root.zoom;
+            text: root.title;
+            color: white;
+            font-size: 12px * root.zoom;
+            font-weight: 600;
+        }
+
+        // Pin labels
+        for label[idx] in ["Execute", "Integer", "Float", "String", "Boolean", "Object", "Array", "Any"]: Text {
+            x: 20px * root.zoom;
+            y: (L.first-pin-y + idx * L.pin-spacing) * root.zoom;
+            text: label;
+            color: #aaa;
+            font-size: 10px * root.zoom;
+        }
+    }
+
+    // Input pins - direct children of node
+    Pin {
+        x: 0px;
+        y: (L.first-pin-y + 0 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 200; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.execute;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+    Pin {
+        x: 0px;
+        y: (L.first-pin-y + 1 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 201; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.integer;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+    Pin {
+        x: 0px;
+        y: (L.first-pin-y + 2 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 202; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.float_;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+    Pin {
+        x: 0px;
+        y: (L.first-pin-y + 3 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 203; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.string;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+    Pin {
+        x: 0px;
+        y: (L.first-pin-y + 4 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 204; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.boolean;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+    Pin {
+        x: 0px;
+        y: (L.first-pin-y + 5 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 205; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.object;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+    Pin {
+        x: 0px;
+        y: (L.first-pin-y + 6 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 206; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.array;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+    Pin {
+        x: 0px;
+        y: (L.first-pin-y + 7 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        pin-id: 207; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
+        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        base-color: PinColors.any;
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "Pin Compatibility Demo";
+    width: 900px;
+    height: 600px;
+    background: #1a1a1a;
+
+    in property <[NodeData]> nodes;
+    in property <[LinkData]> links <=> editor.links;
+    in-out property <string> grid_commands <=> editor.grid-commands;
+    in-out property <int> dragged-node-id: 0;
+
+    out property <float> width_: self.width / 1px;
+    out property <float> height_: self.height / 1px;
+    out property <float> zoom: editor.zoom;
+
+    callback node-rect-changed <=> editor.node-rect-changed;
+    callback pin-position-changed <=> editor.pin-position-changed;
+    callback request-grid-update <=> editor.request-grid-update;
+    callback link-requested <=> editor.link-requested;
+    callback compute-pin-at <=> editor.compute-pin-at;
+    callback compute-link-preview-path <=> editor.compute-link-preview-path;
+
+    public function refresh-links() { editor.refresh-links(); }
+    callback update-viewport(float, float, float);
+    callback node-drag-started <=> editor.node-drag-started;
+    callback node-drag-ended <=> editor.node-drag-ended;
+    pure callback compute-link-path <=> editor.compute-link-path;
+
+    // Property to trigger pin position re-reporting
+    property <int> pin-refresh-counter: 0;
+
+    // Timer to trigger geometry refresh after init
+    init-timer := Timer {
+        interval: 100ms;
+        running: true;
+        triggered => {
+            self.running = false;
+            // Trigger pin re-reporting
+            root.pin-refresh-counter += 1;
+        }
+    }
+
+    editor := NodeEditor {
+        width: 100%;
+        height: 100%;
+
+        viewport-changed => {
+            root.update-viewport(self.zoom, self.pan-x / 1px, self.pan-y / 1px);
+        }
+
+        SourceNode {
+            node-id: 1;
+            title: "Source";
+            world-x: nodes.length > 0 ? nodes[0].x * 1px : 100px;
+            world-y: nodes.length > 0 ? nodes[0].y * 1px : 100px;
+            zoom: editor.zoom;
+            pan-x: editor.pan-x;
+            pan-y: editor.pan-y;
+            drag-offset-x: 1 == root.dragged-node-id ? editor.drag-offset-x : 0px;
+            drag-offset-y: 1 == root.dragged-node-id ? editor.drag-offset-y : 0px;
+            pin-refresh-trigger: root.pin-refresh-counter;
+
+            report-rect(id, x, y, w, h) => { editor.report-node-rect(id, x, y, w, h); }
+            report-position(pid, nid, pt, x, y) => { editor.report-pin-position(pid, nid, pt, x, y); }
+            drag-started(id, sel) => { root.dragged-node-id = id; editor.start-node-drag(id, sel); }
+            drag-moved(id, dx, dy) => { editor.update-node-drag(dx, dy); }
+            drag-ended(id, dx, dy) => { root.dragged-node-id = 0; editor.end-node-drag(dx, dy); }
+            pin-drag-started(id, x, y) => { editor.start-link-from-pin(id, x, y); }
+            pin-drag-moved(id, x, y) => { editor.update-link-end(x, y); }
+            pin-drag-ended(id, x, y) => { editor.update-link-end(x, y); editor.complete-link-creation(); }
+        }
+
+        SinkNode {
+            node-id: 2;
+            title: "Sink";
+            world-x: nodes.length > 1 ? nodes[1].x * 1px : 350px;
+            world-y: nodes.length > 1 ? nodes[1].y * 1px : 100px;
+            zoom: editor.zoom;
+            pan-x: editor.pan-x;
+            pan-y: editor.pan-y;
+            drag-offset-x: 2 == root.dragged-node-id ? editor.drag-offset-x : 0px;
+            drag-offset-y: 2 == root.dragged-node-id ? editor.drag-offset-y : 0px;
+            pin-refresh-trigger: root.pin-refresh-counter;
+
+            report-rect(id, x, y, w, h) => { editor.report-node-rect(id, x, y, w, h); }
+            report-position(pid, nid, pt, x, y) => { editor.report-pin-position(pid, nid, pt, x, y); }
+            drag-started(id, sel) => { root.dragged-node-id = id; editor.start-node-drag(id, sel); }
+            drag-moved(id, dx, dy) => { editor.update-node-drag(dx, dy); }
+            drag-ended(id, dx, dy) => { root.dragged-node-id = 0; editor.end-node-drag(dx, dy); }
+            pin-drag-started(id, x, y) => { editor.start-link-from-pin(id, x, y); }
+            pin-drag-moved(id, x, y) => { editor.update-link-end(x, y); }
+            pin-drag-ended(id, x, y) => { editor.update-link-end(x, y); editor.complete-link-creation(); }
+        }
+    }
+
+    // Instructions
+    Rectangle {
+        x: 10px; y: parent.height - 80px;
+        width: 350px; height: 70px;
+        background: #000000aa;
+        border-radius: 8px;
+
+        VerticalLayout {
+            padding: 8px;
+            spacing: 2px;
+            Text { text: "Type Compatibility:"; color: #fff; font-size: 11px; font-weight: 600; }
+            Text { text: "Same types connect. Int→Float, Bool→Int work."; color: #aaa; font-size: 9px; }
+            Text { text: "Numeric→String works. Any connects to all."; color: #aaa; font-size: 9px; }
+        }
+    }
+}

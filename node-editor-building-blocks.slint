@@ -430,6 +430,8 @@ export component Pin inherits Rectangle {
     in property <length> base-size: 12px;
     in property <length> node-screen-x: 0px;
     in property <length> node-screen-y: 0px;
+    /// Increment this to force pin position re-reporting (workaround for init timing)
+    in property <int> refresh-trigger: 0;
 
     property <length> pin-size: base-size * zoom;
     property <length> pin-radius: pin-size / 2;
@@ -463,6 +465,11 @@ export component Pin inherits Rectangle {
         }
     }
     changed center-y => {
+        if (pin-id > 0) {
+            report-position(pin-id, node-id, pin-type, center-x, center-y);
+        }
+    }
+    changed refresh-trigger => {
         if (pin-id > 0) {
             report-position(pin-id, node-id, pin-type, center-x, center-y);
         }

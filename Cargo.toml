@@ -31,4 +31,4 @@ i-slint-backend-testing = "=1.14.1"
 slint-build = "1.14"
 
 [workspace]
-members = ["examples/advanced", "examples/minimal", "examples/custom-shapes", "examples/animated-links"]
+members = ["examples/advanced", "examples/minimal", "examples/custom-shapes", "examples/animated-links", "examples/pin-compatibility"]
