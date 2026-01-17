@@ -23,6 +23,7 @@ fn main() {
             start_pin_id: 3, // Node 1 output (node_id * 2 + 1)
             end_pin_id: 4,   // Node 2 input (node_id * 2)
             color: Color::from_argb_u8(255, 100, 180, 255),
+            line_width: 2.0,
         },
     ]))));
 

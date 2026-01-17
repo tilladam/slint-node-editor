@@ -59,6 +59,9 @@ impl LinkModel for LinkData {
     fn end_pin_id(&self) -> i32 {
         self.end_pin_id
     }
+    fn line_width(&self) -> f32 {
+        self.line_width
+    }
 }
 
 /// Helper to remove items by ID from a model based on selection
@@ -224,12 +227,14 @@ fn main() {
             start_pin_id: 1002,
             end_pin_id: 2001,
             color: link_colors[0],
+            line_width: 1.5, // Thin link
         },
         LinkData {
             id: 2,
             start_pin_id: 2002,
             end_pin_id: 3001,
             color: link_colors[1],
+            line_width: 5.0, // Thick link to demonstrate feature
         },
     ]));
     window.set_links(ModelRc::from(links.clone()));
@@ -468,7 +473,7 @@ fn main() {
             let color = link_colors[idx];
 
             if let Some(_path) = cache.compute_link_path(output_pin, input_pin, w.get_zoom(), w.get_bezier_min_offset()) {
-                let data = LinkData { id, start_pin_id: output_pin, end_pin_id: input_pin, color };
+                let data = LinkData { id, start_pin_id: output_pin, end_pin_id: input_pin, color, line_width: 2.0 };
                 links.push(data);
             }
         }
@@ -550,28 +555,27 @@ fn main() {
 
     let filter_nodes_for_type = filter_nodes.clone();
     window.on_filter_type_changed(move |id, idx| {
-        for i in 0..filter_nodes_for_type.row_count() {
-            if let Some(mut node) = filter_nodes_for_type.row_data(i) {
-                if node.id == id { node.filter_type_index = idx; filter_nodes_for_type.set_row_data(i, node); break; }
-            }
+        if let Some((i, mut node)) = GraphLogic::find_node_by_id(&filter_nodes_for_type, id, |n| n.id) {
+            node.filter_type_index = idx;
+            filter_nodes_for_type.set_row_data(i, node);
         }
     });
 
     let filter_nodes_for_enable = filter_nodes.clone();
     window.on_filter_toggle_enabled(move |id| {
-        for i in 0..filter_nodes_for_enable.row_count() {
-            if let Some(mut node) = filter_nodes_for_enable.row_data(i) {
-                if node.id == id { node.enabled = !node.enabled; filter_nodes_for_enable.set_row_data(i, node); break; }
-            }
+        if let Some((i, mut node)) = GraphLogic::find_node_by_id(&filter_nodes_for_enable, id, |n| n.id) {
+            node.enabled = !node.enabled;
+            filter_nodes_for_enable.set_row_data(i, node);
         }
     });
 
     let filter_nodes_for_reset = filter_nodes.clone();
     window.on_filter_reset(move |id| {
-        for i in 0..filter_nodes_for_reset.row_count() {
-            if let Some(mut node) = filter_nodes_for_reset.row_data(i) {
-                if node.id == id { node.processed_count = 0; node.filter_type_index = 0; node.enabled = true; filter_nodes_for_reset.set_row_data(i, node); break; }
-            }
+        if let Some((i, mut node)) = GraphLogic::find_node_by_id(&filter_nodes_for_reset, id, |n| n.id) {
+            node.processed_count = 0;
+            node.filter_type_index = 0;
+            node.enabled = true;
+            filter_nodes_for_reset.set_row_data(i, node);
         }
     });
 

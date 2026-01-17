@@ -49,12 +49,14 @@ fn main() {
             start_pin_id: 3, // Node 1 output
             end_pin_id: 4,   // Node 2 input
             color: Color::from_argb_u8(255, 100, 180, 255),
+            line_width: 2.0,
         },
         LinkData {
             id: 2,
             start_pin_id: 7, // Node 3 output
             end_pin_id: 4,   // Node 2 input
             color: Color::from_argb_u8(255, 255, 180, 100),
+            line_width: 3.0, // Thicker link
         },
     ]))));
 

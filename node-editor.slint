@@ -497,6 +497,7 @@ export component NodeEditor {
     for link in root.links: Link {
         path-commands: root.compute-link-path(link.start-pin-id, link.end-pin-id, root.geometry-version);
         link-color: link.color;
+        line-width: link.line-width > 0 ? link.line-width * 1px : 2px;
         selected: root.is-link-selected(link.id, root.selection-version);
         hovered: root.hovered-link-id == link.id;
     }

@@ -16,7 +16,12 @@
 //!
 //! // Set up link management
 //! let mut links = LinkManager::new(tracker.cache());
+//!
+//! // Add a link with default line width (2.0)
 //! links.add(SimpleLink::new(1, output_pin, input_pin, Color::from_rgb_u8(100, 180, 255)));
+//!
+//! // Or add a link with custom line width
+//! links.add(SimpleLink::with_line_width(2, output_pin, input_pin, Color::from_rgb_u8(255, 100, 100), 4.0));
 //!
 //! // Connect to Slint
 //! window.set_link_paths(links.paths());
@@ -46,12 +51,12 @@ struct ConcreteModelSyncer<P, F> {
 impl<P, F> ModelSyncer for ConcreteModelSyncer<P, F>
 where
     P: Clone + 'static,
-    F: Fn(i32, SharedString, slint::Color) -> P,
+    F: Fn(i32, SharedString, slint::Color, f32) -> P,
 {
     fn sync(&self, paths: &[LinkPathData]) {
         // Update existing rows or add new ones
         for (i, path) in paths.iter().enumerate() {
-            let item = (self.constructor)(path.id, path.path_commands.clone().into(), path.color);
+            let item = (self.constructor)(path.id, SharedString::from(path.path_commands.as_str()), path.color, path.line_width);
             if i < self.model.row_count() {
                 self.model.set_row_data(i, item);
             } else {
@@ -114,6 +119,7 @@ struct LinkPathData {
     id: i32,
     path_commands: String,
     color: slint::Color,
+    line_width: f32,
 }
 
 impl<L, N> LinkManager<L, N>
@@ -145,11 +151,11 @@ where
     /// # Arguments
     ///
     /// * `model` - The VecModel to sync to
-    /// * `constructor` - Function to create path items from (id, path_commands, color)
+    /// * `constructor` - Function to create path items from (id, path_commands, color, line_width)
     pub fn bind_model<P, F>(&mut self, model: Rc<VecModel<P>>, constructor: F)
     where
         P: Clone + 'static,
-        F: Fn(i32, SharedString, slint::Color) -> P + 'static,
+        F: Fn(i32, SharedString, slint::Color, f32) -> P + 'static,
     {
         self.syncer = Some(Box::new(ConcreteModelSyncer { model, constructor }));
     }
@@ -230,6 +236,7 @@ where
                     id: link.id(),
                     path_commands: path,
                     color: link.color(),
+                    line_width: link.line_width(),
                 });
             }
         }
@@ -270,11 +277,11 @@ pub trait LinkPathProvider {
     /// Create a Slint-compatible model of link paths.
     ///
     /// The returned closure takes a constructor function that creates
-    /// the Slint LinkPath type from (id, path_commands, color).
+    /// the Slint LinkPath type from (id, path_commands, color, line_width).
     fn create_paths_model<P, F>(&self, constructor: F) -> ModelRc<P>
     where
         P: Clone + 'static,
-        F: Fn(i32, slint::SharedString, slint::Color) -> P + 'static;
+        F: Fn(i32, slint::SharedString, slint::Color, f32) -> P + 'static;
 
     /// Update an existing paths model in place.
     ///
@@ -282,7 +289,7 @@ pub trait LinkPathProvider {
     fn update_paths_model<P, F>(&self, model: &VecModel<P>, constructor: F)
     where
         P: Clone + 'static,
-        F: Fn(i32, slint::SharedString, slint::Color) -> P;
+        F: Fn(i32, slint::SharedString, slint::Color, f32) -> P;
 }
 
 impl<L, N> LinkPathProvider for LinkManager<L, N>
@@ -293,12 +300,12 @@ where
     fn create_paths_model<P, F>(&self, constructor: F) -> ModelRc<P>
     where
         P: Clone + 'static,
-        F: Fn(i32, slint::SharedString, slint::Color) -> P + 'static,
+        F: Fn(i32, slint::SharedString, slint::Color, f32) -> P + 'static,
     {
         let paths = self.paths.borrow();
         let items: Vec<P> = paths
             .iter()
-            .map(|p| constructor(p.id, p.path_commands.clone().into(), p.color))
+            .map(|p| constructor(p.id, SharedString::from(p.path_commands.as_str()), p.color, p.line_width))
             .collect();
         ModelRc::from(Rc::new(VecModel::from(items)))
     }
@@ -306,13 +313,13 @@ where
     fn update_paths_model<P, F>(&self, model: &VecModel<P>, constructor: F)
     where
         P: Clone + 'static,
-        F: Fn(i32, slint::SharedString, slint::Color) -> P,
+        F: Fn(i32, slint::SharedString, slint::Color, f32) -> P,
     {
         let paths = self.paths.borrow();
 
         // Update existing rows or add new ones
         for (i, path) in paths.iter().enumerate() {
-            let item = constructor(path.id, path.path_commands.clone().into(), path.color);
+            let item = constructor(path.id, SharedString::from(path.path_commands.as_str()), path.color, path.line_width);
             if i < model.row_count() {
                 model.set_row_data(i, item);
             } else {

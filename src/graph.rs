@@ -17,6 +17,7 @@ use std::fmt;
 ///     from: i32,
 ///     to: i32,
 ///     color: Color,
+///     width: f32,
 ///     label: String,  // custom field
 /// }
 ///
@@ -25,6 +26,7 @@ use std::fmt;
 ///     fn start_pin_id(&self) -> i32 { self.from }
 ///     fn end_pin_id(&self) -> i32 { self.to }
 ///     fn color(&self) -> Color { self.color }
+///     fn line_width(&self) -> f32 { self.width }
 /// }
 /// ```
 pub trait LinkModel {
@@ -38,6 +40,10 @@ pub trait LinkModel {
     fn color(&self) -> Color {
         Color::from_rgb_u8(255, 255, 255)
     }
+    /// Line width in pixels for rendering the link (default: 2.0)
+    fn line_width(&self) -> f32 {
+        2.0
+    }
 }
 
 /// Simple link data structure implementing [`LinkModel`].
@@ -50,15 +56,21 @@ pub struct SimpleLink {
     pub start_pin_id: i32,
     pub end_pin_id: i32,
     pub color: Color,
+    pub line_width: f32,
 }
 
 impl SimpleLink {
-    /// Create a new link with the specified endpoints and color.
+    /// Create a new link with the specified endpoints, color, and line width.
     pub fn new(id: i32, start_pin_id: i32, end_pin_id: i32, color: Color) -> Self {
-        Self { id, start_pin_id, end_pin_id, color }
+        Self { id, start_pin_id, end_pin_id, color, line_width: 2.0 }
     }
 
-    /// Create a new link with default white color.
+    /// Create a new link with custom line width.
+    pub fn with_line_width(id: i32, start_pin_id: i32, end_pin_id: i32, color: Color, line_width: f32) -> Self {
+        Self { id, start_pin_id, end_pin_id, color, line_width }
+    }
+
+    /// Create a new link with default white color and default line width.
     pub fn with_default_color(id: i32, start_pin_id: i32, end_pin_id: i32) -> Self {
         Self::new(id, start_pin_id, end_pin_id, Color::from_rgb_u8(255, 255, 255))
     }
@@ -69,6 +81,7 @@ impl LinkModel for SimpleLink {
     fn start_pin_id(&self) -> i32 { self.start_pin_id }
     fn end_pin_id(&self) -> i32 { self.end_pin_id }
     fn color(&self) -> Color { self.color }
+    fn line_width(&self) -> f32 { self.line_width }
 }
 
 /// Trait for nodes that can be moved (dragged) in the editor.
