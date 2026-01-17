@@ -187,10 +187,14 @@ in property <float> bezier-min-offset: 50.0;   // Min horizontal offset for curv
 in property <bool> minimap-enabled: false;
 in property <MinimapPosition> minimap-position: bottom-right;
 
-// Data bindings
-in property <[LinkData]> links;                 // Links to render
+// Selection
 in-out property <[int]> selected-node-ids;      // Selected nodes
 in-out property <[int]> selected-link-ids;      // Selected links
+in-out property <int> selection-version: 0;     // Version counter for selection (forces binding re-eval)
+
+// Geometry & Rendering
+in-out property <string> grid-commands;         // SVG path for grid (set via request-grid-update)
+in-out property <int> geometry-version: 0;      // Version counter for geometry (forces link re-eval)
 in property <[MinimapNode]> minimap-nodes: [];  // Minimap data
 in-out property <length> graph-min-x;           // Graph bounds
 in-out property <length> graph-max-x;
@@ -219,7 +223,6 @@ out property <length> context-menu-x;           // Right-click position
 out property <length> context-menu-y;
 
 out property <int> hovered-link-id;             // Link under mouse
-out property <int> selection-version;           // Version counter for cache invalidation
 ```
 
 **Callbacks (Computation):**
@@ -289,7 +292,7 @@ callback link-requested(start-pin-id: int, end-pin-id: int);
 callback link-cancelled();
 
 /// User hovered over a link
-callback link-hovered(link-id: int);
+callback link-hovered();
 
 /// Viewport changed (pan/zoom)
 callback viewport-changed();
@@ -302,6 +305,9 @@ callback add-node-requested();
 
 /// User right-clicked (context menu)
 callback context-menu-requested();
+
+/// User started dragging a node
+callback node-drag-started(node-id: int);
 
 /// User finished dragging nodes
 callback node-drag-ended(delta-x: float, delta-y: float);
@@ -317,6 +323,28 @@ callback pin-position-changed(
     rel-x: length,
     rel-y: length
 );
+```
+
+**Functions (Helper API):**
+
+```slint
+/// Report node rectangle change. Auto-increments geometry-version.
+function report-node-rect(id: int, x: length, y: length, w: length, h: length);
+
+/// Report pin position change. Auto-increments geometry-version.
+function report-pin-position(pin-id: int, node-id: int, pin-type: int, rel-x: length, rel-y: length);
+
+/// Start link creation from a pin
+function start-link-from-pin(pin_id: int, x: length, y: length);
+
+/// Update link end position during creation
+function update-link-end(x: length, y: length);
+
+/// Complete link creation (checks for pin at end pos)
+function complete-link-creation();
+
+/// Force re-computation of all link paths
+function refresh-links();
 ```
 
 ### BaseNode
@@ -404,6 +432,7 @@ fn main() {
         }
     });
 
+    window.invoke_request_grid_update();
     window.run().unwrap();
 }
 ```
@@ -429,6 +458,12 @@ let cache = tracker.cache(); // Use for hit testing
 - **advanced:** A comprehensive example demonstrating custom nodes, widgets inside nodes, minimap, selection logic, link validation, and manual callback implementation.
   - Path: `examples/advanced`
   - Run: `cargo run -p advanced`
+- **animated-links:** Demonstrates creative link animations (growing/snake effect) using de Casteljau's algorithm and glow effects.
+  - Path: `examples/animated-links`
+  - Run: `cargo run -p animated-links`
+- **custom-shapes:** Shows how to implement custom link routing (e.g., orthogonal) and reactive styling.
+  - Path: `examples/custom-shapes`
+  - Run: `cargo run -p custom-shapes`
 - **pin-compatibility:** Demonstrates type-safe connections with a compatibility matrix, visual validation feedback, and custom pin behaviors.
   - Path: `examples/pin-compatibility`
   - Run: `cargo run -p pin-compatibility`
