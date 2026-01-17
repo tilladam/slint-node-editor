@@ -1,6 +1,5 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{NodeEditorController, NodeGeometry};
-use std::cell::Cell;
 use std::rc::Rc;
 
 slint::include_modules!();

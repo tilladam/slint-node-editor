@@ -1,6 +1,5 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::NodeEditorController;
-use std::cell::Cell;
 use std::rc::Rc;
 
 slint::include_modules!();
@@ -31,38 +30,18 @@ fn main() {
     window.on_compute_link_path(ctrl.compute_link_path_callback());
     window.on_node_drag_started(ctrl.node_drag_started_callback());
 
-    // Geometry tracking - update cache and refresh links when all geometry is reported
+    // Geometry tracking - update cache
     window.on_node_rect_changed({
         let ctrl = ctrl.clone();
-        let reports = geometry_reports.clone();
-        let w = w.clone();
         move |id, x, y, width, h| {
             ctrl.handle_node_rect(id, x, y, width, h);
-            let count = reports.get() + 1;
-            reports.set(count);
-            if count == expected_reports {
-                if let Some(win) = w.upgrade() {
-                    win.invoke_refresh_links();
-                    win.window().request_redraw();
-                }
-            }
         }
     });
 
     window.on_pin_position_changed({
         let ctrl = ctrl.clone();
-        let reports = geometry_reports.clone();
-        let w = w.clone();
         move |pid, nid, ptype, x, y| {
             ctrl.handle_pin_position(pid, nid, ptype, x, y);
-            let count = reports.get() + 1;
-            reports.set(count);
-            if count == expected_reports {
-                if let Some(win) = w.upgrade() {
-                    win.invoke_refresh_links();
-                    win.window().request_redraw();
-                }
-            }
         }
     });
 
