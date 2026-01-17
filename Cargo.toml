@@ -24,5 +24,11 @@ include = [
 [dependencies]
 slint = { version = "1.14", default-features = false, features = ["std", "compat-1-2"] }
 
+[dev-dependencies]
+i-slint-backend-testing = "=1.14.1"
+
+[build-dependencies]
+slint-build = "1.14"
+
 [workspace]
 members = ["examples/advanced", "examples/minimal", "examples/custom-shapes"]
