@@ -30,5 +30,6 @@ i-slint-backend-testing = "=1.14.1"
 [build-dependencies]
 slint-build = "1.14"
 
-[workspace]
-members = ["examples/advanced", "examples/minimal", "examples/custom-shapes", "examples/animated-links", "examples/pin-compatibility"]
+# [workspace]
+# members = ["examples/advanced", "examples/minimal", "examples/custom-shapes", "examples/animated-links", "examples/pin-compatibility"]
+# Workspace disabled when used as a path dependency
