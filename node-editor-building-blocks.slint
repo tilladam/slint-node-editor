@@ -1,0 +1,492 @@
+// Node Editor Building Blocks
+//
+// This file contains the foundational components for building node editors:
+// - PinTypes: Standard pin type constants
+// - NodeLayout: Layout constants and helper functions
+// - Minimap: Bird's-eye view component
+// - Link: Bezier link rendering component
+// - BaseNode: Base component for creating custom nodes
+// - Pin: Connection point component
+
+/// Standard pin types for library components.
+/// Applications can extend these by defining their own globals.
+export global PinTypes {
+    /// Input pin type (standard for data/signal inputs)
+    out property <int> input: 1;
+    /// Output pin type (standard for data/signal outputs)
+    out property <int> output: 2;
+}
+
+
+/// Optional layout helpers for common node structures.
+///
+/// This global provides sensible defaults for positioning pins and calculating coordinates
+/// in nodes with a standard layout: [pin-margin] [title-height] [pin-margin] [pin].
+///
+/// **Important:** These are purely optional convenience helpers. Applications can:
+/// 1. Override individual properties to customize node appearance
+/// 2. Define their own globals with different layout assumptions
+/// 3. Not use these functions at all and calculate positions manually
+///
+/// This design prevents coupling the library to specific node structures while providing
+/// useful defaults for the common case.
+export global NodeStyleDefaults {
+    // === Layout Constants (OPTIONAL - override to customize) ===
+
+    /// Pin diameter (customize this to change pin size)
+    in-out property <length> pin-size: 12px;
+    /// Margin from node edge to pin center (customize this to change spacing)
+    in-out property <length> pin-margin: 8px;
+    /// Title bar height (customize this if your nodes have different title sizes)
+    in-out property <length> title-height: 24px;
+    /// Grid spacing (for reference, not used by library)
+    in-out property <length> grid-spacing: 24px;
+
+    // === Position Computation Functions (OPTIONAL) ===
+    //
+    // These functions assume a specific node layout. If your nodes have a different
+    // structure, don't use these functions—calculate positions directly instead.
+
+    /// Compute node screen X position from world coordinates
+    pure public function screen-x(world-x: float, zoom: float, pan-x: length) -> length {
+        return world-x * 1px * zoom + pan-x;
+    }
+
+    /// Compute node screen Y position from world coordinates
+    pure public function screen-y(world-y: float, zoom: float, pan-y: length) -> length {
+        return world-y * 1px * zoom + pan-y;
+    }
+
+    // === Pin Position Computation (Absolute Screen Coordinates) ===
+
+    /// Compute input pin absolute X position
+    pure public function input-pin-x(node-world-x: float, zoom: float, pan-x: length) -> length {
+        return node-world-x * 1px * zoom + pan-x + (self.pin-margin + self.pin-size / 2) * zoom;
+    }
+
+    /// Compute input pin absolute Y position
+    pure public function input-pin-y(node-world-y: float, zoom: float, pan-y: length) -> length {
+        return node-world-y * 1px * zoom + pan-y + (self.pin-margin + self.title-height + self.pin-margin + self.pin-size / 2) * zoom;
+    }
+
+    // === Pin Relative Offsets (Unscaled, From Node Origin) ===
+
+    /// Input pin relative X offset (unscaled, from node top-left)
+    pure public function input-pin-relative-x() -> length {
+        return self.pin-margin + self.pin-size / 2;
+    }
+
+    /// Input pin relative Y offset (unscaled, from node top-left)
+    pure public function input-pin-relative-y() -> length {
+        return self.pin-margin + self.title-height + self.pin-margin + self.pin-size / 2;
+    }
+
+    /// Output pin relative Y offset (unscaled, from node top-left)
+    pure public function output-pin-relative-y() -> length {
+        return self.pin-margin + self.title-height + self.pin-margin + self.pin-size / 2;
+    }
+}
+
+/// Simplified node representation for minimap rendering.
+export struct MinimapNode {
+    /// Unique node identifier
+    id: int,
+    /// X position in graph coordinates
+    x: length,
+    /// Y position in graph coordinates
+    y: length,
+    /// Node width
+    width: length,
+    /// Node height
+    height: length,
+    /// Optional per-node color for minimap rendering
+    color: color,
+}
+
+/// Positioning options for minimap placement within the NodeEditor.
+export enum MinimapPosition {
+    top-left,
+    top-right,
+    bottom-left,
+    bottom-right,
+}
+
+/// Logical link data (what the application provides)
+export struct LinkData {
+    id: int,
+    start-pin-id: int,
+    end-pin-id: int,
+    color: color,
+}
+
+/// Minimap component for bird's-eye view of the node graph.
+export component Minimap inherits Rectangle {
+    // === Data Input ===
+    in property <[MinimapNode]> nodes;
+
+    // === Viewport State ===
+    in property <length> viewport-x;
+    in property <length> viewport-y;
+    in property <float> viewport-zoom: 1.0;
+    in property <length> viewport-width;
+    in property <length> viewport-height;
+
+    // === Graph Bounds ===
+    in property <length> graph-min-x;
+    in property <length> graph-min-y;
+    in property <length> graph-max-x;
+    in property <length> graph-max-y;
+
+    // === Styling ===
+    in property <length> minimap-width: 200px;
+    in property <length> minimap-height: 150px;
+    in property <color> minimap-background-color: #1a1a1aee;
+    in property <color> minimap-node-color: #4a4a4a;
+    in property <color> minimap-viewport-border-color: #ffffff;
+    in property <length> minimap-viewport-border-width: 2px;
+    in property <color> minimap-border-color: #333333;
+    in property <length> minimap-border-width: 1px;
+    in property <length> minimap-padding: 8px;
+
+    // === Interaction ===
+    callback navigate-to(/* graph-x */ length, /* graph-y */ length);
+    callback update-pan(/* new-pan-x */ length, /* new-pan-y */ length);
+
+    // === Internal drag state ===
+    property <bool> internal-is-panning: false;
+    property <length> pan-start-mouse-x: 0px;
+    property <length> pan-start-mouse-y: 0px;
+    property <length> pan-start-viewport-x: 0px;
+    property <length> pan-start-viewport-y: 0px;
+    property <length> drag-threshold: 3px;
+
+    // === Coordinate Transformation ===
+    property <length> graph-width: max(root.graph-max-x - root.graph-min-x, 1px);
+    property <length> graph-height: max(root.graph-max-y - root.graph-min-y, 1px);
+    property <length> available-width: root.minimap-width - 2 * root.minimap-padding;
+    property <length> available-height: root.minimap-height - 2 * root.minimap-padding;
+    property <float> scale: min(
+        root.available-width / root.graph-width,
+        root.available-height / root.graph-height);
+
+    // === Viewport in Graph Coordinates ===
+    property <length> visible-min-x: -root.viewport-x / root.viewport-zoom;
+    property <length> visible-min-y: -root.viewport-y / root.viewport-zoom;
+    property <length> visible-max-x: root.visible-min-x + (root.viewport-width / root.viewport-zoom);
+    property <length> visible-max-y: root.visible-min-y + (root.viewport-height / root.viewport-zoom);
+
+    // === Viewport Indicator in Minimap Coordinates ===
+    property <length> viewport-indicator-x: root.minimap-padding + (root.visible-min-x - root.graph-min-x) * root.scale;
+    property <length> viewport-indicator-y: root.minimap-padding + (root.visible-min-y - root.graph-min-y) * root.scale;
+    property <length> viewport-indicator-width: (root.visible-max-x - root.visible-min-x) * root.scale;
+    property <length> viewport-indicator-height: (root.visible-max-y - root.visible-min-y) * root.scale;
+
+    width: root.minimap-width;
+    height: root.minimap-height;
+    background: root.minimap-background-color;
+    border-color: root.minimap-border-color;
+    border-width: root.minimap-border-width;
+    border-radius: 4px;
+
+    for node in root.nodes: Rectangle {
+        x: root.minimap-padding + (node.x - root.graph-min-x) * root.scale;
+        y: root.minimap-padding + (node.y - root.graph-min-y) * root.scale;
+        width: node.width * root.scale;
+        height: node.height * root.scale;
+        background: node.color.alpha > 0 ? node.color : root.minimap-node-color;
+    }
+
+    Rectangle {
+        x: root.viewport-indicator-x;
+        y: root.viewport-indicator-y;
+        width: root.viewport-indicator-width;
+        height: root.viewport-indicator-height;
+        background: transparent;
+        border-color: root.minimap-viewport-border-color;
+        border-width: root.minimap-viewport-border-width;
+    }
+
+    TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: root.internal-is-panning ? MouseCursor.grabbing : MouseCursor.grab;
+
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                // Store initial state
+                root.pan-start-mouse-x = self.mouse-x;
+                root.pan-start-mouse-y = self.mouse-y;
+                root.pan-start-viewport-x = root.viewport-x;
+                root.pan-start-viewport-y = root.viewport-y;
+                root.internal-is-panning = false;
+            }
+            if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                if !root.internal-is-panning {
+                    // Treat as click: center viewport
+                    root.navigate-to(
+                        root.graph-min-x + ((self.mouse-x - root.minimap-padding) / root.scale),
+                        root.graph-min-y + ((self.mouse-y - root.minimap-padding) / root.scale));
+                }
+                root.internal-is-panning = false;
+            }
+        }
+
+        moved => {
+            if self.pressed {
+                // Check drag threshold
+                if !root.internal-is-panning {
+                    root.internal-is-panning = sqrt(
+                        pow((self.mouse-x - root.pan-start-mouse-x) / 1px, 2) + pow((self.mouse-y - root.pan-start-mouse-y) / 1px, 2)) * 1px > root.drag-threshold;
+                }
+                if root.internal-is-panning {
+                    // Calculate delta in minimap space
+                    root.update-pan(
+                        root.pan-start-viewport-x - (self.mouse-x - root.pan-start-mouse-x) / root.scale * root.viewport-zoom,
+                        root.pan-start-viewport-y - (self.mouse-y - root.pan-start-mouse-y) / root.scale * root.viewport-zoom);
+                }
+            }
+        }
+    }
+}
+
+/// A bezier link between two pins using SVG path commands.
+export component Link inherits Path {
+    in property <string> path-commands;
+    in property <color> link-color: #888888;
+    in property <length> line-width: 2px;
+    in property <bool> selected: false;
+    in property <bool> hovered: false;
+
+    width: 100%;
+    height: 100%;
+    stroke: selected ? link-color.brighter(50%) : (hovered ? link-color.brighter(25%) : link-color);
+    stroke-width: selected ? line-width * 1.5 : (hovered ? line-width * 1.25 : line-width);
+    fill: transparent;
+
+    viewbox-x: 0;
+    viewbox-y: 0;
+    viewbox-width: max(self.width / 1px, 1);
+    viewbox-height: max(self.height / 1px, 1);
+
+    commands: path-commands;
+}
+
+/// Base component for all node types in the node editor.
+export component BaseNode inherits Rectangle {
+    // === Common Properties ===
+    in property <int> node-id;
+    in property <bool> selected: false;
+    in property <length> world-x;
+    in property <length> world-y;
+    in property <float> zoom: 1.0;
+    in property <length> pan-x: 0px;
+    in property <length> pan-y: 0px;
+    in property <length> drag-offset-x: 0px;
+    in property <length> drag-offset-y: 0px;
+
+    // === Styling Properties (overridable) ===
+    in property <color> background-color: #2d2d2d;
+    in property <color> background-color-selected: #3a3a4a;
+    in property <color> border-color-normal: #555;
+    in property <color> border-color-selected: #4a9eff;
+    in property <length> border-radius-base: 8px;
+    in property <length> border-width-normal: 1px;
+    in property <length> border-width-selected: 2px;
+
+    // === Common Callbacks ===
+    callback pin-drag-started(int, length, length);
+    callback pin-drag-moved(int, length, length);
+    callback pin-drag-ended(int, length, length);
+    callback pin-position-changed(/* pin-id */ int, /* node-id */ int, /* pin-type */ int, /* rel-x */ length, /* rel-y */ length);
+    callback clicked(int, bool);
+    callback drag-started(int, bool);
+    callback drag-moved(int, length, length);
+    callback drag-ended(int, length, length);
+    callback report-rect(int, length, length, length, length);
+
+    // === Computed Properties ===
+    out property <length> screen-x: (world-x + drag-offset-x) * zoom + pan-x;
+    out property <length> screen-y: (world-y + drag-offset-y) * zoom + pan-y;
+
+    // === Common Styling ===
+    x: screen-x;
+    y: screen-y;
+    background: selected ? background-color-selected : background-color;
+    border-radius: border-radius-base * zoom;
+    border-width: selected ? border-width-selected * zoom : border-width-normal * zoom;
+    border-color: selected ? border-color-selected : border-color-normal;
+
+    // Report rect on changes
+    init => {
+        if (node-id > 0) {
+            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+        }
+    }
+
+    changed node-id => {
+        if (node-id > 0) {
+            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+        }
+    }
+
+    changed screen-x => {
+        if (node-id > 0) {
+            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+        }
+    }
+    changed screen-y => {
+        if (node-id > 0) {
+            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+        }
+    }
+    changed width => {
+        if (node-id > 0) {
+            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+        }
+    }
+    changed height => {
+        if (node-id > 0) {
+            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+        }
+    }
+
+    // === Drag Handling ===
+    TouchArea {
+        property <bool> shift-held: false;
+        property <bool> is-dragging: false;
+        property <length> drag-threshold: 5px;
+        property <length> start-abs-x: 0px;
+        property <length> start-abs-y: 0px;
+        property <bool> was-selected-on-press: false;
+        property <length> current-drag-offset-x: 0px;
+        property <length> current-drag-offset-y: 0px;
+
+        pointer-event(event) => {
+            // IMPORTANT: Ignore Ctrl+click to allow box selection through nodes
+            if event.button == PointerEventButton.left && event.modifiers.control {
+                return;
+            }
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                shift-held = event.modifiers.shift;
+                is-dragging = false;
+                // Store ABSOLUTE mouse position to avoid coordinate system issues
+                start-abs-x = self.absolute-position.x + self.mouse-x;
+                start-abs-y = self.absolute-position.y + self.mouse-y;
+                current-drag-offset-x = 0px;
+                current-drag-offset-y = 0px;
+                was-selected-on-press = selected;
+
+                // Only select immediately if shift is held (multi-select toggle)
+                // or if node is not already selected
+                if shift-held || !selected {
+                    root.clicked(node-id, shift-held);
+                }
+                // If node is already selected and shift not held, defer selection
+                // until we know if it's a drag or a click
+            }
+            if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                if is-dragging {
+                    // End drag using the tracked offset, not recalculated from mouse position
+                    root.drag-ended(node-id, current-drag-offset-x, current-drag-offset-y);
+                    is-dragging = false;
+                } else {
+                    // Click without drag - if we deferred selection, do it now
+                    if was-selected-on-press && !shift-held {
+                        root.clicked(node-id, shift-held);
+                    }
+                }
+            }
+        }
+
+        moved => {
+            if self.pressed {
+                // Calculate offset from start position using absolute coordinates
+                if !is-dragging {
+                    if abs((self.absolute-position.x + self.mouse-x) - start-abs-x) > drag-threshold || abs((self.absolute-position.y + self.mouse-y) - start-abs-y) > drag-threshold {
+                        is-dragging = true;
+                        root.drag-started(node-id, selected);
+                    }
+                }
+                if is-dragging {
+                    current-drag-offset-x = ((self.absolute-position.x + self.mouse-x) - start-abs-x) / zoom;
+                    current-drag-offset-y = ((self.absolute-position.y + self.mouse-y) - start-abs-y) / zoom;
+                    root.drag-moved(node-id, current-drag-offset-x, current-drag-offset-y);
+                }
+            }
+        }
+    }
+}
+
+/// A connection point on a node where links can be attached.
+export component Pin inherits Rectangle {
+    in property <int> pin-id;
+    in property <int> node-id;  // Node this pin belongs to (for position reporting)
+    in property <int> pin-type;  // Type of pin (input/output/custom)
+    in property <float> zoom: 1.0;
+    in property <color> base-color: #888888;
+    in property <color> hover-color: #aaaaaa;
+    in property <length> base-size: 12px;
+    in property <length> node-screen-x: 0px;
+    in property <length> node-screen-y: 0px;
+
+    property <length> pin-size: base-size * zoom;
+    property <length> pin-radius: pin-size / 2;
+
+    out property <length> center-x: self.x + pin-radius;
+    out property <length> center-y: self.y + pin-radius;
+
+    callback drag-started(int, length, length);
+    callback drag-moved(int, length, length);
+    callback drag-ended(int, length, length);
+    callback report-position(/* pin-id */ int, /* node-id */ int, /* pin-type */ int, /* rel-x */ length, /* rel-y */ length);
+
+    width: pin-size;
+    height: pin-size;
+    background: touch.has-hover ? hover-color : base-color;
+    border-radius: pin-radius;
+
+    init => {
+        if (pin-id > 0) {
+            report-position(pin-id, node-id, pin-type, center-x, center-y);
+        }
+    }
+    changed pin-id => {
+        if (pin-id > 0) {
+            report-position(pin-id, node-id, pin-type, center-x, center-y);
+        }
+    }
+    changed center-x => {
+        if (pin-id > 0) {
+            report-position(pin-id, node-id, pin-type, center-x, center-y);
+        }
+    }
+    changed center-y => {
+        if (pin-id > 0) {
+            report-position(pin-id, node-id, pin-type, center-x, center-y);
+        }
+    }
+
+    touch := TouchArea {
+        property <bool> drag-active: false;
+
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                drag-active = true;
+                root.drag-started(pin-id, node-screen-x + center-x, node-screen-y + center-y);
+            }
+            if event.kind == PointerEventKind.up && drag-active {
+                drag-active = false;
+                root.drag-ended(pin-id,
+                    node-screen-x + center-x + self.mouse-x - pin-radius,
+                    node-screen-y + center-y + self.mouse-y - pin-radius);
+            }
+        }
+        moved => {
+            if drag-active {
+                root.drag-moved(pin-id,
+                    node-screen-x + center-x + self.mouse-x - pin-radius,
+                    node-screen-y + center-y + self.mouse-y - pin-radius);
+            }
+        }
+    }
+}

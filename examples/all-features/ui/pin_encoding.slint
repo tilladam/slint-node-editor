@@ -1,0 +1,19 @@
+// Application-specific pin ID generation
+//
+// This file contains a simple pin ID generation scheme used by this application.
+// The generic library treats pin IDs as opaque integers - it never decodes them.
+// Node ID and pin type are passed explicitly via callbacks, so the encoding
+// here is only used to generate unique IDs, not to convey information.
+
+/// Pin ID generation utility.
+/// This is application-specific - applications can use any scheme that generates unique IDs.
+/// The generic library treats pin IDs as opaque integers and does not decode them.
+export global PinId {
+    /// Generate a unique pin ID from node ID and pin type.
+    /// This encoding ensures uniqueness (up to 1000 pins per node).
+    /// The actual values are passed explicitly via pin-position-changed callback,
+    /// so this is purely for ID generation, not information encoding.
+    pure public function make(node-id: int, pin-type: int) -> int {
+        return node-id * 1000 + pin-type;
+    }
+}

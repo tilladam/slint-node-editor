@@ -1,0 +1,472 @@
+// Node Editor Example
+//
+// This example demonstrates the pure Slint NodeEditor composite component
+// with application-provided computation callbacks.
+//
+// The composite handles:
+// - Grid background rendering (via application callback)
+// - Pan and zoom
+// - Box selection
+// - Link creation with bezier preview
+// - Selection box rendering
+//
+// Usage pattern:
+// 1. Add nodes as children of NodeEditor
+// 2. Add links as children (using Link component)
+// 3. Implement computation callbacks (grid, link paths, hit-testing)
+// 4. Handle event callbacks for link creation, selection changes, etc.
+
+import {
+    NodeEditor,
+    Link,
+    Pin,
+    PinTypes,
+    MinimapNode,
+    BaseNode,
+    NodeStyleDefaults,
+    LinkData,
+} from "@slint-node-editor/node-editor.slint";
+import { PinId } from "pin_encoding.slint";
+import { InstructionsOverlay } from "instructions_overlay.slint";
+
+// Node data for model binding
+export struct NodeData {
+    id: int,
+    title: string,
+    world-x: float,
+    world-y: float,
+}
+
+// Re-export LinkData for Rust
+export { LinkData }
+
+// Re-export NodeStyleDefaults for Rust access (as NodeConstants for backward compatibility)
+export global NodeConstants {
+    out property <length> node-base-width: 150px;
+    out property <length> node-base-height: 80px;
+    out property <length> pin-size <=> NodeStyleDefaults.pin-size;
+    out property <length> pin-margin <=> NodeStyleDefaults.pin-margin;
+    out property <length> title-height <=> NodeStyleDefaults.title-height;
+    out property <length> grid-spacing <=> NodeStyleDefaults.grid-spacing;
+}
+
+export global FilterNodeConstants {
+    out property <length> base-width: 260px;
+    out property <length> base-height: 148px;  // 8 + 28 + 8 + 32*3 + 8
+    out property <length> pin-size: 12px;
+    out property <length> pin-margin: 4px;
+    out property <length> content-padding: 8px;
+    out property <length> title-height: 28px;
+    out property <length> row-height: 32px;
+}
+
+import { FilterNode, FilterNodeData } from "filter_node.slint";
+
+// Re-export FilterNodeData for Rust
+export { FilterNodeData }
+
+// Re-export PinId for Rust (application-specific encoding)
+export { PinId }
+
+// Re-export PinTypes for Rust access
+export { PinTypes }
+
+
+
+// A basic node component with interactive pins
+component Node inherits BaseNode {
+    in property <string> title: "Node";
+    in property <int> input-pin-id: PinId.make(self.node-id, PinTypes.input);
+    in property <int> output-pin-id: PinId.make(self.node-id, PinTypes.output);
+
+    // Pin dimensions (scaled by zoom)
+    property <length> pin-size: NodeConstants.pin-size * self.zoom;
+    property <length> pin-radius: pin-size / 2;
+
+    // Base dimensions (from global constants)
+    property <length> base-width: NodeConstants.node-base-width;
+    property <length> base-height: NodeConstants.node-base-height;
+
+    // Expose pin positions (center of pin circles, in parent coordinates)
+    out property <length> input-pin-x: self.screen-x + input-pin.center-x;
+    out property <length> input-pin-y: self.screen-y + input-pin.center-y;
+    out property <length> output-pin-x: self.screen-x + output-pin.center-x;
+    out property <length> output-pin-y: self.screen-y + output-pin.center-y;
+
+    // Set dimensions
+    width: base-width * self.zoom;
+    height: base-height * self.zoom;
+
+    // Title bar
+    Rectangle {
+        x: 8px * root.zoom;
+        y: 8px * root.zoom;
+        width: parent.width - 16px * root.zoom;
+        height: 24px * root.zoom;
+        background: root.selected ? #4a6a9a : #3d3d3d;
+        border-radius: 4px * root.zoom;
+
+        Text {
+            text: root.title;
+            color: white;
+            font-size: 14px * root.zoom;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    // Report pin positions after initialization (for newly added nodes)
+    init => {
+        if (self.node-id > 0) {
+            root.pin-position-changed(root.input-pin-id, self.node-id, PinTypes.input, input-pin.center-x, input-pin.center-y);
+            root.pin-position-changed(root.output-pin-id, self.node-id, PinTypes.output, output-pin.center-x, output-pin.center-y);
+        }
+    }
+
+    // Input pin (green) - with drag-to-link support
+    input-pin := Pin {
+        x: 8px * root.zoom;
+        y: (8px + 24px + 8px) * root.zoom;  // below title bar
+        pin-id: root.input-pin-id;
+        node-id: root.node-id;
+        pin-type: PinTypes.input;
+        zoom: root.zoom;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
+        base-color: #4CAF50;
+        hover-color: #66BB6A;
+        base-size: NodeConstants.pin-size;
+        drag-started(id, x, y) => {
+            root.pin-drag-started(id, x, y);
+        }
+        drag-moved(id, x, y) => {
+            root.pin-drag-moved(id, x, y);
+        }
+        drag-ended(id, x, y) => {
+            root.pin-drag-ended(id, x, y);
+        }
+        report-position(pin-id, node-id, pin-type, x, y) => {
+            root.pin-position-changed(pin-id, node-id, pin-type, x, y);
+        }
+    }
+
+    // Output pin (blue) - with drag-to-link support
+    output-pin := Pin {
+        x: parent.width - 8px * root.zoom - root.pin-size;
+        y: (8px + 24px + 8px) * root.zoom;  // below title bar
+        pin-id: root.output-pin-id;
+        node-id: root.node-id;
+        pin-type: PinTypes.output;
+        zoom: root.zoom;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
+        base-color: #2196F3;
+        hover-color: #42A5F5;
+        base-size: NodeConstants.pin-size;
+        drag-started(id, x, y) => {
+            root.pin-drag-started(id, x, y);
+        }
+        drag-moved(id, x, y) => {
+            root.pin-drag-moved(id, x, y);
+        }
+        drag-ended(id, x, y) => {
+            root.pin-drag-ended(id, x, y);
+        }
+        report-position(pin-id, node-id, pin-type, x, y) => {
+            root.pin-position-changed(pin-id, node-id, pin-type, x, y);
+        }
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "Node Editor All Features Example";
+    width: 1000px;
+    height: 800px;
+    background: #1a1a1a;
+
+    // Node model - owned by Rust
+    in property <[NodeData]> nodes;
+
+    // Filter node model - owned by Rust (demonstrates complex node type)
+    in property <[FilterNodeData]> filter-nodes;
+
+    // Link model - owned by Rust
+    in property <[LinkData]> links;
+
+    // Grid commands - computed by Rust
+    in-out property <string> grid-commands;
+
+    // Callbacks to Rust for state changes
+    callback selection-changed <=> editor.selection-changed;
+    callback commit-drag <=> editor.node-drag-ended;
+    callback update-viewport(float, float, float);  // zoom, pan-x, pan-y (for link position updates)
+    callback create-link <=> editor.link-requested;
+    callback delete-selected-nodes();  // delete all selected nodes
+    callback add-node <=> editor.add-node-requested;
+
+    // Filter node callbacks
+    callback filter-type-changed(int, int);  // node-id, new-index
+    callback filter-toggle-enabled(int);      // node-id
+    callback filter-reset(int);               // node-id
+
+    // === Computation callbacks (implemented by Rust) ===
+    callback request-grid-update <=> editor.request-grid-update;
+    callback compute-pin-at <=> editor.compute-pin-at;
+    callback compute-link-at <=> editor.compute-link-at;
+    callback compute-box-selection <=> editor.compute-box-selection;
+    callback compute-link-box-selection <=> editor.compute-link-box-selection;
+    callback compute-link-preview-path <=> editor.compute-link-preview-path;
+    pure callback compute-link-path <=> editor.compute-link-path;
+
+    // Node/pin position tracking
+    callback node-rect-changed <=> editor.node-rect-changed;
+    callback pin-position-changed <=> editor.pin-position-changed;
+
+    // Pure function to snap a value to the grid
+    pure public function snap-to-grid(value: float) -> float {
+        return editor.snap-to-grid(value);
+    }
+
+    // Grid snap toggle (bound to editor.grid-snapping)
+    property <bool> grid-snap-enabled: true;
+
+    // Shared pan state (in-out so Rust can read them)
+    // Initial pan to center viewport in the minimap (graph center at 800, 600)
+    in-out property <length> pan-x: 0px;
+    in-out property <length> pan-y: -50px;
+    in-out property <float> zoom: 1.0;
+
+    // Expose editor size for Rust
+    out property <float> width_: self.width / 1px;
+    out property <float> height_: self.height / 1px;
+
+    // Link hover state (managed by editor)
+    out property <int> hovered-link-id <=> editor.hovered-link-id;
+
+    // Selection state (for implementing selection callbacks)
+    in-out property <[int]> selected-node-ids <=> editor.selected-node-ids;
+    in-out property <[int]> selected-link-ids <=> editor.selected-link-ids;
+
+    // Selection manipulation callbacks (implemented by Rust)
+    callback select-node <=> editor.select-node;
+    callback select-link <=> editor.select-link;
+    callback clear-selection <=> editor.clear-selection;
+    callback sync-selection-to-nodes <=> editor.sync-selection-to-nodes;
+    callback sync-selection-to-links <=> editor.sync-selection-to-links;
+
+    // Selection checking callbacks (must be pure for use in property bindings)
+    pure callback is-node-selected(int) -> bool;
+    pure callback is-link-selected(int) -> bool;
+
+    // Selection version counter
+    in-out property <int> selection-version <=> editor.selection-version;
+
+    // Callback to delete selected links (called from Rust)
+    callback delete-selected-links();
+
+    // Link hover distance
+    out property <length> link-hover-distance <=> editor.link-hover-distance;
+
+    // Pin hit radius
+    out property <length> pin-hit-radius <=> editor.pin-hit-radius;
+
+    // Bezier curve configuration (for Rust callbacks)
+    out property <float> bezier-min-offset <=> editor.bezier-min-offset;
+    out property <int> link-hit-samples <=> editor.link-hit-samples;
+
+    // === Minimap properties ===
+    in property <bool> minimap-enabled <=> editor.minimap-enabled;
+    in property <[MinimapNode]> minimap-nodes <=> editor.minimap-nodes;
+    in-out property <float> graph-min-x: 0;
+    in-out property <float> graph-min-y: 0;
+    in-out property <float> graph-max-x: 1600;
+    in-out property <float> graph-max-y: 1200;
+
+    // Forward to editor (convert float to length)
+    changed graph-min-x => {
+        editor.graph-min-x = graph-min-x * 1px;
+    }
+    changed graph-min-y => {
+        editor.graph-min-y = graph-min-y * 1px;
+    }
+    changed graph-max-x => {
+        editor.graph-max-x = graph-max-x * 1px;
+    }
+    changed graph-max-y => {
+        editor.graph-max-y = graph-max-y * 1px;
+    }
+
+    // The pure Slint NodeEditor handles all three layers:
+    // 1. Background with grid
+    // 2. Children (nodes and links) - placed via @children
+    // 3. Overlay for selection box and link preview
+    editor := NodeEditor {
+        width: 100%;
+        height: 100%;
+        pan-x <=> root.pan-x;
+        pan-y <=> root.pan-y;
+        zoom <=> root.zoom;
+        min-zoom: 0.25;
+        max-zoom: 4.0;
+        background-color: #1a1a1a;
+        grid-spacing: 24px;
+        grid-snapping <=> grid-snap-enabled;
+        grid-color: #333333;
+        grid-commands <=> root.grid-commands;
+        links <=> root.links;
+
+        // Set pin hit radius from globals
+        pin-hit-radius: NodeConstants.pin-size * zoom * 0.66;
+        link-hover-distance: 8px;
+
+        // Callbacks aliased to root
+
+
+        // Event callbacks aliased to root:
+        // link-requested => root.create-link
+        // node-drag-ended => root.commit-drag
+        // add-node-requested => root.add-node
+
+        context-menu-requested => {
+            debug("Context menu at: " + editor.context-menu-x / 1px + ", " + editor.context-menu-y / 1px);
+        }
+
+
+
+        // Forward selection checking callbacks to root (version param ignored, just for cache invalidation)
+        is-selected(node-id, version) => {
+            return root.is-node-selected(node-id);
+        }
+        is-link-selected(link-id, version) => {
+            return root.is-link-selected(link-id);
+        }
+
+        viewport-changed => {
+            root.update-viewport(zoom, pan-x / 1px, pan-y / 1px);
+        }
+
+        delete-selected => {
+            root.delete-selected-nodes();
+            root.delete-selected-links();
+        }
+
+        // Nodes - children of NodeEditor
+        for node-data in nodes: Node {
+            title: node-data.title;
+            node-id: node-data.id;
+            selected: editor.is-selected(node-data.id, editor.selection-version);
+            world-x: node-data.world-x * 1px;
+            world-y: node-data.world-y * 1px;
+            drag-offset-x: editor.is-selected(node-data.id, editor.selection-version) ? editor.drag-offset-x : 0px;
+            drag-offset-y: editor.is-selected(node-data.id, editor.selection-version) ? editor.drag-offset-y : 0px;
+            zoom: zoom;
+            pan-x: pan-x;
+            pan-y: pan-y;
+            clicked(id, shift) => {
+                editor.handle-node-click(id, shift);
+            }
+            drag-started(id, already-selected) => {
+                editor.start-node-drag(id, already-selected);
+            }
+            drag-moved(id, offset-x, offset-y) => {
+                editor.update-node-drag(offset-x, offset-y);
+            }
+            drag-ended(id, delta-x, delta-y) => {
+                editor.end-node-drag(delta-x, delta-y);
+            }
+            pin-position-changed(pin-id, node-id, pin-type, x, y) => {
+                editor.report-pin-position(pin-id, node-id, pin-type, x, y);
+            }
+            pin-drag-started(pin-id, x, y) => {
+                editor.start-link-from-pin(pin-id, x, y);
+            }
+            pin-drag-moved(pin-id, x, y) => {
+                editor.update-link-end(x, y);
+            }
+            pin-drag-ended(pin-id, x, y) => {
+                editor.update-link-end(x, y);
+                editor.complete-link-creation();
+            }
+            report-rect(id, x, y, w, h) => {
+                editor.report-node-rect(id, x, y, w, h);
+            }
+        }
+
+        // Filter nodes - complex nodes with widgets
+        for filter-data in filter-nodes: FilterNode {
+            title: filter-data.title;
+            node-id: filter-data.id;
+            selected: editor.is-selected(filter-data.id, editor.selection-version);
+            world-x: filter-data.world-x * 1px;
+            world-y: filter-data.world-y * 1px;
+            drag-offset-x: editor.is-selected(filter-data.id, editor.selection-version) ? editor.drag-offset-x : 0px;
+            drag-offset-y: editor.is-selected(filter-data.id, editor.selection-version) ? editor.drag-offset-y : 0px;
+            zoom: zoom;
+            pan-x: pan-x;
+            pan-y: pan-y;
+            filter-type-index: filter-data.filter-type-index;
+            enabled: filter-data.enabled;
+            processed-count: filter-data.processed-count;
+
+            clicked(id, shift) => {
+                editor.handle-node-click(id, shift);
+            }
+            drag-started(id, already-selected) => {
+                editor.start-node-drag(id, already-selected);
+            }
+            drag-moved(id, offset-x, offset-y) => {
+                editor.update-node-drag(offset-x, offset-y);
+            }
+            drag-ended(id, delta-x, delta-y) => {
+                editor.end-node-drag(delta-x, delta-y);
+            }
+            pin-position-changed(pin-id, node-id, pin-type, x, y) => {
+                editor.report-pin-position(pin-id, node-id, pin-type, x, y);
+            }
+            pin-drag-started(pin-id, x, y) => {
+                editor.start-link-from-pin(pin-id, x, y);
+            }
+            pin-drag-moved(pin-id, x, y) => {
+                editor.update-link-end(x, y);
+            }
+            pin-drag-ended(pin-id, x, y) => {
+                editor.update-link-end(x, y);
+                editor.complete-link-creation();
+            }
+            report-rect(id, x, y, w, h) => {
+                editor.report-node-rect(id, x, y, w, h);
+            }
+            filter-type-changed(id, idx) => {
+                root.filter-type-changed(id, idx);
+            }
+            toggle-enabled(id) => {
+                root.filter-toggle-enabled(id);
+            }
+            reset-clicked(id) => {
+                root.filter-reset(id);
+            }
+        }
+    }
+
+    // Instructions overlay
+    InstructionsOverlay {
+        grid-snap-enabled <=> grid-snap-enabled;
+    }
+
+    // Zoom indicator
+    Rectangle {
+        x: parent.width - 110px;
+        y: 10px;
+        width: 100px;
+        height: 30px;
+        background: #00000080;
+        border-radius: 4px;
+
+        Text {
+            text: "Zoom: " + round(zoom * 100) + "%";
+            color: white;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}

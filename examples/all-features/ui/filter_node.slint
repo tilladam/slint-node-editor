@@ -1,0 +1,360 @@
+// Filter Node - A complex node demonstrating widgets inside nodes
+//
+// This node represents a data filter with:
+// - Multiple input/output pins
+// - ComboBox for filter type selection
+// - Buttons for actions
+// - Labels showing state
+
+import { ComboBox, Button } from "std-widgets.slint";
+import { Pin, PinTypes, BaseNode } from "@slint-node-editor/node-editor.slint";
+import { PinId } from "pin_encoding.slint";
+
+/// Application-specific pin types for filter nodes
+export global FilterPinTypes {
+    /// Data input pin (reuses standard input type)
+    out property <int> data-input: PinTypes.input;
+    /// Data output pin (reuses standard output type)
+    out property <int> data-output: PinTypes.output;
+    /// Control input pin (custom type for parameter control)
+    out property <int> control-input: 3;
+}
+
+// Filter node data passed from Rust
+export struct FilterNodeData {
+    id: int,
+    title: string,
+    world-x: float,
+    world-y: float,
+    filter-type-index: int,
+    enabled: bool,
+    processed-count: int,
+}
+
+// Filter node control pin
+export component ControlPin inherits Pin {
+    in-out property <bool> pulse-state: false;
+    border-radius: 4px;
+    width: pulse-state ? 24px * self.zoom : 10px * self.zoom;  // 20% bigger when pulsed (20 * 1.2 = 24)
+    height: pulse-state ? 24px * self.zoom : 10px * self.zoom;
+    background: #FFC107;
+    border-color: #FF9800;
+
+    // Animate width and height smoothly
+    animate width, height {
+        duration: 800ms;
+        easing: ease-in-out;
+    }
+
+    // Timer to toggle pulse state continuously
+    pulse-timer := Timer {
+        interval: 800ms;
+        running: true;
+        triggered => {
+            pulse-state = !pulse-state;
+        }
+    }
+}
+
+// A complex node with multiple widgets
+export component FilterNode inherits BaseNode {
+    in property <string> title: "Filter";
+
+    // Pin IDs using FilterPinTypes
+    in property <int> data-input-pin-id: PinId.make(self.node-id, FilterPinTypes.data-input);
+    in property <int> data-output-pin-id: PinId.make(self.node-id, FilterPinTypes.data-output);
+    in property <int> control-input-pin-id: PinId.make(self.node-id, FilterPinTypes.control-input);
+
+    // Node-specific state
+    in-out property <int> filter-type-index: 0;
+    in-out property <bool> enabled: true;
+    in property <int> processed-count: 0;
+
+    // Callbacks for widget interactions
+    callback filter-type-changed(int, int);  // node-id, new-index
+    callback toggle-enabled(int);             // node-id
+    callback reset-clicked(int);              // node-id
+
+    // Pin dimensions (scaled by root.zoom)
+    property <length> base-pin-size: 12px;
+    property <length> pin-size: base-pin-size * self.zoom;
+    property <length> pin-radius: pin-size / 2;
+    property <length> pin-margin: 4px;
+
+    // Layout constants
+    property <length> title-height: 28px;
+    property <length> row-height: 32px;
+    property <length> content-padding: 8px;
+    property <length> pin-area-width: 24px;  // Space for pins on each side
+
+    // Base dimensions - sized to fit content
+    // Width must accommodate: pin areas (24px×2) + padding (8px×2) + "Type:" label + ComboBox
+    // Height = VL-padding + title + HL-padding-top + 3*rows + VL-padding
+    property <length> base-width: 260px;
+    property <length> base-height: content-padding + title-height + content-padding + (row-height * 3) + content-padding;
+
+    // Pin Y positions - centered on each content row
+    // Account for: VerticalLayout padding + title + HorizontalLayout padding-top + row offset
+    property <length> row-1-center: (content-padding + title-height + content-padding + row-height / 2) * self.zoom;
+    property <length> row-2-center: (content-padding + title-height + content-padding + row-height + row-height / 2) * self.zoom;
+
+    // Set dimensions
+    width: base-width * self.zoom;
+    height: base-height * self.zoom;
+
+    // Main layout
+    VerticalLayout {
+        padding: root.content-padding * root.zoom;
+        spacing: 0px;
+
+        // Title bar
+        Rectangle {
+            height: root.title-height * root.zoom;
+            background: root.selected ? #6a4a9a : #4a3d5d;
+            border-radius: 4px * root.zoom;
+
+            Text {
+                text: root.title;
+                color: white;
+                font-size: 14px * root.zoom;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        // Content area with left/right margins for pins
+        HorizontalLayout {
+            padding-top: root.content-padding * root.zoom;
+
+            // Left pin labels column
+            VerticalLayout {
+                width: pin-area-width * root.zoom;
+                spacing: 0px;
+
+                // Row 1: Data input label
+                Rectangle {
+                    height: row-height * root.zoom;
+                    Text {
+                        x: 16px * root.zoom;
+                        text: "In";
+                        color: #888;
+                        font-size: 10px * root.zoom;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // Row 2: Control input label
+                Rectangle {
+                    height: row-height * root.zoom;
+                    Text {
+                        x: 16px * root.zoom;
+                        text: "Ctrl";
+                        color: #888;
+                        font-size: 10px * root.zoom;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // Row 3: empty
+                Rectangle {
+                    height: row-height * root.zoom;
+                }
+            }
+
+            // Center content
+            VerticalLayout {
+                spacing: 4px * root.zoom;
+                horizontal-stretch: 1;
+
+                // Row 1: Filter type selector
+                HorizontalLayout {
+                    height: row-height * root.zoom;
+                    spacing: 8px * root.zoom;
+                    alignment: stretch;
+                    padding-top: 4px * root.zoom;
+                    padding-bottom: 4px * root.zoom;
+
+                    Text {
+                        text: "Type:";
+                        color: #aaa;
+                        font-size: 11px * root.zoom;
+                        vertical-alignment: center;
+                    }
+
+                    ComboBox {
+                        horizontal-stretch: 1;
+                        model: ["Low Pass", "High Pass", "Band Pass", "Notch"];
+                        current-index <=> root.filter-type-index;
+                        selected(_value) => {
+                            root.filter-type-changed(root.node-id, root.filter-type-index);
+                        }
+                    }
+                }
+
+                // Row 2: Status row
+                HorizontalLayout {
+                    height: row-height * root.zoom;
+                    spacing: 12px * root.zoom;
+                    alignment: start;
+                    padding-top: 4px * root.zoom;
+                    padding-bottom: 4px * root.zoom;
+
+                    Text {
+                        text: root.enabled ? "Active" : "Bypassed";
+                        color: root.enabled ? #8f8 : #f88;
+                        font-size: 12px * root.zoom;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: "Count: " + root.processed-count;
+                        color: #888;
+                        font-size: 11px * root.zoom;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // Row 3: Button row
+                HorizontalLayout {
+                    height: row-height * root.zoom;
+                    spacing: 8px * root.zoom;
+                    alignment: start;
+                    padding-top: 2px * root.zoom;
+                    padding-bottom: 2px * root.zoom;
+
+                    Button {
+                        text: root.enabled ? "Bypass" : "Enable";
+                        clicked => {
+                            root.toggle-enabled(root.node-id);
+                        }
+                    }
+
+                    Button {
+                        text: "Reset";
+                        clicked => {
+                            root.reset-clicked(root.node-id);
+                        }
+                    }
+                }
+            }
+
+            // Right pin labels column
+            VerticalLayout {
+                width: pin-area-width * root.zoom;
+                spacing: 0px;
+
+                // Row 1: Data output label
+                Rectangle {
+                    height: row-height * root.zoom;
+                    Text {
+                        x: 0px;
+                        width: parent.width - 16px * root.zoom;
+                        text: "Out";
+                        color: #888;
+                        font-size: 10px * root.zoom;
+                        vertical-alignment: center;
+                        horizontal-alignment: right;
+                    }
+                }
+
+                // Rows 2-3: empty
+                Rectangle {
+                    height: row-height * root.zoom * 2;
+                }
+            }
+        }
+    }
+
+    // Report pin positions after initialization (for newly added nodes)
+    init => {
+        // Pins report themselves via their own init handlers, but we also
+        // report here to ensure it happens even if pin init runs before node-id is set
+        if (self.node-id > 0) {
+            // Compute pin IDs inline to ensure correct evaluation
+            root.pin-position-changed(root.data-input-pin-id, self.node-id, FilterPinTypes.data-input, data-input-pin.center-x, data-input-pin.center-y);
+            root.pin-position-changed(root.control-input-pin-id, self.node-id, FilterPinTypes.control-input, control-input-pin.center-x, control-input-pin.center-y);
+            root.pin-position-changed(root.data-output-pin-id, self.node-id, FilterPinTypes.data-output, data-output-pin.center-x, data-output-pin.center-y);
+        }
+    }
+
+    // Data Input pin (green, left side, row 1)
+    data-input-pin := Pin {
+        x: root.pin-margin * root.zoom;
+        y: root.row-1-center - root.pin-radius;
+        pin-id: root.data-input-pin-id;
+        node-id: root.node-id;
+        pin-type: FilterPinTypes.data-input;
+        zoom: root.zoom;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
+        base-color: #4CAF50;
+        hover-color: #66BB6A;
+        base-size: root.base-pin-size;
+        drag-started(id, x, y) => {
+            root.pin-drag-started(id, x, y);
+        }
+        drag-moved(id, x, y) => {
+            root.pin-drag-moved(id, x, y);
+        }
+        drag-ended(id, x, y) => {
+            root.pin-drag-ended(id, x, y);
+        }
+        report-position(pin-id, node-id, pin-type, x, y) => {
+            root.pin-position-changed(pin-id, node-id, pin-type, x, y);
+        }
+    }
+
+    // Control Input pin (yellow, left side, row 2)
+    control-input-pin := ControlPin {
+        x: root.pin-margin * root.zoom;
+        y: root.row-2-center - root.pin-radius;
+        pin-id: root.control-input-pin-id;
+        node-id: root.node-id;
+        pin-type: FilterPinTypes.control-input;
+        zoom: root.zoom;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
+        base-color: #FFC107;
+        hover-color: #FFD54F;
+        base-size: root.base-pin-size;
+        drag-started(id, x, y) => {
+            root.pin-drag-started(id, x, y);
+        }
+        drag-moved(id, x, y) => {
+            root.pin-drag-moved(id, x, y);
+        }
+        drag-ended(id, x, y) => {
+            root.pin-drag-ended(id, x, y);
+        }
+        report-position(pin-id, node-id, pin-type, x, y) => {
+            root.pin-position-changed(pin-id, node-id, pin-type, x, y);
+        }
+    }
+
+    // Data Output pin (blue, right side, row 1)
+    data-output-pin := Pin {
+        x: parent.width - root.pin-margin * root.zoom - root.pin-size;
+        y: root.row-1-center - root.pin-radius;
+        pin-id: root.data-output-pin-id;
+        node-id: root.node-id;
+        pin-type: FilterPinTypes.data-output;
+        zoom: root.zoom;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
+        base-color: #2196F3;
+        hover-color: #42A5F5;
+        base-size: root.base-pin-size;
+        drag-started(id, x, y) => {
+            root.pin-drag-started(id, x, y);
+        }
+        drag-moved(id, x, y) => {
+            root.pin-drag-moved(id, x, y);
+        }
+        drag-ended(id, x, y) => {
+            root.pin-drag-ended(id, x, y);
+        }
+        report-position(pin-id, node-id, pin-type, x, y) => {
+            root.pin-position-changed(pin-id, node-id, pin-type, x, y);
+        }
+    }
+}

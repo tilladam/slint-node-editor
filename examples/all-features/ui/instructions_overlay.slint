@@ -1,0 +1,65 @@
+// Instructions overlay component for the node editor example
+// Displays controls and grid snap toggle
+
+export component InstructionsOverlay inherits Rectangle {
+    // Grid snap toggle binding (passed from parent)
+    in-out property <bool> grid-snap-enabled;
+
+    x: 10px;
+    y: 10px;
+    width: 280px;
+    height: 200px;
+    background: #00000080;
+    border-radius: 8px;
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 4px;
+
+        Text { text: "Node Editor Controls:"; color: #fff; font-size: 14px; font-weight: 600; }
+        Text { text: "Middle mouse: Pan"; color: #ccc; font-size: 12px; }
+        Text { text: "Scroll wheel: Zoom"; color: #ccc; font-size: 12px; }
+        Text { text: "Drag nodes to move them"; color: #ccc; font-size: 12px; }
+        Text { text: "Drag from pin: Create link"; color: #ccc; font-size: 12px; }
+        Text { text: "Ctrl+drag: Box select"; color: #ccc; font-size: 12px; }
+        Text { text: "Shift+click: Extend selection"; color: #ccc; font-size: 12px; }
+
+        Rectangle { height: 8px; } // Spacer
+
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+
+            // Custom checkbox
+            Rectangle {
+                width: 16px;
+                height: 16px;
+                border-radius: 3px;
+                border-width: 1px;
+                border-color: #888;
+                background: grid-snap-enabled ? #4a9eff : #333;
+
+                // Checkmark
+                Text {
+                    text: grid-snap-enabled ? "✓" : "";
+                    color: white;
+                    font-size: 12px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+
+                TouchArea {
+                    clicked => {
+                        grid-snap-enabled = !grid-snap-enabled;
+                    }
+                }
+            }
+            Text {
+                text: "Snap to grid";
+                color: #ccc;
+                font-size: 12px;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
