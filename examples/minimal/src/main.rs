@@ -10,11 +10,6 @@ fn main() {
     let ctrl = NodeEditorController::new();
     let w = window.as_weak();
 
-    // Track geometry reports to know when to refresh links
-    // We have 2 nodes with 2 pins each = 2 node rects + 4 pin positions = 6 reports
-    let geometry_reports = Rc::new(Cell::new(0i32));
-    let expected_reports = 6; // 2 nodes + 4 pins
-
     // Set up nodes (keep reference for drag updates)
     let nodes = Rc::new(VecModel::from(vec![
         NodeData { id: 1, title: SharedString::from("Node A"), x: 100.0, y: 100.0 },

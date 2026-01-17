@@ -280,20 +280,10 @@ fn main() {
         }
     });
 
-    let initial_update_done = Rc::new(RefCell::new(false));
-    let expected_node_count = nodes.row_count() + filter_nodes.row_count();
-
     window.on_node_rect_changed({
         let ctrl = ctrl.clone();
-        let initial_update_done = initial_update_done.clone();
         move |id, x, y, width, height| {
             ctrl.handle_node_rect(id, x, y, width, height);
-
-            let cache = ctrl.cache();
-            let cache = cache.borrow();
-            if !*initial_update_done.borrow() && cache.node_rects.len() >= expected_node_count {
-                *initial_update_done.borrow_mut() = true;
-            }
         }
     });
 
