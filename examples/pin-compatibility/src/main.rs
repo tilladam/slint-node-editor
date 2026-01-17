@@ -216,6 +216,28 @@ fn main() {
         }
     });
 
+    // Link validation callback for hover feedback
+    window.on_validate_link({
+        let ctrl = ctrl.clone();
+        let links = links.clone();
+        move |start_pin, end_pin| {
+            let cache = ctrl.cache();
+            let cache = cache.borrow();
+
+            // Create composite validator with basic checks + type compatibility
+            let validator: CompositeValidator<SimpleNodeGeometry, LinkData> =
+                CompositeValidator::new()
+                    .add(BasicLinkValidator::new(2)) // 2 = output pin type
+                    .add(TypeCompatibilityValidator);
+
+            let links_vec: Vec<LinkData> = links.iter().collect();
+            matches!(
+                validator.validate(start_pin, end_pin, &cache, &links_vec),
+                ValidationResult::Valid
+            )
+        }
+    });
+
     // Link preview path generation
     window.on_compute_link_preview_path({
         let w = window.as_weak();

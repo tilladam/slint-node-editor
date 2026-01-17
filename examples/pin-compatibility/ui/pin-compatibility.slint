@@ -39,10 +39,76 @@ global L {
     out property <length> node-height: 228px;
 }
 
+// Pin with validation indicator overlay
+component ValidatedPin inherits Rectangle {
+    in property <int> pin-id;
+    in property <int> node-id;
+    in property <int> pin-type;
+    in property <float> zoom: 1.0;
+    in property <color> base-color: #888888;
+    in property <length> node-screen-x: 0px;
+    in property <length> node-screen-y: 0px;
+    in property <int> refresh-trigger: 0;
+    in property <int> valid-target-pin-id: 0;  // Pin ID that's a valid drop target
+
+    callback report-position(int, int, int, length, length);
+    callback drag-started(int, length, length);
+    callback drag-moved(int, length, length);
+    callback drag-ended(int, length, length);
+
+    property <bool> is-valid-target: root.valid-target-pin-id == root.pin-id && root.pin-id > 0;
+    property <length> pin-size: 12px * zoom;
+
+    width: pin-size;
+    height: pin-size;
+
+    pin := Pin {
+        pin-id: root.pin-id;
+        node-id: root.node-id;
+        pin-type: root.pin-type;
+        zoom: root.zoom;
+        base-color: root.base-color;
+        // Adjust screen position to account for ValidatedPin's position within node
+        node-screen-x: root.node-screen-x + root.x;
+        node-screen-y: root.node-screen-y + root.y;
+        refresh-trigger: root.refresh-trigger;
+
+        // Add ValidatedPin's offset to get position relative to node
+        report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x + root.x, y + root.y); }
+        drag-started(id, x, y) => { root.drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.drag-ended(id, x, y); }
+    }
+
+    // Green checkmark overlay for valid targets
+    Rectangle {
+        visible: root.is-valid-target;
+        x: root.pin-size;
+        y: -4px * root.zoom;
+        width: 16px * root.zoom;
+        height: 16px * root.zoom;
+        background: #22c55e;
+        border-radius: self.width / 2;
+
+        // Checkmark using Path
+        Path {
+            x: 3px * root.zoom;
+            y: 4px * root.zoom;
+            width: 10px * root.zoom;
+            height: 8px * root.zoom;
+            stroke: white;
+            stroke-width: 2px * root.zoom;
+            fill: transparent;
+            commands: "M 0 4 L 3 7 L 9 1";
+        }
+    }
+}
+
 // Source node with output pins (right side)
 component SourceNode inherits BaseNode {
     in property <string> title: "Source";
     in property <int> pin-refresh-trigger: 0;
+    in property <int> valid-target-pin-id: 0;
     width: L.node-width * self.zoom;
     height: L.node-height * self.zoom;
 
@@ -75,89 +141,89 @@ component SourceNode inherits BaseNode {
     }
 
     // Output pins - direct children of node
-    Pin {
+    ValidatedPin {
         x: parent.width - self.width;
         y: (L.first-pin-y + 0 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 100; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.execute;
+        base-color: PinColors.execute; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
     }
-    Pin {
+    ValidatedPin {
         x: parent.width - self.width;
         y: (L.first-pin-y + 1 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 101; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.integer;
+        base-color: PinColors.integer; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
     }
-    Pin {
+    ValidatedPin {
         x: parent.width - self.width;
         y: (L.first-pin-y + 2 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 102; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.float_;
+        base-color: PinColors.float_; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
     }
-    Pin {
+    ValidatedPin {
         x: parent.width - self.width;
         y: (L.first-pin-y + 3 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 103; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.string;
+        base-color: PinColors.string; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
     }
-    Pin {
+    ValidatedPin {
         x: parent.width - self.width;
         y: (L.first-pin-y + 4 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 104; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.boolean;
+        base-color: PinColors.boolean; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
     }
-    Pin {
+    ValidatedPin {
         x: parent.width - self.width;
         y: (L.first-pin-y + 5 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 105; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.object;
+        base-color: PinColors.object; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
     }
-    Pin {
+    ValidatedPin {
         x: parent.width - self.width;
         y: (L.first-pin-y + 6 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 106; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.array;
+        base-color: PinColors.array; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
     }
-    Pin {
+    ValidatedPin {
         x: parent.width - self.width;
         y: (L.first-pin-y + 7 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 107; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.any;
+        base-color: PinColors.any; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
@@ -169,6 +235,7 @@ component SourceNode inherits BaseNode {
 component SinkNode inherits BaseNode {
     in property <string> title: "Sink";
     in property <int> pin-refresh-trigger: 0;
+    in property <int> valid-target-pin-id: 0;
     width: L.node-width * self.zoom;
     height: L.node-height * self.zoom;
 
@@ -201,89 +268,89 @@ component SinkNode inherits BaseNode {
     }
 
     // Input pins - direct children of node
-    Pin {
+    ValidatedPin {
         x: 0px;
         y: (L.first-pin-y + 0 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 200; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.execute;
+        base-color: PinColors.execute; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
     }
-    Pin {
+    ValidatedPin {
         x: 0px;
         y: (L.first-pin-y + 1 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 201; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.integer;
+        base-color: PinColors.integer; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
     }
-    Pin {
+    ValidatedPin {
         x: 0px;
         y: (L.first-pin-y + 2 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 202; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.float_;
+        base-color: PinColors.float_; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
     }
-    Pin {
+    ValidatedPin {
         x: 0px;
         y: (L.first-pin-y + 3 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 203; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.string;
+        base-color: PinColors.string; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
     }
-    Pin {
+    ValidatedPin {
         x: 0px;
         y: (L.first-pin-y + 4 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 204; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.boolean;
+        base-color: PinColors.boolean; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
     }
-    Pin {
+    ValidatedPin {
         x: 0px;
         y: (L.first-pin-y + 5 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 205; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.object;
+        base-color: PinColors.object; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
     }
-    Pin {
+    ValidatedPin {
         x: 0px;
         y: (L.first-pin-y + 6 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 206; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.array;
+        base-color: PinColors.array; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
     }
-    Pin {
+    ValidatedPin {
         x: 0px;
         y: (L.first-pin-y + 7 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 207; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
-        base-color: PinColors.any;
+        base-color: PinColors.any; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
@@ -319,8 +386,29 @@ export component MainWindow inherits Window {
     callback node-drag-ended <=> editor.node-drag-ended;
     pure callback compute-link-path <=> editor.compute-link-path;
 
+    // Link validation callback - returns true if connection is valid
+    pure callback validate-link(/* start-pin */ int, /* end-pin */ int) -> bool;
+
     // Property to trigger pin position re-reporting
     property <int> pin-refresh-counter: 0;
+
+    // Track valid target pin during link creation
+    property <int> valid-target-pin-id: 0;
+
+    // Update valid target pin based on current cursor position
+    function update-valid-target(start-pin: int, x: length, y: length) {
+        // Find pin at cursor position and validate
+        root.check-and-set-valid-target(start-pin, root.compute-pin-at(x, y));
+    }
+
+    // Helper to check validation and set target
+    function check-and-set-valid-target(start-pin: int, target-pin: int) {
+        if target-pin > 0 && root.validate-link(start-pin, target-pin) {
+            root.valid-target-pin-id = target-pin;
+        } else {
+            root.valid-target-pin-id = 0;
+        }
+    }
 
     // Timer to trigger geometry refresh after init
     init-timer := Timer {
@@ -352,15 +440,26 @@ export component MainWindow inherits Window {
             drag-offset-x: 1 == root.dragged-node-id ? editor.drag-offset-x : 0px;
             drag-offset-y: 1 == root.dragged-node-id ? editor.drag-offset-y : 0px;
             pin-refresh-trigger: root.pin-refresh-counter;
+            valid-target-pin-id: root.valid-target-pin-id;
 
             report-rect(id, x, y, w, h) => { editor.report-node-rect(id, x, y, w, h); }
             report-position(pid, nid, pt, x, y) => { editor.report-pin-position(pid, nid, pt, x, y); }
             drag-started(id, sel) => { root.dragged-node-id = id; editor.start-node-drag(id, sel); }
             drag-moved(id, dx, dy) => { editor.update-node-drag(dx, dy); }
             drag-ended(id, dx, dy) => { root.dragged-node-id = 0; editor.end-node-drag(dx, dy); }
-            pin-drag-started(id, x, y) => { editor.start-link-from-pin(id, x, y); }
-            pin-drag-moved(id, x, y) => { editor.update-link-end(x, y); }
-            pin-drag-ended(id, x, y) => { editor.update-link-end(x, y); editor.complete-link-creation(); }
+            pin-drag-started(id, x, y) => {
+                root.valid-target-pin-id = 0;
+                editor.start-link-from-pin(id, x, y);
+            }
+            pin-drag-moved(id, x, y) => {
+                editor.update-link-end(x, y);
+                root.update-valid-target(editor.link-start-pin-id, x, y);
+            }
+            pin-drag-ended(id, x, y) => {
+                root.valid-target-pin-id = 0;
+                editor.update-link-end(x, y);
+                editor.complete-link-creation();
+            }
         }
 
         SinkNode {
@@ -374,15 +473,26 @@ export component MainWindow inherits Window {
             drag-offset-x: 2 == root.dragged-node-id ? editor.drag-offset-x : 0px;
             drag-offset-y: 2 == root.dragged-node-id ? editor.drag-offset-y : 0px;
             pin-refresh-trigger: root.pin-refresh-counter;
+            valid-target-pin-id: root.valid-target-pin-id;
 
             report-rect(id, x, y, w, h) => { editor.report-node-rect(id, x, y, w, h); }
             report-position(pid, nid, pt, x, y) => { editor.report-pin-position(pid, nid, pt, x, y); }
             drag-started(id, sel) => { root.dragged-node-id = id; editor.start-node-drag(id, sel); }
             drag-moved(id, dx, dy) => { editor.update-node-drag(dx, dy); }
             drag-ended(id, dx, dy) => { root.dragged-node-id = 0; editor.end-node-drag(dx, dy); }
-            pin-drag-started(id, x, y) => { editor.start-link-from-pin(id, x, y); }
-            pin-drag-moved(id, x, y) => { editor.update-link-end(x, y); }
-            pin-drag-ended(id, x, y) => { editor.update-link-end(x, y); editor.complete-link-creation(); }
+            pin-drag-started(id, x, y) => {
+                root.valid-target-pin-id = 0;
+                editor.start-link-from-pin(id, x, y);
+            }
+            pin-drag-moved(id, x, y) => {
+                editor.update-link-end(x, y);
+                root.update-valid-target(editor.link-start-pin-id, x, y);
+            }
+            pin-drag-ended(id, x, y) => {
+                root.valid-target-pin-id = 0;
+                editor.update-link-end(x, y);
+                editor.complete-link-creation();
+            }
         }
     }
 
