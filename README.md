@@ -472,4 +472,5 @@ let cache = tracker.cache(); // Use for hit testing
 
 ## License
 
-Same as Slint framework
+MIT/Apache
+
