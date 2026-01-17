@@ -429,6 +429,9 @@ let cache = tracker.cache(); // Use for hit testing
 - **advanced:** A comprehensive example demonstrating custom nodes, widgets inside nodes, minimap, selection logic, link validation, and manual callback implementation.
   - Path: `examples/advanced`
   - Run: `cargo run -p advanced`
+- **pin-compatibility:** Demonstrates type-safe connections with a compatibility matrix, visual validation feedback, and custom pin behaviors.
+  - Path: `examples/pin-compatibility`
+  - Run: `cargo run -p pin-compatibility`
 
 ## License
 
