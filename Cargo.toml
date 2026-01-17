@@ -25,4 +25,4 @@ include = [
 slint = { version = "1.14", default-features = false, features = ["std", "compat-1-2"] }
 
 [workspace]
-members = ["examples/all-features", "examples/minimal", "examples/custom-shapes"]
+members = ["examples/advanced", "examples/minimal", "examples/custom-shapes"]

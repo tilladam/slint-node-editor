@@ -10,7 +10,7 @@ This is the **Slint Node Editor** library (`slint-node-editor`), a generic Slint
 
 ```bash
 # Build and run the full-featured example
-cargo run -p all-features
+cargo run -p advanced
 
 # Build and run the minimal example
 cargo run -p minimal
@@ -26,12 +26,12 @@ cargo check
 
 | File | Purpose |
 |------|---------|
-| `examples/all-features/src/main.rs` | Application entry point (Full Example) |
+| `examples/advanced/src/main.rs` | Application entry point (Full Example) |
 | `src/lib.rs` | Library entry point (Rust) |
 | `node-editor.slint` | Generic Slint components (NodeEditor, Pin, Link, Minimap) |
-| `examples/all-features/ui/pin_encoding.slint` | Application-specific pin ID encoding scheme |
-| `examples/all-features/ui/ui.slint` | Application-specific UI (Node component, data structs, main window) |
-| `examples/all-features/ui/filter_node.slint` | Complex node example with multiple widgets |
+| `examples/advanced/ui/pin_encoding.slint` | Application-specific pin ID encoding scheme |
+| `examples/advanced/ui/ui.slint` | Application-specific UI (Node component, data structs, main window) |
+| `examples/advanced/ui/filter_node.slint` | Complex node example with multiple widgets |
 
 ## Architecture
 
@@ -47,11 +47,11 @@ cargo check
 
 **Pin ID encoding**: Application-specific. The generic library treats pin IDs as opaque integers. Examples:
 - minimal: `pin_id = node_id * 2 + pin_type` (0=input, 1=output)
-- all-features: `pin_id = node_id * 1000 + pin_type`
+- advanced: `pin_id = node_id * 1000 + pin_type`
 
 **Callback-based computation**: The Slint UI delegates expensive operations to Rust via callbacks (e.g., `compute-pin-at`).
 
-## Data Models (in examples/all-features/src/main.rs)
+## Data Models (in examples/advanced/src/main.rs)
 
 The application maintains separate models for different node types but unifies operations via helper functions:
 
@@ -82,8 +82,8 @@ let cache = tracker.cache(); // Use for hit testing, etc.
 - Nodes: `NodeGeometry` trait + `GeometryCache<N>`
 - Links: `LinkModel` trait + `LinkManager<L, N>`
 
-## Helper Functions (all-features example)
-`examples/all-features/src/main.rs` defines local helpers to handle multiple node models:
+## Helper Functions (advanced example)
+`examples/advanced/src/main.rs` defines local helpers to handle multiple node models:
 
 - `remove_selected_items`: Generic function to remove items from a `VecModel` based on selection.
 - `compute_graph_bounds`: Iterates over all node models to calculate the bounding box of the graph.

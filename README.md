@@ -413,9 +413,9 @@ let cache = tracker.cache(); // Use for hit testing
 - **minimal:** A simple example using `NodeEditorController` with basic nodes and links.
   - Path: `examples/minimal`
   - Run: `cargo run -p minimal`
-- **all-features:** A comprehensive example demonstrating custom nodes, widgets inside nodes, minimap, selection logic, link validation, and manual callback implementation.
-  - Path: `examples/all-features`
-  - Run: `cargo run -p all-features`
+- **advanced:** A comprehensive example demonstrating custom nodes, widgets inside nodes, minimap, selection logic, link validation, and manual callback implementation.
+  - Path: `examples/advanced`
+  - Run: `cargo run -p advanced`
 
 ## License
 
