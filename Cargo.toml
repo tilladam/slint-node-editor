@@ -22,7 +22,7 @@ include = [
 ]
 
 [dependencies]
-slint = { version = "1.14", default-features = false, features = ["std", "compat-1-2"] }
+slint = { git = "https://github.com/slint-ui/slint", default-features = false, features = ["std", "compat-1-2"] }
 
 [dev-dependencies]
 i-slint-backend-testing = "=1.14.1"
