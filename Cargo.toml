@@ -1,0 +1,28 @@
+[package]
+name = "slint-node-editor"
+version = "0.1.0"
+edition = "2021"
+authors = ["Till Adam <till.adam@kdab.com>"]
+license = "MIT OR Apache-2.0"
+description = "A flexible, generic Slint component library for building visual graph editors"
+repository = "https://github.com/slint-ui/slint"
+homepage = "https://slint.dev"
+documentation = "https://docs.rs/slint-node-editor"
+keywords = ["gui", "node-editor", "graph", "slint", "visual-programming"]
+categories = ["gui", "visualization"]
+readme = "README.md"
+rust-version = "1.70"
+include = [
+    "src/**/*",
+    "*.slint",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+]
+
+[dependencies]
+slint = { version = "1.14", default-features = false, features = ["std", "compat-1-2"] }
+
+[workspace]
+members = ["examples/all-features", "examples/minimal", "examples/custom-shapes"]
