@@ -1,0 +1,316 @@
+import { NodeEditor, BaseNode, Pin, PinTypes, LinkData } from "@slint-node-editor/node-editor.slint";
+
+export struct NodeData {
+    id: int,
+    title: string,
+    x: float,
+    y: float,
+}
+
+// Animated link data with progress for grow animation
+export struct AnimatedLinkData {
+    id: int,
+    start-pin-id: int,
+    end-pin-id: int,
+    color: color,
+    line-width: float,
+    // Animation progress (0.0 = start, 1.0 = complete)
+    progress: float,
+    // Creation timestamp for sparkle effects
+    birth-time: float,
+}
+
+// Re-export for Rust
+export { LinkData }
+
+// Custom animated link component with grow effect and sparkles
+component AnimatedLink inherits Rectangle {
+    in property <string> path-commands;
+    in property <color> link-color: #888888;
+    in property <length> line-width: 2px;
+    in property <float> progress: 1.0;
+    in property <float> birth-time: 0.0;
+    in property <float> current-time: 0.0;
+    in property <bool> selected: false;
+    in property <bool> hovered: false;
+
+    // Calculate age for effects
+    property <float> age: current-time - birth-time;
+    // Pulsing glow for recently created links (fades over 2 seconds)
+    property <float> glow-intensity: max(0, 1.0 - age / 2.0);
+    // Rainbow hue shift during creation
+    property <float> hue-shift: mod(age * 180, 360);
+
+    width: 100%;
+    height: 100%;
+
+    // Main link path
+    Path {
+        width: 100%;
+        height: 100%;
+        // Apply dash pattern based on progress (creates grow effect)
+        // Estimate path length as ~500px for bezier, adjust dash accordingly
+        stroke: selected ? link-color.brighter(50%) :
+                (hovered ? link-color.brighter(25%) : link-color);
+        stroke-width: selected ? line-width * 1.5 :
+                      (hovered ? line-width * 1.25 :
+                       (glow-intensity > 0.1 ? line-width * (1.0 + glow-intensity * 0.5) : line-width));
+        fill: transparent;
+
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: max(parent.width / 1px, 1);
+        viewbox-height: max(parent.height / 1px, 1);
+
+        commands: path-commands;
+    }
+
+    // Glow layer (underneath main path)
+    if glow-intensity > 0.1: Path {
+        width: 100%;
+        height: 100%;
+        stroke: link-color.with-alpha(glow-intensity * 0.3);
+        stroke-width: line-width * (2.0 + glow-intensity * 3.0);
+        fill: transparent;
+
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: max(parent.width / 1px, 1);
+        viewbox-height: max(parent.height / 1px, 1);
+
+        commands: path-commands;
+    }
+}
+
+component SimpleNode inherits BaseNode {
+    in property <string> title: "Node";
+    in property <color> accent-color: #4a9eff;
+    width: 150px * self.zoom;
+    height: 100px * self.zoom;
+
+    Rectangle {
+        background: root.selected ? accent-color.darker(60%) : #333;
+        border-radius: 6px * root.zoom;
+        border-width: root.selected ? 2px * root.zoom : 1px * root.zoom;
+        border-color: root.selected ? accent-color : #666;
+
+        // Animated gradient overlay
+        Rectangle {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: 30px * root.zoom;
+            border-radius: 6px * root.zoom;
+            background: @linear-gradient(180deg, accent-color.with-alpha(0.3) 0%, transparent 100%);
+            clip: true;
+
+            // Only round top corners
+            Rectangle {
+                y: parent.height - 6px * root.zoom;
+                width: parent.width;
+                height: 6px * root.zoom;
+                background: root.selected ? accent-color.darker(60%) : #333;
+            }
+        }
+
+        Text {
+            text: root.title;
+            color: white;
+            font-size: 14px * root.zoom;
+            font-weight: 600;
+        }
+    }
+
+    // Input pin (left side)
+    Pin {
+        x: 0px;
+        y: parent.height / 2 - self.height / 2;
+        pin-id: root.node-id * 2;
+        node-id: root.node-id;
+        pin-type: PinTypes.input;
+        zoom: root.zoom;
+        base-color: accent-color.darker(30%);
+        hover-color: accent-color;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
+        report-position(id, nid, type, x, y) => {
+            root.report-position(id, nid, type, x, y);
+        }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+
+    // Output pin (right side)
+    Pin {
+        x: parent.width - self.width;
+        y: parent.height / 2 - self.height / 2;
+        pin-id: root.node-id * 2 + 1;
+        node-id: root.node-id;
+        pin-type: PinTypes.output;
+        zoom: root.zoom;
+        base-color: accent-color.darker(30%);
+        hover-color: accent-color;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
+        report-position(id, nid, type, x, y) => {
+            root.report-position(id, nid, type, x, y);
+        }
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+    }
+
+    callback report-position(int, int, int, length, length);
+}
+
+export component MainWindow inherits Window {
+    title: "Animated Link Creation";
+    width: 900px;
+    height: 700px;
+    background: #1a1a2e;
+
+    in property <[NodeData]> nodes;
+    in property <[AnimatedLinkData]> animated-links;
+    in property <[LinkData]> links <=> editor.links;
+    in-out property <string> grid_commands <=> editor.grid-commands;
+    in-out property <int> dragged-node-id: 0;
+
+    // Animation time (updated from Rust)
+    in property <float> animation-time: 0.0;
+
+    // Size for grid generation
+    out property <float> width_: self.width / 1px;
+    out property <float> height_: self.height / 1px;
+
+    // Callbacks to Rust
+    callback node-rect-changed <=> editor.node-rect-changed;
+    callback pin-position-changed <=> editor.pin-position-changed;
+    callback request-grid-update <=> editor.request-grid-update;
+    callback link-requested <=> editor.link-requested;
+
+    public function refresh-links() {
+        editor.refresh-links();
+    }
+
+    callback update-viewport(float, float, float);
+    callback node-drag-started <=> editor.node-drag-started;
+    callback node-drag-ended <=> editor.node-drag-ended;
+    pure callback compute-link-path <=> editor.compute-link-path;
+    callback compute-pin-at <=> editor.compute-pin-at;
+    callback compute-link-preview-path <=> editor.compute-link-preview-path;
+    callback add-animated-link(/* from-pin */ int, /* to-pin */ int);
+
+    // Instructions panel
+    Rectangle {
+        x: 20px;
+        y: 20px;
+        width: 280px;
+        height: 130px;
+        background: #2a2a4080;
+        border-radius: 8px;
+        border-color: #4a4a6a;
+        border-width: 1px;
+
+        VerticalLayout {
+            padding: 12px;
+            spacing: 6px;
+
+            Text {
+                text: "Animated Link Creation Demo";
+                color: #ffffff;
+                font-size: 14px;
+                font-weight: 700;
+            }
+            Text {
+                text: "Drag from output pin (right) to input pin (left)";
+                color: #aaaacc;
+                font-size: 11px;
+            }
+            Text {
+                text: "Watch the link grow with glow effect!";
+                color: #88aaff;
+                font-size: 11px;
+            }
+            Text {
+                text: "New links pulse and fade to normal";
+                color: #aaaacc;
+                font-size: 11px;
+            }
+            Text {
+                text: "Pan: middle mouse | Zoom: scroll";
+                color: #888899;
+                font-size: 10px;
+            }
+        }
+    }
+
+    editor := NodeEditor {
+        width: 100%;
+        height: 100%;
+        background-color: #1a1a2e;
+        grid-color: #2a2a4a;
+
+        viewport-changed => {
+            root.update-viewport(self.zoom, self.pan-x / 1px, self.pan-y / 1px);
+        }
+
+        link-requested(start-pin, end-pin) => {
+            root.add-animated-link(start-pin, end-pin);
+        }
+
+        // Render animated links with effects
+        for link in root.animated-links: AnimatedLink {
+            path-commands: root.compute-link-path(link.start-pin-id, link.end-pin-id, editor.geometry-version);
+            link-color: link.color;
+            line-width: link.line-width > 0 ? link.line-width * 1px : 2px;
+            progress: link.progress;
+            birth-time: link.birth-time;
+            current-time: root.animation-time;
+        }
+
+        for data in root.nodes: SimpleNode {
+            node-id: data.id;
+            title: data.title;
+            accent-color: data.id == 1 ? #ff6b6b :
+                          data.id == 2 ? #4ecdc4 :
+                          data.id == 3 ? #ffe66d :
+                          data.id == 4 ? #a855f7 : #4a9eff;
+            world-x: data.x * 1px;
+            world-y: data.y * 1px;
+            zoom: editor.zoom;
+            pan-x: editor.pan-x;
+            pan-y: editor.pan-y;
+            drag-offset-x: data.id == root.dragged-node-id ? editor.drag-offset-x : 0px;
+            drag-offset-y: data.id == root.dragged-node-id ? editor.drag-offset-y : 0px;
+
+            report-rect(id, x, y, w, h) => {
+                editor.report-node-rect(id, x, y, w, h);
+            }
+            report-position(pid, nid, pt, x, y) => {
+                editor.report-pin-position(pid, nid, pt, x, y);
+            }
+            pin-drag-started(pin-id, x, y) => {
+                editor.start-link-from-pin(pin-id, x, y);
+            }
+            pin-drag-moved(pin-id, x, y) => {
+                editor.update-link-end(x, y);
+            }
+            pin-drag-ended(pin-id, x, y) => {
+                editor.update-link-end(x, y);
+                editor.complete-link-creation();
+            }
+            drag-started(id, already-selected) => {
+                root.dragged-node-id = id;
+                editor.start-node-drag(id, already-selected);
+            }
+            drag-moved(id, dx, dy) => {
+                editor.update-node-drag(dx, dy);
+            }
+            drag-ended(id, dx, dy) => {
+                root.dragged-node-id = 0;
+                editor.end-node-drag(dx, dy);
+            }
+        }
+    }
+}
