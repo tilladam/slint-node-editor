@@ -56,9 +56,9 @@ impl SelectionManager {
 
     /// Sync the internal selection set to a Slint VecModel
     pub fn sync_to_model(&self, model: &VecModel<i32>) {
-        // Clear and repopulate to ensure exact match
+        // Clear by removing from the back to avoid O(n²) shifting
         while model.row_count() > 0 {
-            model.remove(0);
+            model.remove(model.row_count() - 1);
         }
         for &id in &self.selected {
             model.push(id);
