@@ -19,9 +19,19 @@ pub fn generate_bezier_path(
     zoom: f32,
     min_offset: f32,
 ) -> String {
+    // If distance is very small, use a straight line to avoid zig-zags
+    let dx = end_x - start_x;
+    let dy = end_y - start_y;
+    let dist_sq = dx * dx + dy * dy;
+    let threshold = 10.0 * zoom;
+
+    if dist_sq < threshold * threshold {
+        return format!("M {} {} L {} {}", start_x, start_y, end_x, end_y);
+    }
+
     // Calculate control point offset (horizontal bezier)
-    let dx = (end_x - start_x).abs();
-    let offset = (dx * 0.5).max(min_offset * zoom);
+    let dx_abs = dx.abs();
+    let offset = (dx_abs * 0.5).max(min_offset * zoom);
 
     // Control points extend horizontally from start and end
     let ctrl1_x = start_x + offset;
@@ -72,9 +82,21 @@ pub fn generate_partial_bezier_path(
         return generate_bezier_path(start_x, start_y, end_x, end_y, zoom, min_offset);
     }
 
+    // If distance is very small, use a straight line
+    let dx_full = end_x - start_x;
+    let dy_full = end_y - start_y;
+    let dist_sq = dx_full * dx_full + dy_full * dy_full;
+    let threshold = 10.0 * zoom;
+
+    if dist_sq < threshold * threshold {
+        let curr_x = start_x + dx_full * t;
+        let curr_y = start_y + dy_full * t;
+        return format!("M {} {} L {} {}", start_x, start_y, curr_x, curr_y);
+    }
+
     // Calculate full bezier control points
-    let dx = (end_x - start_x).abs();
-    let offset = (dx * 0.5).max(min_offset * zoom);
+    let dx_abs = dx_full.abs();
+    let offset = (dx_abs * 0.5).max(min_offset * zoom);
 
     let p0 = (start_x, start_y);
     let p1 = (start_x + offset, start_y);
@@ -131,8 +153,22 @@ impl CubicBezier {
         zoom: f32,
         min_offset: f32,
     ) -> Self {
-        let dx = (end_x - start_x).abs();
-        let offset = (dx * 0.5).max(min_offset * zoom);
+        let dx = end_x - start_x;
+        let dy = end_y - start_y;
+        let dist_sq = dx * dx + dy * dy;
+        let threshold = 10.0 * zoom;
+
+        if dist_sq < threshold * threshold {
+            return CubicBezier {
+                p0: (start_x, start_y),
+                p1: (start_x, start_y),
+                p2: (end_x, end_y),
+                p3: (end_x, end_y),
+            };
+        }
+
+        let dx_abs = dx.abs();
+        let offset = (dx_abs * 0.5).max(min_offset * zoom);
 
         CubicBezier {
             p0: (start_x, start_y),
@@ -240,11 +276,25 @@ mod tests {
     }
 
     #[test]
+    fn test_bezier_path_small_distance() {
+        // Distance is 5.0, threshold is 10.0
+        let path = generate_bezier_path(0.0, 0.0, 5.0, 0.0, 1.0, 50.0);
+        assert!(path.contains(" L "));
+        assert!(!path.contains(" C "));
+
+        // Distance is 15.0, threshold is 10.0
+        let path2 = generate_bezier_path(0.0, 0.0, 15.0, 0.0, 1.0, 50.0);
+        assert!(path2.contains(" C "));
+        assert!(!path2.contains(" L "));
+    }
+
+    #[test]
     fn test_bezier_path_zero_distance() {
-        // Start and end at same point - should still produce valid path
+        // Start and end at same point - should produce a straight line (effectively a point)
         let path = generate_bezier_path(50.0, 50.0, 50.0, 50.0, 1.0, 50.0);
         assert!(path.starts_with("M "));
-        assert!(path.contains(" C "));
+        assert!(path.contains(" L "));
+        assert!(!path.contains(" C "));
     }
 
     #[test]
