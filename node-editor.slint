@@ -282,7 +282,7 @@ export component NodeEditor {
     }
 
     /// Apply zoom with pan adjustment - takes calculated new zoom and mouse position graph coords
-    function apply-zoom-with-adjustment(new-zoom: float, mouse-x: length, mouse-y: length,
+    public function apply-zoom-with-adjustment(new-zoom: float, mouse-x: length, mouse-y: length,
                                         graph-x: float, graph-y: float) {
         root.zoom = new-zoom;
         root.pan-x = mouse-x - graph-x * new-zoom * 1px;
@@ -390,19 +390,9 @@ export component NodeEditor {
             height: 100%;
 
             scroll-event(event) => {
-                // Zoom centered on mouse position
-                if event.delta-y != 0 {
-                    // Calculate new zoom inline
-                    // zoom-factor is 1.1 for zoom in (delta-y > 0), 0.9 for zoom out
-                    // Apply zoom with pan adjustment to center on mouse
-                    root.apply-zoom-with-adjustment(
-                        clamp(root.zoom * (event.delta-y > 0 ? 1.1 : 0.9), root.min-zoom, root.max-zoom),
-                        self.mouse-x,
-                        self.mouse-y,
-                        (self.mouse-x / 1px - root.pan-x / 1px) / root.zoom,
-                        (self.mouse-y / 1px - root.pan-y / 1px) / root.zoom
-                    );
-                }
+                // Pan
+                root.pan-x += event.delta-x;
+                root.pan-y += event.delta-y;
                 accept
             }
 
