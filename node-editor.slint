@@ -108,7 +108,7 @@ export component NodeEditor {
     // Path-based minimap rendering (optimization for large graphs)
     in property <string> minimap-nodes-path: "";
     in property <int> minimap-path-version: 0;
-    pure callback compute-minimap-nodes-path(/* scale */ float, /* offset-x */ float, /* offset-y */ float) -> string;
+    pure callback compute-minimap-nodes-path(/* version */ int, /* scale */ float, /* offset-x */ float, /* offset-y */ float) -> string;
 
     // === Pin hit radius ===
     in property <length> pin-hit-radius: 10px;
@@ -566,8 +566,8 @@ export component NodeEditor {
         minimap-width: root.minimap-size-width;
         minimap-height: root.minimap-size-height;
 
-        compute-nodes-path(scale, offset-x, offset-y) => {
-            root.compute-minimap-nodes-path(scale, offset-x, offset-y)
+        compute-nodes-path(version, scale, offset-x, offset-y) => {
+            root.compute-minimap-nodes-path(version, scale, offset-x, offset-y)
         }
 
         navigate-to(graph-x, graph-y) => {

@@ -131,10 +131,10 @@ export component Minimap inherits Rectangle {
     // The path should contain SVG path commands for all node rectangles.
     in property <string> nodes-path: "";
 
-    // Callback to compute the nodes path. Called when scale/offset changes.
-    // Parameters: scale, offset-x, offset-y (for coordinate transformation)
+    // Callback to compute the nodes path. Called when scale/offset/version changes.
+    // Parameters: version (for cache invalidation), scale, offset-x, offset-y
     // Returns: SVG path string for all nodes
-    pure callback compute-nodes-path(/* scale */ float, /* offset-x */ float, /* offset-y */ float) -> string;
+    pure callback compute-nodes-path(/* version */ int, /* scale */ float, /* offset-x */ float, /* offset-y */ float) -> string;
 
     // Version counter to trigger path recomputation
     in property <int> path-version: 0;
@@ -204,15 +204,16 @@ export component Minimap inherits Rectangle {
     border-radius: 4px;
 
     // Computed path for optimized rendering (recomputed when path-version changes)
+    // Note: path-version is passed to force Slint to re-evaluate when it changes
     property <string> computed-path: root.compute-nodes-path(
+        root.path-version,
         root.scale,
         root.minimap-padding / 1px - (root.graph-min-x / 1px) * root.scale,
         root.minimap-padding / 1px - (root.graph-min-y / 1px) * root.scale
     );
 
-    // Use path-version to force recomputation when needed
-    property <string> effective-path: root.path-version >= 0 ?
-        (root.nodes-path != "" ? root.nodes-path : root.computed-path) : "";
+    // Use computed path, or nodes-path if provided externally
+    property <string> effective-path: root.nodes-path != "" ? root.nodes-path : root.computed-path;
 
     // Path-based rendering (optimized - single element for all nodes)
     if root.effective-path != "": Path {
