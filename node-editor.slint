@@ -115,6 +115,17 @@ export component NodeEditor {
     /// Number of samples for link hit-testing (higher = more precise, slower)
     in property <int> link-hit-samples: 20;
 
+    // === Box selection modifier configuration ===
+    /// Allow box selection on click on empty area (no modifier needed)
+    in property <bool> box-selection-on-empty: true;
+    /// Ctrl modifier enables box selection (even over links/nodes)
+    in property <bool> box-selection-modifier-ctrl: true;
+    /// Alt modifier enables box selection (even over links/nodes)
+    in property <bool> box-selection-modifier-alt: false;
+    /// Shift modifier enables box selection (even over links/nodes)
+    /// Note: Shift is typically used for extending selection, enable with care
+    in property <bool> box-selection-modifier-shift: false;
+
     // === Internal state ===
     property <bool> internal-is-panning: false;
     property <length> pan-start-mouse-x;
@@ -406,9 +417,14 @@ export component NodeEditor {
                         root.pan-start-offset-x = root.pan-x;
                         root.pan-start-offset-y = root.pan-y;
                     } else if event.button == PointerEventButton.left {
-                        // Check if clicking on empty area or Ctrl is held
-                        if root.compute-link-at(self.mouse-x, self.mouse-y) < 0 || event.modifiers.control {
-                            // Clicked on empty area (or Ctrl held) - start box selection
+                        // Check if box selection should start based on configuration
+                        // Modifier keys can force box selection even over links
+                        // Empty area allows box selection if box-selection-on-empty is true
+                        if (root.box-selection-modifier-ctrl && event.modifiers.control) ||
+                           (root.box-selection-modifier-alt && event.modifiers.alt) ||
+                           (root.box-selection-modifier-shift && event.modifiers.shift) ||
+                           (root.box-selection-on-empty && root.compute-link-at(self.mouse-x, self.mouse-y) < 0) {
+                            // Start box selection
                             root.internal-is-box-selecting = true;
                             root.box-start-x = self.mouse-x;
                             root.box-start-y = self.mouse-y;
@@ -419,7 +435,7 @@ export component NodeEditor {
                                 root.selected-link-ids = [];
                                 root.clear-selection();
                             }
-                        } else {
+                        } else if root.compute-link-at(self.mouse-x, self.mouse-y) >= 0 {
                             // Clicked on a link - select it
                             root.select-link(root.compute-link-at(self.mouse-x, self.mouse-y), event.modifiers.shift);
                         }
