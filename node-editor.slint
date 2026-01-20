@@ -405,21 +405,24 @@ export component NodeEditor {
                         root.pan-start-mouse-y = self.mouse-y;
                         root.pan-start-offset-x = root.pan-x;
                         root.pan-start-offset-y = root.pan-y;
-                    } else if event.button == PointerEventButton.left && event.modifiers.control {
-                        // Start box selection
-                        root.internal-is-box-selecting = true;
-                        root.box-start-x = self.mouse-x;
-                        root.box-start-y = self.mouse-y;
-                        root.box-current-x = self.mouse-x;
-                        root.box-current-y = self.mouse-y;
-                        // Clear existing link selection
-                        root.selected-link-ids = [];
                     } else if event.button == PointerEventButton.left {
-                        // Check for link click and handle selection
-                        root.handle-link-click(
-                            root.compute-link-at(self.mouse-x, self.mouse-y),
-                            event.modifiers.shift
-                        );
+                        // Check if clicking on empty area or Ctrl is held
+                        if root.compute-link-at(self.mouse-x, self.mouse-y) < 0 || event.modifiers.control {
+                            // Clicked on empty area (or Ctrl held) - start box selection
+                            root.internal-is-box-selecting = true;
+                            root.box-start-x = self.mouse-x;
+                            root.box-start-y = self.mouse-y;
+                            root.box-current-x = self.mouse-x;
+                            root.box-current-y = self.mouse-y;
+                            // Clear existing selection unless shift held
+                            if !event.modifiers.shift {
+                                root.selected-link-ids = [];
+                                root.clear-selection();
+                            }
+                        } else {
+                            // Clicked on a link - select it
+                            root.select-link(root.compute-link-at(self.mouse-x, self.mouse-y), event.modifiers.shift);
+                        }
                     } else if event.button == PointerEventButton.right {
                         root.context-menu-x = self.mouse-x;
                         root.context-menu-y = self.mouse-y;
