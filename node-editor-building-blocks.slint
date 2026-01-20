@@ -126,6 +126,19 @@ export component Minimap inherits Rectangle {
     // === Data Input ===
     in property <[MinimapNode]> nodes;
 
+    // === Path-based rendering (optimization for large graphs) ===
+    // When nodes-path is non-empty, it's used instead of the nodes array for rendering.
+    // The path should contain SVG path commands for all node rectangles.
+    in property <string> nodes-path: "";
+
+    // Callback to compute the nodes path. Called when scale/offset changes.
+    // Parameters: scale, offset-x, offset-y (for coordinate transformation)
+    // Returns: SVG path string for all nodes
+    pure callback compute-nodes-path(/* scale */ float, /* offset-x */ float, /* offset-y */ float) -> string;
+
+    // Version counter to trigger path recomputation
+    in property <int> path-version: 0;
+
     // === Viewport State ===
     in property <length> viewport-x;
     in property <length> viewport-y;
@@ -190,12 +203,36 @@ export component Minimap inherits Rectangle {
     border-width: root.minimap-border-width;
     border-radius: 4px;
 
-    for node in root.nodes: Rectangle {
-        x: root.minimap-padding + (node.x - root.graph-min-x) * root.scale;
-        y: root.minimap-padding + (node.y - root.graph-min-y) * root.scale;
-        width: node.width * root.scale;
-        height: node.height * root.scale;
-        background: node.color.alpha > 0 ? node.color : root.minimap-node-color;
+    // Computed path for optimized rendering (recomputed when path-version changes)
+    property <string> computed-path: root.compute-nodes-path(
+        root.scale,
+        root.minimap-padding / 1px - (root.graph-min-x / 1px) * root.scale,
+        root.minimap-padding / 1px - (root.graph-min-y / 1px) * root.scale
+    );
+
+    // Use path-version to force recomputation when needed
+    property <string> effective-path: root.path-version >= 0 ?
+        (root.nodes-path != "" ? root.nodes-path : root.computed-path) : "";
+
+    // Path-based rendering (optimized - single element for all nodes)
+    if root.effective-path != "": Path {
+        x: 0;
+        y: 0;
+        width: root.minimap-width;
+        height: root.minimap-height;
+        commands: root.effective-path;
+        fill: root.minimap-node-color;
+    }
+
+    // Fallback: individual rectangles (used when no path callback is set)
+    if root.effective-path == "": Rectangle {
+        for node in root.nodes: Rectangle {
+            x: root.minimap-padding + (node.x - root.graph-min-x) * root.scale;
+            y: root.minimap-padding + (node.y - root.graph-min-y) * root.scale;
+            width: node.width * root.scale;
+            height: node.height * root.scale;
+            background: node.color.alpha > 0 ? node.color : root.minimap-node-color;
+        }
     }
 
     Rectangle {
