@@ -60,7 +60,7 @@ pub mod controller;
 // Re-export traits and functions
 pub use hit_test::{
     find_link_at, find_pin_at, links_in_selection_box, nodes_in_selection_box, LinkGeometry,
-    NodeGeometry, PinGeometry, SimpleNodeGeometry,
+    NodeGeometry, PinGeometry, SimpleLinkGeometry, SimpleNodeGeometry,
 };
 pub use grid::generate_grid_commands;
 pub use path::{generate_bezier_path, generate_partial_bezier_path};
