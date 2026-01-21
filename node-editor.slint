@@ -33,6 +33,18 @@
 import { PinTypes, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, Minimap, Link, BaseNode, Pin } from "node-editor-building-blocks.slint";
 export { PinTypes, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, Minimap, Link, BaseNode, Pin }
 
+/// Modifier key for triggering box selection over nodes/links
+export enum BoxSelectionModifier {
+    /// No modifier - box selection only works on empty areas
+    none,
+    /// Ctrl key enables box selection anywhere
+    ctrl,
+    /// Alt key enables box selection anywhere
+    alt,
+    /// Shift key enables box selection anywhere (note: shift is also used for extend-selection)
+    shift,
+}
+
 /// Pure Slint node editor composite component.
 ///
 /// Provides:
@@ -122,13 +134,8 @@ export component NodeEditor {
     // === Box selection modifier configuration ===
     /// Allow box selection on click on empty area (no modifier needed)
     in property <bool> box-selection-on-empty: true;
-    /// Ctrl modifier enables box selection (even over links/nodes)
-    in property <bool> box-selection-modifier-ctrl: true;
-    /// Alt modifier enables box selection (even over links/nodes)
-    in property <bool> box-selection-modifier-alt: false;
-    /// Shift modifier enables box selection (even over links/nodes)
-    /// Note: Shift is typically used for extending selection, enable with care
-    in property <bool> box-selection-modifier-shift: false;
+    /// Modifier key that enables box selection even over links/nodes
+    in property <BoxSelectionModifier> box-selection-modifier: BoxSelectionModifier.ctrl;
 
     // === Internal state ===
     property <bool> internal-is-panning: false;
@@ -359,9 +366,9 @@ export component NodeEditor {
     }
 
     // === Minimap Positioning ===
-    property <length> minimap-size-width: 180px;
-    property <length> minimap-size-height: 135px;
-    property <length> minimap-margin: 24px;
+    in property <length> minimap-size-width: 180px;
+    in property <length> minimap-size-height: 135px;
+    in property <length> minimap-margin: 24px;
 
     pure function compute-minimap-x() -> length {
         if (root.minimap-position == MinimapPosition.top-left || root.minimap-position == MinimapPosition.bottom-left) {
@@ -422,11 +429,11 @@ export component NodeEditor {
                         root.pan-start-offset-y = root.pan-y;
                     } else if event.button == PointerEventButton.left {
                         // Check if box selection should start based on configuration
-                        // Modifier keys can force box selection even over links
+                        // Modifier key can force box selection even over links
                         // Empty area allows box selection if box-selection-on-empty is true
-                        if (root.box-selection-modifier-ctrl && event.modifiers.control) ||
-                           (root.box-selection-modifier-alt && event.modifiers.alt) ||
-                           (root.box-selection-modifier-shift && event.modifiers.shift) ||
+                        if (root.box-selection-modifier == BoxSelectionModifier.ctrl && event.modifiers.control) ||
+                           (root.box-selection-modifier == BoxSelectionModifier.alt && event.modifiers.alt) ||
+                           (root.box-selection-modifier == BoxSelectionModifier.shift && event.modifiers.shift) ||
                            (root.box-selection-on-empty && root.compute-link-at(self.mouse-x, self.mouse-y) < 0) {
                             // Start box selection
                             root.internal-is-box-selecting = true;
