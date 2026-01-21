@@ -23,7 +23,7 @@ pub fn generate_bezier_path(
     let dx = end_x - start_x;
     let dy = end_y - start_y;
     let dist_sq = dx * dx + dy * dy;
-    let threshold = 10.0 * zoom;
+    let threshold = 20.0 * zoom;
 
     if dist_sq < threshold * threshold {
         return format!("M {} {} L {} {}", start_x, start_y, end_x, end_y);
@@ -86,7 +86,7 @@ pub fn generate_partial_bezier_path(
     let dx_full = end_x - start_x;
     let dy_full = end_y - start_y;
     let dist_sq = dx_full * dx_full + dy_full * dy_full;
-    let threshold = 10.0 * zoom;
+    let threshold = 20.0 * zoom;
 
     if dist_sq < threshold * threshold {
         let curr_x = start_x + dx_full * t;
