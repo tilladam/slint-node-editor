@@ -22,13 +22,13 @@ include = [
 ]
 
 [dependencies]
-slint = { path = "../../../../Rust/slint/slint/api/rs/slint", default-features = false, features = ["std", "compat-1-2"] }
+slint = { git = "https://github.com/slint-ui/slint", default-features = false, features = ["std", "compat-1-2"] }
 
 [dev-dependencies]
-i-slint-backend-testing = { path = "../../../../Rust/slint/slint/internal/backends/testing" }
+i-slint-backend-testing = { git = "https://github.com/slint-ui/slint" }
 
 [build-dependencies]
-slint-build = { path = "../../../../Rust/slint/slint/api/rs/build" }
+slint-build = { git = "https://github.com/slint-ui/slint" }
 
 # [workspace]
 # members = ["examples/advanced", "examples/minimal", "examples/custom-shapes", "examples/animated-links", "examples/pin-compatibility"]
