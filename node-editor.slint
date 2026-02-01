@@ -370,14 +370,16 @@ export component NodeEditor {
 
     /// End node drag
     public function end-node-drag(delta-x: length, delta-y: length) {
-        root.internal-is-dragging = false;
-        root.internal-drag-offset-x = 0px;
-        root.internal-drag-offset-y = 0px;
-
+        // Call callback FIRST so Rust can update model with correct positions
         root.node-drag-ended(
             root.grid-snapping ? root.snap-to-grid(delta-x / 1px) : delta-x / 1px,
             root.grid-snapping ? root.snap-to-grid(delta-y / 1px) : delta-y / 1px
         );
+
+        // THEN reset visual offset (now report-rect will find model already updated)
+        root.internal-is-dragging = false;
+        root.internal-drag-offset-x = 0px;
+        root.internal-drag-offset-y = 0px;
     }
 
     // === Trigger updates on viewport changes ===
