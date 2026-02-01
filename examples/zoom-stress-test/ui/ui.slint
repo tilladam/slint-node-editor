@@ -1,0 +1,277 @@
+// Zoom Stress Test Example
+//
+// This example tests widget scaling behavior at various zoom levels.
+// It contains three nodes with complex Slint controls to verify:
+// - Controls remain usable at all zoom levels
+// - Font sizes stay readable and crisp
+// - Hit targets are adequate for interaction
+// - Layout consistency across zoom levels
+
+import { NodeEditor, Link, LinkData } from "@slint-node-editor/node-editor.slint";
+import { InputNode, InputNodeData } from "input_node.slint";
+import { ControlNode, ControlNodeData } from "control_node.slint";
+import { DisplayNode, DisplayNodeData } from "display_node.slint";
+
+// Re-export for Rust
+export { InputNodeData, ControlNodeData, DisplayNodeData, LinkData }
+
+export component MainWindow inherits Window {
+    title: "Zoom Stress Test - Widget Scaling";
+    width: 1200px;
+    height: 800px;
+    background: #1a1a1a;
+
+    // Node models
+    in property <[InputNodeData]> input-nodes;
+    in property <[ControlNodeData]> control-nodes;
+    in property <[DisplayNodeData]> display-nodes;
+
+    // Link model
+    in property <[LinkData]> links;
+
+    // Grid commands
+    in-out property <string> grid-commands;
+
+    // Viewport state
+    in-out property <length> pan-x: 0px;
+    in-out property <length> pan-y: 0px;
+    in-out property <float> zoom: 1.0;
+
+    // Expose size for Rust
+    out property <float> width_: self.width / 1px;
+    out property <float> height_: self.height / 1px;
+
+    // Callbacks to Rust
+    callback request-grid-update <=> editor.request-grid-update;
+    callback node-rect-changed <=> editor.node-rect-changed;
+    callback pin-position-changed <=> editor.pin-position-changed;
+    callback update-viewport(float, float, float);
+    pure callback compute-link-path <=> editor.compute-link-path;
+
+    // Input node callbacks
+    callback input-text-changed(int, string);
+    callback input-spin-changed(int, int);
+    callback input-combo-changed(int, int);
+
+    // Control node callbacks
+    callback control-check-a-toggled(int, bool);
+    callback control-check-b-toggled(int, bool);
+    callback control-switch-toggled(int, bool);
+    callback control-slider-changed(int, float);
+    callback control-action-clicked(int, string);
+
+    editor := NodeEditor {
+        width: 100%;
+        height: 100%;
+        pan-x <=> root.pan-x;
+        pan-y <=> root.pan-y;
+        zoom <=> root.zoom;
+        min-zoom: 0.1;  // Allow very small zoom to stress test
+        max-zoom: 5.0;  // Allow very large zoom to stress test
+        background-color: #1a1a1a;
+        grid-spacing: 24px;
+        grid-color: #333333;
+        grid-commands <=> root.grid-commands;
+        links <=> root.links;
+
+        viewport-changed => {
+            root.update-viewport(self.zoom, self.pan-x / 1px, self.pan-y / 1px);
+        }
+
+        // Input nodes
+        for data in root.input-nodes: InputNode {
+            node-id: data.id;
+            title: data.title;
+            world-x: data.world-x * 1px;
+            world-y: data.world-y * 1px;
+            zoom: editor.zoom;
+            pan-x: editor.pan-x;
+            pan-y: editor.pan-y;
+            text-value: data.text-value;
+            spin-value: data.spin-value;
+            combo-index: data.combo-index;
+
+            report-rect(id, x, y, w, h) => {
+                editor.report-node-rect(id, x, y, w, h);
+            }
+            pin-position-changed(pin-id, node-id, pin-type, x, y) => {
+                editor.report-pin-position(pin-id, node-id, pin-type, x, y);
+            }
+            pin-drag-started(pin-id, x, y) => {
+                editor.start-link-from-pin(pin-id, x, y);
+            }
+            pin-drag-moved(pin-id, x, y) => {
+                editor.update-link-end(x, y);
+            }
+            pin-drag-ended(pin-id, x, y) => {
+                editor.update-link-end(x, y);
+                editor.complete-link-creation();
+            }
+            text-changed(id, val) => {
+                root.input-text-changed(id, val);
+            }
+            spin-changed(id, val) => {
+                root.input-spin-changed(id, val);
+            }
+            combo-changed(id, idx) => {
+                root.input-combo-changed(id, idx);
+            }
+        }
+
+        // Control nodes
+        for data in root.control-nodes: ControlNode {
+            node-id: data.id;
+            title: data.title;
+            world-x: data.world-x * 1px;
+            world-y: data.world-y * 1px;
+            zoom: editor.zoom;
+            pan-x: editor.pan-x;
+            pan-y: editor.pan-y;
+            check-a: data.check-a;
+            check-b: data.check-b;
+            switch-value: data.switch-value;
+            slider-value: data.slider-value;
+
+            report-rect(id, x, y, w, h) => {
+                editor.report-node-rect(id, x, y, w, h);
+            }
+            pin-position-changed(pin-id, node-id, pin-type, x, y) => {
+                editor.report-pin-position(pin-id, node-id, pin-type, x, y);
+            }
+            pin-drag-started(pin-id, x, y) => {
+                editor.start-link-from-pin(pin-id, x, y);
+            }
+            pin-drag-moved(pin-id, x, y) => {
+                editor.update-link-end(x, y);
+            }
+            pin-drag-ended(pin-id, x, y) => {
+                editor.update-link-end(x, y);
+                editor.complete-link-creation();
+            }
+            check-a-toggled(id, val) => {
+                root.control-check-a-toggled(id, val);
+            }
+            check-b-toggled(id, val) => {
+                root.control-check-b-toggled(id, val);
+            }
+            switch-toggled(id, val) => {
+                root.control-switch-toggled(id, val);
+            }
+            slider-changed(id, val) => {
+                root.control-slider-changed(id, val);
+            }
+            action-clicked(id, action) => {
+                root.control-action-clicked(id, action);
+            }
+        }
+
+        // Display nodes
+        for data in root.display-nodes: DisplayNode {
+            node-id: data.id;
+            title: data.title;
+            world-x: data.world-x * 1px;
+            world-y: data.world-y * 1px;
+            zoom: editor.zoom;
+            pan-x: editor.pan-x;
+            pan-y: editor.pan-y;
+            progress: data.progress;
+            status-text: data.status-text;
+            color-r: data.color-r;
+            color-g: data.color-g;
+            color-b: data.color-b;
+            is-loading: data.is-loading;
+
+            report-rect(id, x, y, w, h) => {
+                editor.report-node-rect(id, x, y, w, h);
+            }
+            pin-position-changed(pin-id, node-id, pin-type, x, y) => {
+                editor.report-pin-position(pin-id, node-id, pin-type, x, y);
+            }
+            pin-drag-started(pin-id, x, y) => {
+                editor.start-link-from-pin(pin-id, x, y);
+            }
+            pin-drag-moved(pin-id, x, y) => {
+                editor.update-link-end(x, y);
+            }
+            pin-drag-ended(pin-id, x, y) => {
+                editor.update-link-end(x, y);
+                editor.complete-link-creation();
+            }
+        }
+    }
+
+    // Zoom level indicator
+    Rectangle {
+        x: parent.width - 160px;
+        y: 10px;
+        width: 150px;
+        height: 60px;
+        background: #00000099;
+        border-radius: 8px;
+
+        VerticalLayout {
+            padding: 10px;
+            spacing: 4px;
+
+            Text {
+                text: "Zoom: " + round(zoom * 100) + "%";
+                color: white;
+                font-size: 14px;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                text: zoom < 0.5 ? "Very small" :
+                      zoom < 0.8 ? "Small" :
+                      zoom < 1.2 ? "Normal" :
+                      zoom < 2.0 ? "Large" : "Very large";
+                color: zoom < 0.5 ? #f88 :
+                       zoom < 0.8 ? #fa8 :
+                       zoom < 1.2 ? #8f8 :
+                       zoom < 2.0 ? #8af : #f8f;
+                font-size: 11px;
+                horizontal-alignment: center;
+            }
+        }
+    }
+
+    // Instructions
+    Rectangle {
+        x: 10px;
+        y: 10px;
+        width: 280px;
+        height: 100px;
+        background: #00000099;
+        border-radius: 8px;
+
+        VerticalLayout {
+            padding: 12px;
+            spacing: 4px;
+
+            Text {
+                text: "Zoom Stress Test";
+                color: white;
+                font-size: 14px;
+                font-weight: 700;
+            }
+
+            Text {
+                text: "Scroll to zoom (0.1x - 5.0x)";
+                color: #aaa;
+                font-size: 11px;
+            }
+
+            Text {
+                text: "Middle-click drag to pan";
+                color: #aaa;
+                font-size: 11px;
+            }
+
+            Text {
+                text: "Test widget usability at all zoom levels";
+                color: #888;
+                font-size: 10px;
+            }
+        }
+    }
+}

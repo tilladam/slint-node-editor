@@ -1,0 +1,254 @@
+// Control Node - Tests toggle/action controls at various zoom levels
+//
+// Controls tested:
+// - CheckBox (small click targets)
+// - Switch (toggle control)
+// - Button (various sizes)
+// - Slider (draggable range control)
+
+import { CheckBox, Switch, Button, Slider } from "std-widgets.slint";
+import { Pin, PinTypes, BaseNode } from "@slint-node-editor/node-editor.slint";
+
+// Control node data passed from Rust
+export struct ControlNodeData {
+    id: int,
+    title: string,
+    world-x: float,
+    world-y: float,
+    check-a: bool,
+    check-b: bool,
+    switch-value: bool,
+    slider-value: float,
+}
+
+export component ControlNode inherits BaseNode {
+    in property <string> title: "Control";
+
+    // Pin IDs
+    in property <int> input-pin-id: self.node-id * 10;
+    in property <int> output-pin-id: self.node-id * 10 + 1;
+
+    // Node state
+    in-out property <bool> check-a: false;
+    in-out property <bool> check-b: true;
+    in-out property <bool> switch-value: true;
+    in-out property <float> slider-value: 0.5;
+
+    // Callbacks for widget changes
+    callback check-a-toggled(int, bool);     // node-id, new-value
+    callback check-b-toggled(int, bool);     // node-id, new-value
+    callback switch-toggled(int, bool);      // node-id, new-value
+    callback slider-changed(int, float);     // node-id, new-value
+    callback action-clicked(int, string);    // node-id, action-name
+
+    // Layout constants
+    property <length> content-padding: 8px;
+    property <length> title-height: 28px;
+    property <length> row-height: 32px;
+    property <length> row-spacing: 4px;
+    property <length> pin-area-width: 20px;
+
+    // Pin dimensions
+    property <length> base-pin-size: 12px;
+    property <length> pin-size: base-pin-size * self.zoom;
+
+    // Base dimensions
+    property <length> base-width: 260px;
+    property <length> base-height: content-padding + title-height + content-padding
+                                   + (row-height * 4) + (row-spacing * 3) + content-padding;
+
+    width: base-width * self.zoom;
+    height: base-height * self.zoom;
+
+    // Main layout
+    VerticalLayout {
+        padding: root.content-padding * root.zoom;
+        spacing: root.row-spacing * root.zoom;
+
+        // Title bar
+        Rectangle {
+            height: root.title-height * root.zoom;
+            background: root.selected ? #7a4a4a : #5d3d3d;
+            border-radius: 4px * root.zoom;
+
+            Text {
+                text: root.title;
+                color: white;
+                font-size: 14px * root.zoom;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        // Row 1: Checkboxes
+        HorizontalLayout {
+            height: root.row-height * root.zoom;
+            spacing: 16px * root.zoom;
+            padding-left: root.pin-area-width * root.zoom;
+            padding-right: root.pin-area-width * root.zoom;
+            alignment: start;
+
+            CheckBox {
+                text: "Option A";
+                checked <=> root.check-a;
+                toggled => {
+                    root.check-a-toggled(root.node-id, root.check-a);
+                }
+            }
+
+            CheckBox {
+                text: "Option B";
+                checked <=> root.check-b;
+                toggled => {
+                    root.check-b-toggled(root.node-id, root.check-b);
+                }
+            }
+        }
+
+        // Row 2: Switch
+        HorizontalLayout {
+            height: root.row-height * root.zoom;
+            spacing: 12px * root.zoom;
+            padding-left: root.pin-area-width * root.zoom;
+            padding-right: root.pin-area-width * root.zoom;
+            alignment: start;
+
+            Text {
+                text: "Enable:";
+                color: #ccc;
+                font-size: 12px * root.zoom;
+                vertical-alignment: center;
+            }
+
+            Switch {
+                checked <=> root.switch-value;
+                toggled => {
+                    root.switch-toggled(root.node-id, root.switch-value);
+                }
+            }
+
+            Text {
+                text: root.switch-value ? "ON" : "OFF";
+                color: root.switch-value ? #8f8 : #f88;
+                font-size: 11px * root.zoom;
+                vertical-alignment: center;
+            }
+        }
+
+        // Row 3: Slider
+        HorizontalLayout {
+            height: root.row-height * root.zoom;
+            spacing: 8px * root.zoom;
+            padding-left: root.pin-area-width * root.zoom;
+            padding-right: root.pin-area-width * root.zoom;
+
+            Text {
+                text: "Level:";
+                color: #ccc;
+                font-size: 12px * root.zoom;
+                vertical-alignment: center;
+                width: 40px * root.zoom;
+            }
+
+            Slider {
+                horizontal-stretch: 1;
+                value <=> root.slider-value;
+                minimum: 0;
+                maximum: 1;
+                changed(val) => {
+                    root.slider-changed(root.node-id, val);
+                }
+            }
+
+            Text {
+                text: round(root.slider-value * 100) + "%";
+                color: #aaa;
+                font-size: 10px * root.zoom;
+                vertical-alignment: center;
+                width: 35px * root.zoom;
+                horizontal-alignment: right;
+            }
+        }
+
+        // Row 4: Buttons
+        HorizontalLayout {
+            height: root.row-height * root.zoom;
+            spacing: 8px * root.zoom;
+            padding-left: root.pin-area-width * root.zoom;
+            padding-right: root.pin-area-width * root.zoom;
+            alignment: center;
+
+            Button {
+                text: "Apply";
+                clicked => {
+                    root.action-clicked(root.node-id, "apply");
+                }
+            }
+
+            Button {
+                text: "Reset";
+                clicked => {
+                    root.action-clicked(root.node-id, "reset");
+                }
+            }
+
+            Button {
+                text: "...";
+                clicked => {
+                    root.action-clicked(root.node-id, "more");
+                }
+            }
+        }
+    }
+
+    // Input pin (left side, upper third)
+    input-pin := Pin {
+        x: root.content-padding * root.zoom;
+        y: (root.content-padding + root.title-height + root.content-padding + root.row-height / 2) * root.zoom - root.pin-size / 2;
+        pin-id: root.input-pin-id;
+        node-id: root.node-id;
+        pin-type: PinTypes.input;
+        zoom: root.zoom;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
+        base-color: #2196F3;
+        hover-color: #42A5F5;
+        base-size: root.base-pin-size;
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+        report-position(pin-id, node-id, pin-type, x, y) => {
+            root.pin-position-changed(pin-id, node-id, pin-type, x, y);
+        }
+    }
+
+    // Output pin (right side, lower third)
+    output-pin := Pin {
+        x: parent.width - root.content-padding * root.zoom - root.pin-size;
+        y: parent.height - (root.content-padding + root.row-height / 2) * root.zoom - root.pin-size / 2;
+        pin-id: root.output-pin-id;
+        node-id: root.node-id;
+        pin-type: PinTypes.output;
+        zoom: root.zoom;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
+        base-color: #FF9800;
+        hover-color: #FFB74D;
+        base-size: root.base-pin-size;
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+        report-position(pin-id, node-id, pin-type, x, y) => {
+            root.pin-position-changed(pin-id, node-id, pin-type, x, y);
+        }
+    }
+
+    init => {
+        if (self.node-id > 0) {
+            root.pin-position-changed(root.input-pin-id, self.node-id, PinTypes.input,
+                                      input-pin.center-x, input-pin.center-y);
+            root.pin-position-changed(root.output-pin-id, self.node-id, PinTypes.output,
+                                      output-pin.center-x, output-pin.center-y);
+        }
+    }
+}

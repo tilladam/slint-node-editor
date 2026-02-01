@@ -1,0 +1,269 @@
+// Display Node - Tests output/visualization controls at various zoom levels
+//
+// Controls tested:
+// - ProgressIndicator (spinner)
+// - Text at various font sizes
+// - Color preview rectangles
+// - Progress bar simulation
+
+import { ProgressIndicator, Spinner } from "std-widgets.slint";
+import { Pin, PinTypes, BaseNode } from "@slint-node-editor/node-editor.slint";
+
+// Display node data passed from Rust
+export struct DisplayNodeData {
+    id: int,
+    title: string,
+    world-x: float,
+    world-y: float,
+    progress: float,
+    status-text: string,
+    color-r: float,
+    color-g: float,
+    color-b: float,
+    is-loading: bool,
+}
+
+export component DisplayNode inherits BaseNode {
+    in property <string> title: "Display";
+
+    // Pin IDs
+    in property <int> input-pin-id: self.node-id * 10;
+
+    // Node state
+    in property <float> progress: 0.65;
+    in property <string> status-text: "Ready";
+    in property <float> color-r: 0.2;
+    in property <float> color-g: 0.6;
+    in property <float> color-b: 0.9;
+    in property <bool> is-loading: false;
+
+    // Layout constants
+    property <length> content-padding: 8px;
+    property <length> title-height: 28px;
+    property <length> row-height: 28px;
+    property <length> row-spacing: 6px;
+    property <length> pin-area-width: 20px;
+
+    // Pin dimensions
+    property <length> base-pin-size: 12px;
+    property <length> pin-size: base-pin-size * self.zoom;
+
+    // Base dimensions
+    property <length> base-width: 240px;
+    property <length> base-height: content-padding + title-height + content-padding
+                                   + (row-height * 5) + (row-spacing * 4) + content-padding;
+
+    width: base-width * self.zoom;
+    height: base-height * self.zoom;
+
+    // Main layout
+    VerticalLayout {
+        padding: root.content-padding * root.zoom;
+        spacing: root.row-spacing * root.zoom;
+
+        // Title bar
+        Rectangle {
+            height: root.title-height * root.zoom;
+            background: root.selected ? #4a4a7a : #3d3d5d;
+            border-radius: 4px * root.zoom;
+
+            Text {
+                text: root.title;
+                color: white;
+                font-size: 14px * root.zoom;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        // Row 1: Large status text
+        HorizontalLayout {
+            height: root.row-height * root.zoom;
+            padding-left: root.pin-area-width * root.zoom;
+            padding-right: root.pin-area-width * root.zoom;
+            alignment: center;
+
+            Text {
+                text: root.status-text;
+                color: #fff;
+                font-size: 16px * root.zoom;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            if root.is-loading: Spinner {
+                indeterminate: true;
+                width: 20px * root.zoom;
+                height: 20px * root.zoom;
+            }
+        }
+
+        // Row 2: Progress bar
+        HorizontalLayout {
+            height: root.row-height * root.zoom;
+            spacing: 8px * root.zoom;
+            padding-left: root.pin-area-width * root.zoom;
+            padding-right: root.pin-area-width * root.zoom;
+
+            Text {
+                text: round(root.progress * 100) + "%";
+                color: #aaa;
+                font-size: 11px * root.zoom;
+                vertical-alignment: center;
+                width: 35px * root.zoom;
+            }
+
+            Rectangle {
+                horizontal-stretch: 1;
+                height: 12px * root.zoom;
+                background: #333;
+                border-radius: 6px * root.zoom;
+
+                Rectangle {
+                    x: 0;
+                    y: 0;
+                    width: parent.width * root.progress;
+                    height: parent.height;
+                    background: #4CAF50;
+                    border-radius: 6px * root.zoom;
+                }
+            }
+        }
+
+        // Row 3: Color preview with RGB values
+        HorizontalLayout {
+            height: root.row-height * root.zoom;
+            spacing: 8px * root.zoom;
+            padding-left: root.pin-area-width * root.zoom;
+            padding-right: root.pin-area-width * root.zoom;
+
+            Text {
+                text: "Color:";
+                color: #ccc;
+                font-size: 11px * root.zoom;
+                vertical-alignment: center;
+            }
+
+            Rectangle {
+                width: 40px * root.zoom;
+                height: 20px * root.zoom;
+                background: rgb(root.color-r * 255, root.color-g * 255, root.color-b * 255);
+                border-radius: 4px * root.zoom;
+                border-width: 1px * root.zoom;
+                border-color: #666;
+            }
+
+            Text {
+                text: "R:" + round(root.color-r * 255);
+                color: #f88;
+                font-size: 9px * root.zoom;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: "G:" + round(root.color-g * 255);
+                color: #8f8;
+                font-size: 9px * root.zoom;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: "B:" + round(root.color-b * 255);
+                color: #88f;
+                font-size: 9px * root.zoom;
+                vertical-alignment: center;
+            }
+        }
+
+        // Row 4: Multiple font sizes demonstration
+        HorizontalLayout {
+            height: root.row-height * root.zoom;
+            spacing: 6px * root.zoom;
+            padding-left: root.pin-area-width * root.zoom;
+            padding-right: root.pin-area-width * root.zoom;
+            alignment: start;
+
+            Text {
+                text: "XL";
+                color: #ccc;
+                font-size: 18px * root.zoom;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: "Large";
+                color: #aaa;
+                font-size: 14px * root.zoom;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: "Med";
+                color: #888;
+                font-size: 11px * root.zoom;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: "Small";
+                color: #666;
+                font-size: 9px * root.zoom;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: "Tiny";
+                color: #555;
+                font-size: 7px * root.zoom;
+                vertical-alignment: center;
+            }
+        }
+
+        // Row 5: Mini color swatches
+        HorizontalLayout {
+            height: root.row-height * root.zoom;
+            spacing: 4px * root.zoom;
+            padding-left: root.pin-area-width * root.zoom;
+            padding-right: root.pin-area-width * root.zoom;
+            alignment: start;
+
+            for color in [#e74c3c, #e67e22, #f1c40f, #2ecc71, #3498db, #9b59b6, #1abc9c, #34495e]: Rectangle {
+                width: 18px * root.zoom;
+                height: 18px * root.zoom;
+                background: color;
+                border-radius: 3px * root.zoom;
+                border-width: 1px * root.zoom;
+                border-color: #00000040;
+            }
+        }
+    }
+
+    // Input pin (left side, centered)
+    input-pin := Pin {
+        x: root.content-padding * root.zoom;
+        y: parent.height / 2 - root.pin-size / 2;
+        pin-id: root.input-pin-id;
+        node-id: root.node-id;
+        pin-type: PinTypes.input;
+        zoom: root.zoom;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
+        base-color: #9C27B0;
+        hover-color: #BA68C8;
+        base-size: root.base-pin-size;
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+        report-position(pin-id, node-id, pin-type, x, y) => {
+            root.pin-position-changed(pin-id, node-id, pin-type, x, y);
+        }
+    }
+
+    init => {
+        if (self.node-id > 0) {
+            root.pin-position-changed(root.input-pin-id, self.node-id, PinTypes.input,
+                                      input-pin.center-x, input-pin.center-y);
+        }
+    }
+}

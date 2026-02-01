@@ -1,0 +1,182 @@
+// Input Node - Tests text/numeric input controls at various zoom levels
+//
+// Controls tested:
+// - LineEdit (text input)
+// - SpinBox (numeric input with +/- buttons)
+// - ComboBox (dropdown selection)
+
+import { LineEdit, SpinBox, ComboBox } from "std-widgets.slint";
+import { Pin, PinTypes, BaseNode } from "@slint-node-editor/node-editor.slint";
+
+// Input node data passed from Rust
+export struct InputNodeData {
+    id: int,
+    title: string,
+    world-x: float,
+    world-y: float,
+    text-value: string,
+    spin-value: int,
+    combo-index: int,
+}
+
+export component InputNode inherits BaseNode {
+    in property <string> title: "Input";
+
+    // Pin IDs
+    in property <int> output-pin-id: self.node-id * 10 + 1;
+
+    // Node state
+    in-out property <string> text-value: "";
+    in-out property <int> spin-value: 50;
+    in-out property <int> combo-index: 0;
+
+    // Callbacks for widget changes
+    callback text-changed(int, string);      // node-id, new-value
+    callback spin-changed(int, int);         // node-id, new-value
+    callback combo-changed(int, int);        // node-id, new-index
+
+    // Layout constants
+    property <length> content-padding: 8px;
+    property <length> title-height: 28px;
+    property <length> row-height: 36px;
+    property <length> row-spacing: 6px;
+    property <length> label-width: 50px;
+    property <length> pin-area-width: 20px;
+
+    // Pin dimensions
+    property <length> base-pin-size: 12px;
+    property <length> pin-size: base-pin-size * self.zoom;
+
+    // Base dimensions
+    property <length> base-width: 280px;
+    property <length> base-height: content-padding + title-height + content-padding
+                                   + (row-height * 3) + (row-spacing * 2) + content-padding;
+
+    width: base-width * self.zoom;
+    height: base-height * self.zoom;
+
+    // Main layout
+    VerticalLayout {
+        padding: root.content-padding * root.zoom;
+        spacing: root.row-spacing * root.zoom;
+
+        // Title bar
+        Rectangle {
+            height: root.title-height * root.zoom;
+            background: root.selected ? #4a7a4a : #3d5d3d;
+            border-radius: 4px * root.zoom;
+
+            Text {
+                text: root.title;
+                color: white;
+                font-size: 14px * root.zoom;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        // Row 1: Text input
+        HorizontalLayout {
+            height: root.row-height * root.zoom;
+            spacing: 8px * root.zoom;
+            padding-left: root.pin-area-width * root.zoom;
+            padding-right: root.pin-area-width * root.zoom;
+
+            Text {
+                width: root.label-width * root.zoom;
+                text: "Text:";
+                color: #ccc;
+                font-size: 12px * root.zoom;
+                vertical-alignment: center;
+            }
+
+            LineEdit {
+                horizontal-stretch: 1;
+                text <=> root.text-value;
+                placeholder-text: "Enter text...";
+                edited(val) => {
+                    root.text-changed(root.node-id, val);
+                }
+            }
+        }
+
+        // Row 2: Numeric input
+        HorizontalLayout {
+            height: root.row-height * root.zoom;
+            spacing: 8px * root.zoom;
+            padding-left: root.pin-area-width * root.zoom;
+            padding-right: root.pin-area-width * root.zoom;
+
+            Text {
+                width: root.label-width * root.zoom;
+                text: "Value:";
+                color: #ccc;
+                font-size: 12px * root.zoom;
+                vertical-alignment: center;
+            }
+
+            SpinBox {
+                horizontal-stretch: 1;
+                value <=> root.spin-value;
+                minimum: 0;
+                maximum: 100;
+                edited(val) => {
+                    root.spin-changed(root.node-id, val);
+                }
+            }
+        }
+
+        // Row 3: Dropdown
+        HorizontalLayout {
+            height: root.row-height * root.zoom;
+            spacing: 8px * root.zoom;
+            padding-left: root.pin-area-width * root.zoom;
+            padding-right: root.pin-area-width * root.zoom;
+
+            Text {
+                width: root.label-width * root.zoom;
+                text: "Mode:";
+                color: #ccc;
+                font-size: 12px * root.zoom;
+                vertical-alignment: center;
+            }
+
+            ComboBox {
+                horizontal-stretch: 1;
+                model: ["Linear", "Exponential", "Logarithmic", "Cubic"];
+                current-index <=> root.combo-index;
+                selected(_val) => {
+                    root.combo-changed(root.node-id, root.combo-index);
+                }
+            }
+        }
+    }
+
+    // Output pin (right side, centered vertically)
+    output-pin := Pin {
+        x: parent.width - root.content-padding * root.zoom - root.pin-size;
+        y: parent.height / 2 - root.pin-size / 2;
+        pin-id: root.output-pin-id;
+        node-id: root.node-id;
+        pin-type: PinTypes.output;
+        zoom: root.zoom;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
+        base-color: #4CAF50;
+        hover-color: #66BB6A;
+        base-size: root.base-pin-size;
+        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
+        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
+        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+        report-position(pin-id, node-id, pin-type, x, y) => {
+            root.pin-position-changed(pin-id, node-id, pin-type, x, y);
+        }
+    }
+
+    init => {
+        if (self.node-id > 0) {
+            root.pin-position-changed(root.output-pin-id, self.node-id, PinTypes.output,
+                                      output-pin.center-x, output-pin.center-y);
+        }
+    }
+}
