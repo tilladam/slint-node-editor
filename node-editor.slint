@@ -311,6 +311,24 @@ export component NodeEditor {
         root.pan-y = mouse-y - graph-y * new-zoom * 1px;
     }
 
+    /// Zoom sensitivity for scroll-to-zoom (higher = faster zoom)
+    in property <float> scroll-zoom-sensitivity: 0.002;
+
+    /// Handle scroll-to-zoom (Ctrl+scroll or pinch gesture)
+    /// delta-y: scroll amount (positive = zoom in, negative = zoom out)
+    /// mouse-x, mouse-y: screen coordinates to zoom toward
+    function handle-scroll-zoom(delta-y: length, mouse-x: length, mouse-y: length) {
+        // Convert scroll delta to zoom factor and apply zoom centered on mouse
+        // Calculate graph coordinates under mouse, then apply new zoom
+        root.apply-zoom-with-adjustment(
+            clamp(root.zoom * (1.0 + (delta-y / 1px) * root.scroll-zoom-sensitivity), root.min-zoom, root.max-zoom),
+            mouse-x,
+            mouse-y,
+            (mouse-x - root.pan-x) / root.zoom / 1px,
+            (mouse-y - root.pan-y) / root.zoom / 1px
+        );
+    }
+
     /// Handle link click selection - delegates to Rust via callback
     function handle-link-click(link-id: int, shift-held: bool) {
         root.select-link(link-id, shift-held);
@@ -412,9 +430,16 @@ export component NodeEditor {
             height: 100%;
 
             scroll-event(event) => {
-                // Pan
-                root.pan-x += event.delta-x;
-                root.pan-y += event.delta-y;
+                if event.modifiers.control {
+                    // Ctrl+scroll: Zoom centered on mouse position
+                    // Use delta-y for zoom (positive = zoom in, negative = zoom out)
+                    // Scale factor: each "click" of scroll changes zoom by ~10%
+                    root.handle-scroll-zoom(event.delta-y, self.mouse-x, self.mouse-y);
+                } else {
+                    // Normal scroll: Pan
+                    root.pan-x += event.delta-x;
+                    root.pan-y += event.delta-y;
+                }
                 accept
             }
 
