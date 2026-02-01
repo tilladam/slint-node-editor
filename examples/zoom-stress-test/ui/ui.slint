@@ -105,6 +105,11 @@ export component MainWindow inherits Window {
             text-value: data.text-value;
             spin-value: data.spin-value;
             combo-index: data.combo-index;
+            // LOD configuration from NodeEditor
+            lod-full-threshold: editor.lod-full-threshold;
+            lod-simplified-threshold: editor.lod-simplified-threshold;
+            min-node-width: editor.min-node-width;
+            min-node-height: editor.min-node-height;
 
             report-rect(id, x, y, w, h) => {
                 editor.report-node-rect(id, x, y, w, h);
@@ -146,6 +151,11 @@ export component MainWindow inherits Window {
             check-b: data.check-b;
             switch-value: data.switch-value;
             slider-value: data.slider-value;
+            // LOD configuration from NodeEditor
+            lod-full-threshold: editor.lod-full-threshold;
+            lod-simplified-threshold: editor.lod-simplified-threshold;
+            min-node-width: editor.min-node-width;
+            min-node-height: editor.min-node-height;
 
             report-rect(id, x, y, w, h) => {
                 editor.report-node-rect(id, x, y, w, h);
@@ -195,6 +205,11 @@ export component MainWindow inherits Window {
             color-g: data.color-g;
             color-b: data.color-b;
             is-loading: data.is-loading;
+            // LOD configuration from NodeEditor
+            lod-full-threshold: editor.lod-full-threshold;
+            lod-simplified-threshold: editor.lod-simplified-threshold;
+            min-node-width: editor.min-node-width;
+            min-node-height: editor.min-node-height;
 
             report-rect(id, x, y, w, h) => {
                 editor.report-node-rect(id, x, y, w, h);

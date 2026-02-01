@@ -42,9 +42,11 @@ export component DisplayNode inherits BaseNode {
     in property <float> color-b: 0.9;
     in property <bool> is-loading: false;
 
-    // === LOD Configuration ===
-    property <float> lod-full-threshold: 0.5;
-    property <float> lod-simplified-threshold: 0.25;
+    // === LOD Configuration (can be overridden by parent) ===
+    in property <float> lod-full-threshold: 0.5;
+    in property <float> lod-simplified-threshold: 0.25;
+    in property <length> min-node-width: 80px;
+    in property <length> min-node-height: 40px;
 
     // LOD level: 2=full, 1=simplified, 0=minimal
     property <int> lod-level: self.zoom > lod-full-threshold ? 2
@@ -72,9 +74,9 @@ export component DisplayNode inherits BaseNode {
     property <length> simplified-width: 120px;
     property <length> simplified-height: content-padding + title-height + row-spacing + 16px + content-padding;
 
-    // Minimal size
-    property <length> minimal-width: 80px;
-    property <length> minimal-height: 40px;
+    // Minimal size (from configurable properties)
+    property <length> minimal-width: root.min-node-width;
+    property <length> minimal-height: root.min-node-height;
 
     // Effective dimensions based on LOD
     property <length> effective-base-width: lod-level == 2 ? full-width

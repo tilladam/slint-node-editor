@@ -72,6 +72,17 @@ export component NodeEditor {
     in property <float> min-zoom: 0.1;
     in property <float> max-zoom: 3.0;
 
+    // === LOD (Level of Detail) configuration ===
+    /// Zoom threshold above which nodes render full detail (all widgets)
+    in property <float> lod-full-threshold: 0.5;
+    /// Zoom threshold above which nodes render simplified detail (title + pins)
+    /// Below this threshold, nodes render minimal detail (colored box + title)
+    in property <float> lod-simplified-threshold: 0.25;
+    /// Minimum width for nodes at any zoom level
+    in property <length> min-node-width: 80px;
+    /// Minimum height for nodes at any zoom level
+    in property <length> min-node-height: 40px;
+
     // === Link data (set by application) ===
     /// Logical link data - application provides this
     in property <[LinkData]> links: [];
