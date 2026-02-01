@@ -11,6 +11,7 @@ import { NodeEditor, Link, LinkData } from "@slint-node-editor/node-editor.slint
 import { InputNode, InputNodeData } from "input_node.slint";
 import { ControlNode, ControlNodeData } from "control_node.slint";
 import { DisplayNode, DisplayNodeData } from "display_node.slint";
+import { Button } from "std-widgets.slint";
 
 // Re-export for Rust
 export { InputNodeData, ControlNodeData, DisplayNodeData, LinkData }
@@ -59,6 +60,19 @@ export component MainWindow inherits Window {
     callback control-switch-toggled(int, bool);
     callback control-slider-changed(int, float);
     callback control-action-clicked(int, string);
+
+    // Set zoom while keeping the view centered on the same graph point
+    public function set-zoom-centered(new-zoom: float) {
+        // Calculate graph coordinates at viewport center
+        // graph_coord = (screen_center - pan) / zoom
+        editor.apply-zoom-with-adjustment(
+            new-zoom,
+            root.width / 2,
+            root.height / 2,
+            (root.width / 2 - root.pan-x) / root.zoom / 1px,
+            (root.height / 2 - root.pan-y) / root.zoom / 1px
+        );
+    }
 
     editor := NodeEditor {
         width: 100%;
@@ -271,6 +285,68 @@ export component MainWindow inherits Window {
                 text: "Test widget usability at all zoom levels";
                 color: #888;
                 font-size: 10px;
+            }
+        }
+    }
+
+    // Zoom preset buttons
+    Rectangle {
+        x: 10px;
+        y: 120px;
+        width: 280px;
+        height: 70px;
+        background: #00000099;
+        border-radius: 8px;
+
+        VerticalLayout {
+            padding: 10px;
+            spacing: 8px;
+
+            Text {
+                text: "Zoom Presets";
+                color: #ccc;
+                font-size: 11px;
+                horizontal-alignment: center;
+            }
+
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: center;
+
+                Button {
+                    text: "Tiny";
+                    clicked => {
+                        root.set-zoom-centered(0.15);
+                    }
+                }
+
+                Button {
+                    text: "Small";
+                    clicked => {
+                        root.set-zoom-centered(0.5);
+                    }
+                }
+
+                Button {
+                    text: "Normal";
+                    clicked => {
+                        root.set-zoom-centered(1.0);
+                    }
+                }
+
+                Button {
+                    text: "Big";
+                    clicked => {
+                        root.set-zoom-centered(2.5);
+                    }
+                }
+
+                Button {
+                    text: "Huge";
+                    clicked => {
+                        root.set-zoom-centered(5.0);
+                    }
+                }
             }
         }
     }
