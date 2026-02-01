@@ -18,6 +18,9 @@ cargo run -p minimal
 # Build and run the custom shapes example
 cargo run -p custom-shapes
 
+# Build and run the zoom stress test (LOD system demo)
+cargo run -p zoom-stress-test
+
 # Check compilation without running
 cargo check
 ```
@@ -32,6 +35,7 @@ cargo check
 | `examples/advanced/ui/pin_encoding.slint` | Application-specific pin ID encoding scheme |
 | `examples/advanced/ui/ui.slint` | Application-specific UI (Node component, data structs, main window) |
 | `examples/advanced/ui/filter_node.slint` | Complex node example with multiple widgets |
+| `examples/zoom-stress-test/ui/*.slint` | LOD implementation patterns for zoom scaling |
 
 ## Architecture
 
@@ -50,6 +54,12 @@ cargo check
 - advanced: `pin_id = node_id * 1000 + pin_type`
 
 **Callback-based computation**: The Slint UI delegates expensive operations to Rust via callbacks (e.g., `compute-pin-at`).
+
+**Level of Detail (LOD)**: NodeEditor supports configurable LOD thresholds for zoom-dependent rendering:
+- `lod-full-threshold: 0.5` - Zoom above which nodes render full detail
+- `lod-simplified-threshold: 0.25` - Zoom above which nodes render simplified detail
+- Below simplified threshold: nodes render as minimal colored boxes
+- See `examples/zoom-stress-test` for implementation patterns
 
 ## Data Models (in examples/advanced/src/main.rs)
 

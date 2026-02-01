@@ -163,6 +163,15 @@ The editor uses two coordinate systems:
 
 The library handles all transformations transparently.
 
+### Zoom & Pan Controls
+
+Built-in input handling:
+- **Ctrl+Scroll**: Zoom in/out centered on mouse position
+- **Scroll**: Pan the viewport
+- **Middle-click drag**: Pan the viewport
+
+Zoom is automatically clamped to `min-zoom` (default 0.1) and `max-zoom` (default 3.0).
+
 ## Component Reference
 
 ### NodeEditor (Main Component)
@@ -174,6 +183,12 @@ in-out property <length> pan-y;          // Pan offset (y)
 in-out property <float> zoom;            // Zoom factor (1.0 = 100%)
 in property <float> min-zoom: 0.1;       // Minimum zoom level
 in property <float> max-zoom: 3.0;       // Maximum zoom level
+
+// LOD (Level of Detail) configuration
+in property <float> lod-full-threshold: 0.5;       // Zoom above which nodes render full detail
+in property <float> lod-simplified-threshold: 0.25; // Zoom above which nodes render simplified
+in property <length> min-node-width: 80px;          // Minimum node width at any zoom
+in property <length> min-node-height: 40px;         // Minimum node height at any zoom
 
 in property <length> grid-spacing: 24px;       // Grid cell size
 in property <bool> grid-snapping: true;        // Enable snap-to-grid
@@ -469,6 +484,9 @@ let cache = tracker.cache(); // Use for hit testing
 - **pin-compatibility:** Demonstrates type-safe connections with a compatibility matrix, visual validation feedback, and custom pin behaviors.
   - Path: `examples/pin-compatibility`
   - Run: `cargo run -p pin-compatibility`
+- **zoom-stress-test:** Tests widget scaling at various zoom levels with Level of Detail (LOD) rendering. Shows how to implement LOD transitions for complex nodes.
+  - Path: `examples/zoom-stress-test`
+  - Run: `cargo run -p zoom-stress-test`
 
 ## License
 
