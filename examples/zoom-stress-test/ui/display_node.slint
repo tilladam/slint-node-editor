@@ -5,6 +5,11 @@
 // - Text at various font sizes
 // - Color preview rectangles
 // - Progress bar simulation
+//
+// LOD Levels:
+// - Full (zoom > 0.5): All widgets visible
+// - Simplified (0.25 < zoom <= 0.5): Title + progress bar + pin only
+// - Minimal (zoom <= 0.25): Colored rectangle with title
 
 import { ProgressIndicator, Spinner } from "std-widgets.slint";
 import { Pin, PinTypes, BaseNode } from "@slint-node-editor/node-editor.slint";
@@ -37,7 +42,16 @@ export component DisplayNode inherits BaseNode {
     in property <float> color-b: 0.9;
     in property <bool> is-loading: false;
 
-    // Layout constants
+    // === LOD Configuration ===
+    property <float> lod-full-threshold: 0.5;
+    property <float> lod-simplified-threshold: 0.25;
+
+    // LOD level: 2=full, 1=simplified, 0=minimal
+    property <int> lod-level: self.zoom > lod-full-threshold ? 2
+                            : self.zoom > lod-simplified-threshold ? 1
+                            : 0;
+
+    // === Layout constants ===
     property <length> content-padding: 8px;
     property <length> title-height: 28px;
     property <length> row-height: 28px;
@@ -46,79 +60,263 @@ export component DisplayNode inherits BaseNode {
 
     // Pin dimensions
     property <length> base-pin-size: 12px;
-    property <length> pin-size: base-pin-size * self.zoom;
+    property <length> pin-size: max(base-pin-size * self.zoom, 8px);  // Minimum 8px for clickability
 
-    // Base dimensions
-    property <length> base-width: 240px;
-    property <length> base-height: content-padding + title-height + content-padding
+    // === Size calculations per LOD ===
+    // Full size
+    property <length> full-width: 240px;
+    property <length> full-height: content-padding + title-height + content-padding
                                    + (row-height * 5) + (row-spacing * 4) + content-padding;
 
-    width: base-width * self.zoom;
-    height: base-height * self.zoom;
+    // Simplified size (title + progress bar)
+    property <length> simplified-width: 120px;
+    property <length> simplified-height: content-padding + title-height + row-spacing + 16px + content-padding;
 
-    // Main layout
-    VerticalLayout {
-        padding: root.content-padding * root.zoom;
-        spacing: root.row-spacing * root.zoom;
+    // Minimal size
+    property <length> minimal-width: 80px;
+    property <length> minimal-height: 40px;
 
-        // Title bar
-        Rectangle {
-            height: root.title-height * root.zoom;
-            background: root.selected ? #4a4a7a : #3d3d5d;
-            border-radius: 4px * root.zoom;
+    // Effective dimensions based on LOD
+    property <length> effective-base-width: lod-level == 2 ? full-width
+                                          : lod-level == 1 ? simplified-width
+                                          : minimal-width;
+    property <length> effective-base-height: lod-level == 2 ? full-height
+                                           : lod-level == 1 ? simplified-height
+                                           : minimal-height;
 
-            Text {
-                text: root.title;
-                color: white;
-                font-size: 14px * root.zoom;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
-        }
+    // Apply zoom with minimum size floor
+    width: max(effective-base-width * self.zoom, minimal-width);
+    height: max(effective-base-height * self.zoom, minimal-height);
 
-        // Row 1: Large status text
-        HorizontalLayout {
-            height: root.row-height * root.zoom;
-            padding-left: root.pin-area-width * root.zoom;
-            padding-right: root.pin-area-width * root.zoom;
-            alignment: center;
+    // Node colors
+    property <color> node-color: #3d3d5d;
+    property <color> node-color-selected: #4a4a7a;
 
-            Text {
-                text: root.status-text;
-                color: #fff;
-                font-size: 16px * root.zoom;
-                font-weight: 700;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
+    // === LOD 2: Full content ===
+    if lod-level == 2: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: root.selected ? root.node-color-selected : root.node-color;
+        border-radius: 4px * root.zoom;
+        border-width: root.selected ? 2px : 1px;
+        border-color: root.selected ? #88f : #555;
 
-            if root.is-loading: Spinner {
-                indeterminate: true;
-                width: 20px * root.zoom;
-                height: 20px * root.zoom;
-            }
-        }
+        VerticalLayout {
+            padding: root.content-padding * root.zoom;
+            spacing: root.row-spacing * root.zoom;
 
-        // Row 2: Progress bar
-        HorizontalLayout {
-            height: root.row-height * root.zoom;
-            spacing: 8px * root.zoom;
-            padding-left: root.pin-area-width * root.zoom;
-            padding-right: root.pin-area-width * root.zoom;
-
-            Text {
-                text: round(root.progress * 100) + "%";
-                color: #aaa;
-                font-size: 11px * root.zoom;
-                vertical-alignment: center;
-                width: 35px * root.zoom;
-            }
-
+            // Title bar
             Rectangle {
-                horizontal-stretch: 1;
-                height: 12px * root.zoom;
+                height: root.title-height * root.zoom;
+                background: root.selected ? root.node-color-selected.darker(0.2) : root.node-color.darker(0.2);
+                border-radius: 4px * root.zoom;
+
+                Text {
+                    text: root.title;
+                    color: white;
+                    font-size: 14px * root.zoom;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            // Row 1: Large status text
+            HorizontalLayout {
+                height: root.row-height * root.zoom;
+                padding-left: root.pin-area-width * root.zoom;
+                padding-right: root.pin-area-width * root.zoom;
+                alignment: center;
+
+                Text {
+                    text: root.status-text;
+                    color: #fff;
+                    font-size: 16px * root.zoom;
+                    font-weight: 700;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+
+                if root.is-loading: Spinner {
+                    indeterminate: true;
+                    width: 20px * root.zoom;
+                    height: 20px * root.zoom;
+                }
+            }
+
+            // Row 2: Progress bar
+            HorizontalLayout {
+                height: root.row-height * root.zoom;
+                spacing: 8px * root.zoom;
+                padding-left: root.pin-area-width * root.zoom;
+                padding-right: root.pin-area-width * root.zoom;
+
+                Text {
+                    text: round(root.progress * 100) + "%";
+                    color: #aaa;
+                    font-size: 11px * root.zoom;
+                    vertical-alignment: center;
+                    width: 35px * root.zoom;
+                }
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                    height: 12px * root.zoom;
+                    background: #333;
+                    border-radius: 6px * root.zoom;
+
+                    Rectangle {
+                        x: 0;
+                        y: 0;
+                        width: parent.width * root.progress;
+                        height: parent.height;
+                        background: #4CAF50;
+                        border-radius: 6px * root.zoom;
+                    }
+                }
+            }
+
+            // Row 3: Color preview with RGB values
+            HorizontalLayout {
+                height: root.row-height * root.zoom;
+                spacing: 8px * root.zoom;
+                padding-left: root.pin-area-width * root.zoom;
+                padding-right: root.pin-area-width * root.zoom;
+
+                Text {
+                    text: "Color:";
+                    color: #ccc;
+                    font-size: 11px * root.zoom;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    width: 40px * root.zoom;
+                    height: 20px * root.zoom;
+                    background: rgb(root.color-r * 255, root.color-g * 255, root.color-b * 255);
+                    border-radius: 4px * root.zoom;
+                    border-width: 1px * root.zoom;
+                    border-color: #666;
+                }
+
+                Text {
+                    text: "R:" + round(root.color-r * 255);
+                    color: #f88;
+                    font-size: 9px * root.zoom;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: "G:" + round(root.color-g * 255);
+                    color: #8f8;
+                    font-size: 9px * root.zoom;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: "B:" + round(root.color-b * 255);
+                    color: #88f;
+                    font-size: 9px * root.zoom;
+                    vertical-alignment: center;
+                }
+            }
+
+            // Row 4: Multiple font sizes demonstration
+            HorizontalLayout {
+                height: root.row-height * root.zoom;
+                spacing: 6px * root.zoom;
+                padding-left: root.pin-area-width * root.zoom;
+                padding-right: root.pin-area-width * root.zoom;
+                alignment: start;
+
+                Text {
+                    text: "XL";
+                    color: #ccc;
+                    font-size: 18px * root.zoom;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: "Large";
+                    color: #aaa;
+                    font-size: 14px * root.zoom;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: "Med";
+                    color: #888;
+                    font-size: 11px * root.zoom;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: "Small";
+                    color: #666;
+                    font-size: 9px * root.zoom;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: "Tiny";
+                    color: #555;
+                    font-size: 7px * root.zoom;
+                    vertical-alignment: center;
+                }
+            }
+
+            // Row 5: Mini color swatches
+            HorizontalLayout {
+                height: root.row-height * root.zoom;
+                spacing: 4px * root.zoom;
+                padding-left: root.pin-area-width * root.zoom;
+                padding-right: root.pin-area-width * root.zoom;
+                alignment: start;
+
+                for color in [#e74c3c, #e67e22, #f1c40f, #2ecc71, #3498db, #9b59b6, #1abc9c, #34495e]: Rectangle {
+                    width: 18px * root.zoom;
+                    height: 18px * root.zoom;
+                    background: color;
+                    border-radius: 3px * root.zoom;
+                    border-width: 1px * root.zoom;
+                    border-color: #00000040;
+                }
+            }
+        }
+    }
+
+    // === LOD 1: Simplified content (title + progress bar) ===
+    if lod-level == 1: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: root.selected ? root.node-color-selected : root.node-color;
+        border-radius: 4px * root.zoom;
+        border-width: root.selected ? 2px : 1px;
+        border-color: root.selected ? #88f : #555;
+
+        VerticalLayout {
+            padding: root.content-padding * root.zoom;
+            spacing: root.row-spacing * root.zoom;
+
+            // Title bar
+            Rectangle {
+                height: root.title-height * root.zoom;
+                background: root.selected ? root.node-color-selected.darker(0.2) : root.node-color.darker(0.2);
+                border-radius: 4px * root.zoom;
+
+                Text {
+                    text: root.title;
+                    color: white;
+                    font-size: max(14px * root.zoom, 9px);
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            // Simplified progress bar
+            Rectangle {
+                height: 8px * root.zoom;
                 background: #333;
-                border-radius: 6px * root.zoom;
+                border-radius: 4px * root.zoom;
 
                 Rectangle {
                     x: 0;
@@ -126,120 +324,31 @@ export component DisplayNode inherits BaseNode {
                     width: parent.width * root.progress;
                     height: parent.height;
                     background: #4CAF50;
-                    border-radius: 6px * root.zoom;
+                    border-radius: 4px * root.zoom;
                 }
-            }
-        }
-
-        // Row 3: Color preview with RGB values
-        HorizontalLayout {
-            height: root.row-height * root.zoom;
-            spacing: 8px * root.zoom;
-            padding-left: root.pin-area-width * root.zoom;
-            padding-right: root.pin-area-width * root.zoom;
-
-            Text {
-                text: "Color:";
-                color: #ccc;
-                font-size: 11px * root.zoom;
-                vertical-alignment: center;
-            }
-
-            Rectangle {
-                width: 40px * root.zoom;
-                height: 20px * root.zoom;
-                background: rgb(root.color-r * 255, root.color-g * 255, root.color-b * 255);
-                border-radius: 4px * root.zoom;
-                border-width: 1px * root.zoom;
-                border-color: #666;
-            }
-
-            Text {
-                text: "R:" + round(root.color-r * 255);
-                color: #f88;
-                font-size: 9px * root.zoom;
-                vertical-alignment: center;
-            }
-
-            Text {
-                text: "G:" + round(root.color-g * 255);
-                color: #8f8;
-                font-size: 9px * root.zoom;
-                vertical-alignment: center;
-            }
-
-            Text {
-                text: "B:" + round(root.color-b * 255);
-                color: #88f;
-                font-size: 9px * root.zoom;
-                vertical-alignment: center;
-            }
-        }
-
-        // Row 4: Multiple font sizes demonstration
-        HorizontalLayout {
-            height: root.row-height * root.zoom;
-            spacing: 6px * root.zoom;
-            padding-left: root.pin-area-width * root.zoom;
-            padding-right: root.pin-area-width * root.zoom;
-            alignment: start;
-
-            Text {
-                text: "XL";
-                color: #ccc;
-                font-size: 18px * root.zoom;
-                vertical-alignment: center;
-            }
-
-            Text {
-                text: "Large";
-                color: #aaa;
-                font-size: 14px * root.zoom;
-                vertical-alignment: center;
-            }
-
-            Text {
-                text: "Med";
-                color: #888;
-                font-size: 11px * root.zoom;
-                vertical-alignment: center;
-            }
-
-            Text {
-                text: "Small";
-                color: #666;
-                font-size: 9px * root.zoom;
-                vertical-alignment: center;
-            }
-
-            Text {
-                text: "Tiny";
-                color: #555;
-                font-size: 7px * root.zoom;
-                vertical-alignment: center;
-            }
-        }
-
-        // Row 5: Mini color swatches
-        HorizontalLayout {
-            height: root.row-height * root.zoom;
-            spacing: 4px * root.zoom;
-            padding-left: root.pin-area-width * root.zoom;
-            padding-right: root.pin-area-width * root.zoom;
-            alignment: start;
-
-            for color in [#e74c3c, #e67e22, #f1c40f, #2ecc71, #3498db, #9b59b6, #1abc9c, #34495e]: Rectangle {
-                width: 18px * root.zoom;
-                height: 18px * root.zoom;
-                background: color;
-                border-radius: 3px * root.zoom;
-                border-width: 1px * root.zoom;
-                border-color: #00000040;
             }
         }
     }
 
-    // Input pin (left side, centered)
+    // === LOD 0: Minimal content (colored box with title) ===
+    if lod-level == 0: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: root.selected ? root.node-color-selected : root.node-color;
+        border-radius: 4px;
+        border-width: root.selected ? 2px : 1px;
+        border-color: root.selected ? #88f : #555;
+
+        Text {
+            text: root.title;
+            color: white;
+            font-size: 9px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    // === Input pin (left side, centered) ===
     input-pin := Pin {
         x: root.content-padding * root.zoom;
         y: parent.height / 2 - root.pin-size / 2;
@@ -252,6 +361,7 @@ export component DisplayNode inherits BaseNode {
         base-color: #9C27B0;
         hover-color: #BA68C8;
         base-size: root.base-pin-size;
+        visible: root.lod-level > 0;
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }

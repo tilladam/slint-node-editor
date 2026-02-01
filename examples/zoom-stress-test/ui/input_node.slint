@@ -4,6 +4,11 @@
 // - LineEdit (text input)
 // - SpinBox (numeric input with +/- buttons)
 // - ComboBox (dropdown selection)
+//
+// LOD Levels:
+// - Full (zoom > 0.5): All widgets visible and interactive
+// - Simplified (0.25 < zoom <= 0.5): Title + pin only
+// - Minimal (zoom <= 0.25): Colored rectangle with title
 
 import { LineEdit, SpinBox, ComboBox } from "std-widgets.slint";
 import { Pin, PinTypes, BaseNode } from "@slint-node-editor/node-editor.slint";
@@ -35,7 +40,16 @@ export component InputNode inherits BaseNode {
     callback spin-changed(int, int);         // node-id, new-value
     callback combo-changed(int, int);        // node-id, new-index
 
-    // Layout constants
+    // === LOD Configuration ===
+    property <float> lod-full-threshold: 0.5;
+    property <float> lod-simplified-threshold: 0.25;
+
+    // LOD level: 2=full, 1=simplified, 0=minimal
+    property <int> lod-level: self.zoom > lod-full-threshold ? 2
+                            : self.zoom > lod-simplified-threshold ? 1
+                            : 0;
+
+    // === Layout constants ===
     property <length> content-padding: 8px;
     property <length> title-height: 28px;
     property <length> row-height: 36px;
@@ -45,114 +59,191 @@ export component InputNode inherits BaseNode {
 
     // Pin dimensions
     property <length> base-pin-size: 12px;
-    property <length> pin-size: base-pin-size * self.zoom;
+    property <length> pin-size: max(base-pin-size * self.zoom, 8px);  // Minimum 8px for clickability
 
-    // Base dimensions
-    property <length> base-width: 280px;
-    property <length> base-height: content-padding + title-height + content-padding
+    // === Size calculations per LOD ===
+    // Full size
+    property <length> full-width: 280px;
+    property <length> full-height: content-padding + title-height + content-padding
                                    + (row-height * 3) + (row-spacing * 2) + content-padding;
 
-    width: base-width * self.zoom;
-    height: base-height * self.zoom;
+    // Simplified size (title + some padding)
+    property <length> simplified-width: 120px;
+    property <length> simplified-height: content-padding + title-height + content-padding;
 
-    // Main layout
-    VerticalLayout {
-        padding: root.content-padding * root.zoom;
-        spacing: root.row-spacing * root.zoom;
+    // Minimal size (fixed minimum)
+    property <length> minimal-width: 80px;
+    property <length> minimal-height: 40px;
 
-        // Title bar
-        Rectangle {
-            height: root.title-height * root.zoom;
-            background: root.selected ? #4a7a4a : #3d5d3d;
-            border-radius: 4px * root.zoom;
+    // Effective dimensions based on LOD
+    property <length> effective-base-width: lod-level == 2 ? full-width
+                                          : lod-level == 1 ? simplified-width
+                                          : minimal-width;
+    property <length> effective-base-height: lod-level == 2 ? full-height
+                                           : lod-level == 1 ? simplified-height
+                                           : minimal-height;
 
-            Text {
-                text: root.title;
-                color: white;
-                font-size: 14px * root.zoom;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
-        }
+    // Apply zoom with minimum size floor
+    width: max(effective-base-width * self.zoom, minimal-width);
+    height: max(effective-base-height * self.zoom, minimal-height);
 
-        // Row 1: Text input
-        HorizontalLayout {
-            height: root.row-height * root.zoom;
-            spacing: 8px * root.zoom;
-            padding-left: root.pin-area-width * root.zoom;
-            padding-right: root.pin-area-width * root.zoom;
+    // Node colors
+    property <color> node-color: #3d5d3d;
+    property <color> node-color-selected: #4a7a4a;
 
-            Text {
-                width: root.label-width * root.zoom;
-                text: "Text:";
-                color: #ccc;
-                font-size: 12px * root.zoom;
-                vertical-alignment: center;
-            }
+    // === LOD 2: Full content ===
+    if lod-level == 2: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: root.selected ? root.node-color-selected : root.node-color;
+        border-radius: 4px * root.zoom;
+        border-width: root.selected ? 2px : 1px;
+        border-color: root.selected ? #8f8 : #555;
 
-            LineEdit {
-                horizontal-stretch: 1;
-                text <=> root.text-value;
-                placeholder-text: "Enter text...";
-                edited(val) => {
-                    root.text-changed(root.node-id, val);
+        VerticalLayout {
+            padding: root.content-padding * root.zoom;
+            spacing: root.row-spacing * root.zoom;
+
+            // Title bar
+            Rectangle {
+                height: root.title-height * root.zoom;
+                background: root.selected ? root.node-color-selected.darker(0.2) : root.node-color.darker(0.2);
+                border-radius: 4px * root.zoom;
+
+                Text {
+                    text: root.title;
+                    color: white;
+                    font-size: 14px * root.zoom;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
                 }
             }
-        }
 
-        // Row 2: Numeric input
-        HorizontalLayout {
-            height: root.row-height * root.zoom;
-            spacing: 8px * root.zoom;
-            padding-left: root.pin-area-width * root.zoom;
-            padding-right: root.pin-area-width * root.zoom;
+            // Row 1: Text input
+            HorizontalLayout {
+                height: root.row-height * root.zoom;
+                spacing: 8px * root.zoom;
+                padding-left: root.pin-area-width * root.zoom;
+                padding-right: root.pin-area-width * root.zoom;
 
-            Text {
-                width: root.label-width * root.zoom;
-                text: "Value:";
-                color: #ccc;
-                font-size: 12px * root.zoom;
-                vertical-alignment: center;
-            }
+                Text {
+                    width: root.label-width * root.zoom;
+                    text: "Text:";
+                    color: #ccc;
+                    font-size: 12px * root.zoom;
+                    vertical-alignment: center;
+                }
 
-            SpinBox {
-                horizontal-stretch: 1;
-                value <=> root.spin-value;
-                minimum: 0;
-                maximum: 100;
-                edited(val) => {
-                    root.spin-changed(root.node-id, val);
+                LineEdit {
+                    horizontal-stretch: 1;
+                    text <=> root.text-value;
+                    placeholder-text: "Enter text...";
+                    edited(val) => {
+                        root.text-changed(root.node-id, val);
+                    }
                 }
             }
-        }
 
-        // Row 3: Dropdown
-        HorizontalLayout {
-            height: root.row-height * root.zoom;
-            spacing: 8px * root.zoom;
-            padding-left: root.pin-area-width * root.zoom;
-            padding-right: root.pin-area-width * root.zoom;
+            // Row 2: Numeric input
+            HorizontalLayout {
+                height: root.row-height * root.zoom;
+                spacing: 8px * root.zoom;
+                padding-left: root.pin-area-width * root.zoom;
+                padding-right: root.pin-area-width * root.zoom;
 
-            Text {
-                width: root.label-width * root.zoom;
-                text: "Mode:";
-                color: #ccc;
-                font-size: 12px * root.zoom;
-                vertical-alignment: center;
+                Text {
+                    width: root.label-width * root.zoom;
+                    text: "Value:";
+                    color: #ccc;
+                    font-size: 12px * root.zoom;
+                    vertical-alignment: center;
+                }
+
+                SpinBox {
+                    horizontal-stretch: 1;
+                    value <=> root.spin-value;
+                    minimum: 0;
+                    maximum: 100;
+                    edited(val) => {
+                        root.spin-changed(root.node-id, val);
+                    }
+                }
             }
 
-            ComboBox {
-                horizontal-stretch: 1;
-                model: ["Linear", "Exponential", "Logarithmic", "Cubic"];
-                current-index <=> root.combo-index;
-                selected(_val) => {
-                    root.combo-changed(root.node-id, root.combo-index);
+            // Row 3: Dropdown
+            HorizontalLayout {
+                height: root.row-height * root.zoom;
+                spacing: 8px * root.zoom;
+                padding-left: root.pin-area-width * root.zoom;
+                padding-right: root.pin-area-width * root.zoom;
+
+                Text {
+                    width: root.label-width * root.zoom;
+                    text: "Mode:";
+                    color: #ccc;
+                    font-size: 12px * root.zoom;
+                    vertical-alignment: center;
+                }
+
+                ComboBox {
+                    horizontal-stretch: 1;
+                    model: ["Linear", "Exponential", "Logarithmic", "Cubic"];
+                    current-index <=> root.combo-index;
+                    selected(_val) => {
+                        root.combo-changed(root.node-id, root.combo-index);
+                    }
                 }
             }
         }
     }
 
-    // Output pin (right side, centered vertically)
+    // === LOD 1: Simplified content (title + pin only) ===
+    if lod-level == 1: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: root.selected ? root.node-color-selected : root.node-color;
+        border-radius: 4px * root.zoom;
+        border-width: root.selected ? 2px : 1px;
+        border-color: root.selected ? #8f8 : #555;
+
+        VerticalLayout {
+            padding: root.content-padding * root.zoom;
+
+            Rectangle {
+                height: root.title-height * root.zoom;
+                background: root.selected ? root.node-color-selected.darker(0.2) : root.node-color.darker(0.2);
+                border-radius: 4px * root.zoom;
+
+                Text {
+                    text: root.title;
+                    color: white;
+                    font-size: max(14px * root.zoom, 9px);  // Minimum readable font
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    // === LOD 0: Minimal content (colored box with title) ===
+    if lod-level == 0: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: root.selected ? root.node-color-selected : root.node-color;
+        border-radius: 4px;
+        border-width: root.selected ? 2px : 1px;
+        border-color: root.selected ? #8f8 : #555;
+
+        Text {
+            text: root.title;
+            color: white;
+            font-size: 9px;  // Fixed minimum font
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    // === Output pin (visible at all LOD levels, but positioned differently) ===
     output-pin := Pin {
         x: parent.width - root.content-padding * root.zoom - root.pin-size;
         y: parent.height / 2 - root.pin-size / 2;
@@ -165,6 +256,8 @@ export component InputNode inherits BaseNode {
         base-color: #4CAF50;
         hover-color: #66BB6A;
         base-size: root.base-pin-size;
+        // Hide pin at minimal LOD
+        visible: root.lod-level > 0;
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }

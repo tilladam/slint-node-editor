@@ -5,6 +5,11 @@
 // - Switch (toggle control)
 // - Button (various sizes)
 // - Slider (draggable range control)
+//
+// LOD Levels:
+// - Full (zoom > 0.5): All widgets visible and interactive
+// - Simplified (0.25 < zoom <= 0.5): Title + pins only
+// - Minimal (zoom <= 0.25): Colored rectangle with title
 
 import { CheckBox, Switch, Button, Slider } from "std-widgets.slint";
 import { Pin, PinTypes, BaseNode } from "@slint-node-editor/node-editor.slint";
@@ -41,7 +46,16 @@ export component ControlNode inherits BaseNode {
     callback slider-changed(int, float);     // node-id, new-value
     callback action-clicked(int, string);    // node-id, action-name
 
-    // Layout constants
+    // === LOD Configuration ===
+    property <float> lod-full-threshold: 0.5;
+    property <float> lod-simplified-threshold: 0.25;
+
+    // LOD level: 2=full, 1=simplified, 0=minimal
+    property <int> lod-level: self.zoom > lod-full-threshold ? 2
+                            : self.zoom > lod-simplified-threshold ? 1
+                            : 0;
+
+    // === Layout constants ===
     property <length> content-padding: 8px;
     property <length> title-height: 28px;
     property <length> row-height: 32px;
@@ -50,161 +64,238 @@ export component ControlNode inherits BaseNode {
 
     // Pin dimensions
     property <length> base-pin-size: 12px;
-    property <length> pin-size: base-pin-size * self.zoom;
+    property <length> pin-size: max(base-pin-size * self.zoom, 8px);  // Minimum 8px for clickability
 
-    // Base dimensions
-    property <length> base-width: 260px;
-    property <length> base-height: content-padding + title-height + content-padding
+    // === Size calculations per LOD ===
+    // Full size
+    property <length> full-width: 260px;
+    property <length> full-height: content-padding + title-height + content-padding
                                    + (row-height * 4) + (row-spacing * 3) + content-padding;
 
-    width: base-width * self.zoom;
-    height: base-height * self.zoom;
+    // Simplified size
+    property <length> simplified-width: 100px;
+    property <length> simplified-height: content-padding + title-height + content-padding;
 
-    // Main layout
-    VerticalLayout {
-        padding: root.content-padding * root.zoom;
-        spacing: root.row-spacing * root.zoom;
+    // Minimal size
+    property <length> minimal-width: 80px;
+    property <length> minimal-height: 40px;
 
-        // Title bar
-        Rectangle {
-            height: root.title-height * root.zoom;
-            background: root.selected ? #7a4a4a : #5d3d3d;
-            border-radius: 4px * root.zoom;
+    // Effective dimensions based on LOD
+    property <length> effective-base-width: lod-level == 2 ? full-width
+                                          : lod-level == 1 ? simplified-width
+                                          : minimal-width;
+    property <length> effective-base-height: lod-level == 2 ? full-height
+                                           : lod-level == 1 ? simplified-height
+                                           : minimal-height;
 
-            Text {
-                text: root.title;
-                color: white;
-                font-size: 14px * root.zoom;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
-        }
+    // Apply zoom with minimum size floor
+    width: max(effective-base-width * self.zoom, minimal-width);
+    height: max(effective-base-height * self.zoom, minimal-height);
 
-        // Row 1: Checkboxes
-        HorizontalLayout {
-            height: root.row-height * root.zoom;
-            spacing: 16px * root.zoom;
-            padding-left: root.pin-area-width * root.zoom;
-            padding-right: root.pin-area-width * root.zoom;
-            alignment: start;
+    // Node colors
+    property <color> node-color: #5d3d3d;
+    property <color> node-color-selected: #7a4a4a;
 
-            CheckBox {
-                text: "Option A";
-                checked <=> root.check-a;
-                toggled => {
-                    root.check-a-toggled(root.node-id, root.check-a);
+    // === LOD 2: Full content ===
+    if lod-level == 2: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: root.selected ? root.node-color-selected : root.node-color;
+        border-radius: 4px * root.zoom;
+        border-width: root.selected ? 2px : 1px;
+        border-color: root.selected ? #f88 : #555;
+
+        VerticalLayout {
+            padding: root.content-padding * root.zoom;
+            spacing: root.row-spacing * root.zoom;
+
+            // Title bar
+            Rectangle {
+                height: root.title-height * root.zoom;
+                background: root.selected ? root.node-color-selected.darker(0.2) : root.node-color.darker(0.2);
+                border-radius: 4px * root.zoom;
+
+                Text {
+                    text: root.title;
+                    color: white;
+                    font-size: 14px * root.zoom;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
                 }
             }
 
-            CheckBox {
-                text: "Option B";
-                checked <=> root.check-b;
-                toggled => {
-                    root.check-b-toggled(root.node-id, root.check-b);
+            // Row 1: Checkboxes
+            HorizontalLayout {
+                height: root.row-height * root.zoom;
+                spacing: 16px * root.zoom;
+                padding-left: root.pin-area-width * root.zoom;
+                padding-right: root.pin-area-width * root.zoom;
+                alignment: start;
+
+                CheckBox {
+                    text: "Option A";
+                    checked <=> root.check-a;
+                    toggled => {
+                        root.check-a-toggled(root.node-id, root.check-a);
+                    }
                 }
-            }
-        }
 
-        // Row 2: Switch
-        HorizontalLayout {
-            height: root.row-height * root.zoom;
-            spacing: 12px * root.zoom;
-            padding-left: root.pin-area-width * root.zoom;
-            padding-right: root.pin-area-width * root.zoom;
-            alignment: start;
-
-            Text {
-                text: "Enable:";
-                color: #ccc;
-                font-size: 12px * root.zoom;
-                vertical-alignment: center;
-            }
-
-            Switch {
-                checked <=> root.switch-value;
-                toggled => {
-                    root.switch-toggled(root.node-id, root.switch-value);
+                CheckBox {
+                    text: "Option B";
+                    checked <=> root.check-b;
+                    toggled => {
+                        root.check-b-toggled(root.node-id, root.check-b);
+                    }
                 }
             }
 
-            Text {
-                text: root.switch-value ? "ON" : "OFF";
-                color: root.switch-value ? #8f8 : #f88;
-                font-size: 11px * root.zoom;
-                vertical-alignment: center;
-            }
-        }
+            // Row 2: Switch
+            HorizontalLayout {
+                height: root.row-height * root.zoom;
+                spacing: 12px * root.zoom;
+                padding-left: root.pin-area-width * root.zoom;
+                padding-right: root.pin-area-width * root.zoom;
+                alignment: start;
 
-        // Row 3: Slider
-        HorizontalLayout {
-            height: root.row-height * root.zoom;
-            spacing: 8px * root.zoom;
-            padding-left: root.pin-area-width * root.zoom;
-            padding-right: root.pin-area-width * root.zoom;
+                Text {
+                    text: "Enable:";
+                    color: #ccc;
+                    font-size: 12px * root.zoom;
+                    vertical-alignment: center;
+                }
 
-            Text {
-                text: "Level:";
-                color: #ccc;
-                font-size: 12px * root.zoom;
-                vertical-alignment: center;
-                width: 40px * root.zoom;
-            }
+                Switch {
+                    checked <=> root.switch-value;
+                    toggled => {
+                        root.switch-toggled(root.node-id, root.switch-value);
+                    }
+                }
 
-            Slider {
-                horizontal-stretch: 1;
-                value <=> root.slider-value;
-                minimum: 0;
-                maximum: 1;
-                changed(val) => {
-                    root.slider-changed(root.node-id, val);
+                Text {
+                    text: root.switch-value ? "ON" : "OFF";
+                    color: root.switch-value ? #8f8 : #f88;
+                    font-size: 11px * root.zoom;
+                    vertical-alignment: center;
                 }
             }
 
-            Text {
-                text: round(root.slider-value * 100) + "%";
-                color: #aaa;
-                font-size: 10px * root.zoom;
-                vertical-alignment: center;
-                width: 35px * root.zoom;
-                horizontal-alignment: right;
-            }
-        }
+            // Row 3: Slider
+            HorizontalLayout {
+                height: root.row-height * root.zoom;
+                spacing: 8px * root.zoom;
+                padding-left: root.pin-area-width * root.zoom;
+                padding-right: root.pin-area-width * root.zoom;
 
-        // Row 4: Buttons
-        HorizontalLayout {
-            height: root.row-height * root.zoom;
-            spacing: 8px * root.zoom;
-            padding-left: root.pin-area-width * root.zoom;
-            padding-right: root.pin-area-width * root.zoom;
-            alignment: center;
+                Text {
+                    text: "Level:";
+                    color: #ccc;
+                    font-size: 12px * root.zoom;
+                    vertical-alignment: center;
+                    width: 40px * root.zoom;
+                }
 
-            Button {
-                text: "Apply";
-                clicked => {
-                    root.action-clicked(root.node-id, "apply");
+                Slider {
+                    horizontal-stretch: 1;
+                    value <=> root.slider-value;
+                    minimum: 0;
+                    maximum: 1;
+                    changed(val) => {
+                        root.slider-changed(root.node-id, val);
+                    }
+                }
+
+                Text {
+                    text: round(root.slider-value * 100) + "%";
+                    color: #aaa;
+                    font-size: 10px * root.zoom;
+                    vertical-alignment: center;
+                    width: 35px * root.zoom;
+                    horizontal-alignment: right;
                 }
             }
 
-            Button {
-                text: "Reset";
-                clicked => {
-                    root.action-clicked(root.node-id, "reset");
-                }
-            }
+            // Row 4: Buttons
+            HorizontalLayout {
+                height: root.row-height * root.zoom;
+                spacing: 8px * root.zoom;
+                padding-left: root.pin-area-width * root.zoom;
+                padding-right: root.pin-area-width * root.zoom;
+                alignment: center;
 
-            Button {
-                text: "...";
-                clicked => {
-                    root.action-clicked(root.node-id, "more");
+                Button {
+                    text: "Apply";
+                    clicked => {
+                        root.action-clicked(root.node-id, "apply");
+                    }
+                }
+
+                Button {
+                    text: "Reset";
+                    clicked => {
+                        root.action-clicked(root.node-id, "reset");
+                    }
+                }
+
+                Button {
+                    text: "...";
+                    clicked => {
+                        root.action-clicked(root.node-id, "more");
+                    }
                 }
             }
         }
     }
 
-    // Input pin (left side, upper third)
+    // === LOD 1: Simplified content (title + pins only) ===
+    if lod-level == 1: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: root.selected ? root.node-color-selected : root.node-color;
+        border-radius: 4px * root.zoom;
+        border-width: root.selected ? 2px : 1px;
+        border-color: root.selected ? #f88 : #555;
+
+        VerticalLayout {
+            padding: root.content-padding * root.zoom;
+
+            Rectangle {
+                height: root.title-height * root.zoom;
+                background: root.selected ? root.node-color-selected.darker(0.2) : root.node-color.darker(0.2);
+                border-radius: 4px * root.zoom;
+
+                Text {
+                    text: root.title;
+                    color: white;
+                    font-size: max(14px * root.zoom, 9px);
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    // === LOD 0: Minimal content (colored box with title) ===
+    if lod-level == 0: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: root.selected ? root.node-color-selected : root.node-color;
+        border-radius: 4px;
+        border-width: root.selected ? 2px : 1px;
+        border-color: root.selected ? #f88 : #555;
+
+        Text {
+            text: root.title;
+            color: white;
+            font-size: 9px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    // === Input pin (left side) ===
     input-pin := Pin {
         x: root.content-padding * root.zoom;
-        y: (root.content-padding + root.title-height + root.content-padding + root.row-height / 2) * root.zoom - root.pin-size / 2;
+        y: parent.height / 2 - root.pin-size / 2;
         pin-id: root.input-pin-id;
         node-id: root.node-id;
         pin-type: PinTypes.input;
@@ -214,6 +305,7 @@ export component ControlNode inherits BaseNode {
         base-color: #2196F3;
         hover-color: #42A5F5;
         base-size: root.base-pin-size;
+        visible: root.lod-level > 0;
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
@@ -222,10 +314,10 @@ export component ControlNode inherits BaseNode {
         }
     }
 
-    // Output pin (right side, lower third)
+    // === Output pin (right side) ===
     output-pin := Pin {
         x: parent.width - root.content-padding * root.zoom - root.pin-size;
-        y: parent.height - (root.content-padding + root.row-height / 2) * root.zoom - root.pin-size / 2;
+        y: parent.height / 2 - root.pin-size / 2;
         pin-id: root.output-pin-id;
         node-id: root.node-id;
         pin-type: PinTypes.output;
@@ -235,6 +327,7 @@ export component ControlNode inherits BaseNode {
         base-color: #FF9800;
         hover-color: #FFB74D;
         base-size: root.base-pin-size;
+        visible: root.lod-level > 0;
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
