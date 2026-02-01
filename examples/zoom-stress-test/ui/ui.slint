@@ -63,10 +63,11 @@ export component MainWindow inherits Window {
 
     // Set zoom while keeping the view centered on the same graph point
     public function set-zoom-centered(new-zoom: float) {
+        // Clamp to configured limits
         // Calculate graph coordinates at viewport center
         // graph_coord = (screen_center - pan) / zoom
         editor.apply-zoom-with-adjustment(
-            new-zoom,
+            clamp(new-zoom, editor.min-zoom, editor.max-zoom),
             root.width / 2,
             root.height / 2,
             (root.width / 2 - root.pan-x) / root.zoom / 1px,
@@ -80,8 +81,8 @@ export component MainWindow inherits Window {
         pan-x <=> root.pan-x;
         pan-y <=> root.pan-y;
         zoom <=> root.zoom;
-        min-zoom: 0.1;  // Allow very small zoom to stress test
-        max-zoom: 5.0;  // Allow very large zoom to stress test
+        min-zoom: 0.1;  // Minimum usable zoom (bird's eye view)
+        max-zoom: 3.0;  // Maximum zoom (avoids rendering artifacts)
         background-color: #1a1a1a;
         grid-spacing: 24px;
         grid-color: #333333;
@@ -270,7 +271,7 @@ export component MainWindow inherits Window {
             }
 
             Text {
-                text: "Ctrl+scroll to zoom (0.1x - 5.0x)";
+                text: "Ctrl+scroll to zoom (0.1x - 3.0x)";
                 color: #aaa;
                 font-size: 11px;
             }
@@ -344,7 +345,7 @@ export component MainWindow inherits Window {
                 Button {
                     text: "Huge";
                     clicked => {
-                        root.set-zoom-centered(5.0);
+                        root.set-zoom-centered(3.0);
                     }
                 }
             }
