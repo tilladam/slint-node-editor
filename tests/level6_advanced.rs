@@ -280,7 +280,7 @@ fn test_no_duplicates_validator() {
     let cache = cache.borrow();
 
     // Existing links: (pin 3 → pin 4)
-    let existing = vec![SimpleLink::with_default_color(1, 3, 4)];
+    let existing = vec![SimpleLink::new(1, 3, 4, Color::from_rgb_u8(255, 255, 255))];
 
     // Same direction - should reject
     let result = validator.validate(3, 4, &cache, &existing);
@@ -307,7 +307,7 @@ fn test_composite_validator() {
 
     let cache = harness.ctrl.cache();
     let cache = cache.borrow();
-    let existing = vec![SimpleLink::with_default_color(1, 3, 4)];
+    let existing = vec![SimpleLink::new(1, 3, 4, Color::from_rgb_u8(255, 255, 255))];
 
     // Self-loop (caught by BasicLinkValidator)
     let result = validator.validate(3, 3, &cache, &existing);

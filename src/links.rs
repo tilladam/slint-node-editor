@@ -33,7 +33,7 @@
 use crate::graph::LinkModel;
 use crate::hit_test::NodeGeometry;
 use crate::state::GeometryCache;
-use slint::{Model, ModelRc, SharedString, VecModel};
+use slint::{Model, SharedString, VecModel};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -247,12 +247,6 @@ where
         }
     }
 
-    /// Update paths with a specific bezier offset (one-time override).
-    pub fn update_paths_with_offset(&mut self, zoom: f32, bezier_offset: f32) {
-        self.bezier_offset = bezier_offset;
-        self.update_paths(zoom);
-    }
-
     /// Get an iterator over link IDs.
     pub fn ids(&self) -> impl Iterator<Item = i32> + '_ {
         self.links.iter().map(|l| l.id())
@@ -266,71 +260,6 @@ where
     /// Find a link by ID (mutable).
     pub fn find_mut(&mut self, id: i32) -> Option<&mut L> {
         self.links.iter_mut().find(|l| l.id() == id)
-    }
-}
-
-/// Trait for creating Slint-compatible LinkPath models.
-///
-/// This trait is implemented by LinkManager and allows it to produce
-/// a model that can be bound to Slint's link rendering.
-pub trait LinkPathProvider {
-    /// Create a Slint-compatible model of link paths.
-    ///
-    /// The returned closure takes a constructor function that creates
-    /// the Slint LinkPath type from (id, path_commands, color, line_width).
-    fn create_paths_model<P, F>(&self, constructor: F) -> ModelRc<P>
-    where
-        P: Clone + 'static,
-        F: Fn(i32, slint::SharedString, slint::Color, f32) -> P + 'static;
-
-    /// Update an existing paths model in place.
-    ///
-    /// This is more efficient than creating a new model each time.
-    fn update_paths_model<P, F>(&self, model: &VecModel<P>, constructor: F)
-    where
-        P: Clone + 'static,
-        F: Fn(i32, slint::SharedString, slint::Color, f32) -> P;
-}
-
-impl<L, N> LinkPathProvider for LinkManager<L, N>
-where
-    L: LinkModel,
-    N: NodeGeometry + Copy,
-{
-    fn create_paths_model<P, F>(&self, constructor: F) -> ModelRc<P>
-    where
-        P: Clone + 'static,
-        F: Fn(i32, slint::SharedString, slint::Color, f32) -> P + 'static,
-    {
-        let paths = self.paths.borrow();
-        let items: Vec<P> = paths
-            .iter()
-            .map(|p| constructor(p.id, SharedString::from(p.path_commands.as_str()), p.color, p.line_width))
-            .collect();
-        ModelRc::from(Rc::new(VecModel::from(items)))
-    }
-
-    fn update_paths_model<P, F>(&self, model: &VecModel<P>, constructor: F)
-    where
-        P: Clone + 'static,
-        F: Fn(i32, slint::SharedString, slint::Color, f32) -> P,
-    {
-        let paths = self.paths.borrow();
-
-        // Update existing rows or add new ones
-        for (i, path) in paths.iter().enumerate() {
-            let item = constructor(path.id, SharedString::from(path.path_commands.as_str()), path.color, path.line_width);
-            if i < model.row_count() {
-                model.set_row_data(i, item);
-            } else {
-                model.push(item);
-            }
-        }
-
-        // Remove excess rows
-        while model.row_count() > paths.len() {
-            model.remove(model.row_count() - 1);
-        }
     }
 }
 

@@ -70,8 +70,8 @@ pub use graph::{
     GraphLogic, LinkModel, MovableNode, SimpleLink,
     // Link validation framework
     LinkValidator, BasicLinkValidator, NoDuplicatesValidator, CompositeValidator,
-    ValidationResult, ValidationError, validate_link,
+    ValidationResult, ValidationError,
 };
 pub use tracking::GeometryTracker;
-pub use links::{LinkManager, LinkPathProvider};
+pub use links::LinkManager;
 pub use controller::NodeEditorController;

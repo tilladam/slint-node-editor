@@ -70,10 +70,6 @@ impl SimpleLink {
         Self { id, start_pin_id, end_pin_id, color, line_width }
     }
 
-    /// Create a new link with default white color and default line width.
-    pub fn with_default_color(id: i32, start_pin_id: i32, end_pin_id: i32) -> Self {
-        Self::new(id, start_pin_id, end_pin_id, Color::from_rgb_u8(255, 255, 255))
-    }
 }
 
 impl LinkModel for SimpleLink {
@@ -514,32 +510,6 @@ impl<N, L> LinkValidator<N, L> for CompositeValidator<N, L> {
     }
 }
 
-/// Convenience function to validate a link with any validator
-///
-/// # Example
-///
-/// ```ignore
-/// let validator = BasicLinkValidator::new(2);
-/// let result = validate_link(start_pin, end_pin, &cache, &links, &validator);
-///
-/// match result {
-///     ValidationResult::Valid => { /* create link */ }
-///     ValidationResult::Invalid(err) => eprintln!("Cannot create link: {}", err),
-/// }
-/// ```
-pub fn validate_link<V, N, L>(
-    start_pin: i32,
-    end_pin: i32,
-    cache: &GeometryCache<N>,
-    links: &[L],
-    validator: &V,
-) -> ValidationResult
-where
-    V: LinkValidator<N, L>,
-{
-    validator.validate(start_pin, end_pin, cache, links)
-}
-
 // ============================================================================
 // Tests
 // ============================================================================
@@ -794,12 +764,12 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_link_convenience_function() {
+    fn test_validator_validate_directly() {
         let cache = setup_cache();
         let validator = BasicLinkValidator::new(2);
         let links: Vec<TestLink> = vec![];
 
-        let result = validate_link(1001, 2001, &cache, &links, &validator);
+        let result = validator.validate(1001, 2001, &cache, &links);
         assert!(result.is_valid());
     }
 
