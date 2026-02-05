@@ -5,8 +5,8 @@ edition = "2021"
 publish = false
 
 [dependencies]
-slint = { git = "https://github.com/slint-ui/slint", features = ["compat-1-2"] }
+slint = { version = "1.15", features = ["compat-1-2"] }
 slint-node-editor = { path = "../../" }
 
 [build-dependencies]
-slint-build = { git = "https://github.com/slint-ui/slint" }
+slint-build = "1.15"

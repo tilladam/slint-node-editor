@@ -22,13 +22,13 @@ include = [
 ]
 
 [dependencies]
-slint = { git = "https://github.com/slint-ui/slint", default-features = false, features = ["std", "compat-1-2"] }
+slint = { version = "1.15", default-features = false, features = ["std", "compat-1-2"] }
 
 [dev-dependencies]
-i-slint-backend-testing = { git = "https://github.com/slint-ui/slint" }
+i-slint-backend-testing = "1.15"
 
 [build-dependencies]
-slint-build = { git = "https://github.com/slint-ui/slint" }
+slint-build = "1.15"
 
 # [workspace]
 # members = ["examples/advanced", "examples/minimal", "examples/custom-shapes", "examples/animated-links", "examples/pin-compatibility"]

@@ -213,9 +213,9 @@ checksum = "5192cca8006f1fd4f7237516f40fa183bb07f8fbdfedaa0036de5ea9b0b45e78"
 
 [[package]]
 name = "anyhow"
-version = "1.0.100"
+version = "1.0.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
+checksum = "5f0e0fee31ef5ed1ba1316088939cea399010ed7731dba877ed44aeb407a75ea"
 
 [[package]]
 name = "arbitrary"
@@ -827,16 +827,7 @@ version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91fcde4ca1211b5a94b573083c472ee19e86b19a441913f66e1cc5c41daf0255"
 dependencies = [
- "const-field-offset-macro 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "field-offset",
-]
-
-[[package]]
-name = "const-field-offset"
-version = "0.1.5"
-source = "git+https://github.com/slint-ui/slint#7cb82e2f30a40e5d4477e4994b90abd4a4a85a11"
-dependencies = [
- "const-field-offset-macro 0.1.5 (git+https://github.com/slint-ui/slint)",
+ "const-field-offset-macro",
  "field-offset",
 ]
 
@@ -845,16 +836,6 @@ name = "const-field-offset-macro"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5387f5bbc9e9e6c96436ea125afa12614cebf8ac67f49abc08c1e7a891466c90"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "const-field-offset-macro"
-version = "0.1.5"
-source = "git+https://github.com/slint-ui/slint#7cb82e2f30a40e5d4477e4994b90abd4a4a85a11"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1875,10 +1856,10 @@ dependencies = [
  "drm",
  "gbm",
  "glutin",
- "i-slint-common 1.15.0",
- "i-slint-core 1.15.0",
+ "i-slint-common",
+ "i-slint-core",
  "i-slint-renderer-femtovg",
- "i-slint-renderer-software 1.15.0",
+ "i-slint-renderer-software",
  "input",
  "memmap2",
  "nix",
@@ -1892,17 +1873,17 @@ version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81a4f5e40723d6d5beb9db91420ba2057ec61774975113020942ff9eb71e2813"
 dependencies = [
- "const-field-offset 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "const-field-offset",
  "cpp",
  "cpp_build",
- "i-slint-common 1.15.0",
- "i-slint-core 1.15.0",
- "i-slint-core-macros 1.15.0",
+ "i-slint-common",
+ "i-slint-core",
+ "i-slint-core-macros",
  "lyon_path",
  "pin-project",
  "pin-weak",
  "qttypes",
- "vtable 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vtable",
 ]
 
 [[package]]
@@ -1915,21 +1896,10 @@ dependencies = [
  "i-slint-backend-linuxkms",
  "i-slint-backend-qt",
  "i-slint-backend-winit",
- "i-slint-common 1.15.0",
- "i-slint-core 1.15.0",
- "i-slint-core-macros 1.15.0",
+ "i-slint-common",
+ "i-slint-core",
+ "i-slint-core-macros",
  "i-slint-renderer-femtovg",
-]
-
-[[package]]
-name = "i-slint-backend-selector"
-version = "1.16.0"
-source = "git+https://github.com/slint-ui/slint#7cb82e2f30a40e5d4477e4994b90abd4a4a85a11"
-dependencies = [
- "cfg-if",
- "i-slint-common 1.16.0",
- "i-slint-core 1.16.0",
- "i-slint-core-macros 1.16.0",
 ]
 
 [[package]]
@@ -1949,12 +1919,12 @@ dependencies = [
  "futures",
  "glutin",
  "glutin-winit",
- "i-slint-common 1.15.0",
- "i-slint-core 1.15.0",
- "i-slint-core-macros 1.15.0",
+ "i-slint-common",
+ "i-slint-core",
+ "i-slint-core-macros",
  "i-slint-renderer-femtovg",
  "i-slint-renderer-skia",
- "i-slint-renderer-software 1.15.0",
+ "i-slint-renderer-software",
  "imgref",
  "lyon_path",
  "muda",
@@ -1970,7 +1940,7 @@ dependencies = [
  "scopeguard",
  "softbuffer",
  "strum",
- "vtable 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vtable",
  "wasm-bindgen",
  "web-sys",
  "windows 0.62.2",
@@ -1989,15 +1959,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "i-slint-common"
-version = "1.16.0"
-source = "git+https://github.com/slint-ui/slint#7cb82e2f30a40e5d4477e4994b90abd4a4a85a11"
-dependencies = [
- "fontique",
- "ttf-parser 0.25.1",
-]
-
-[[package]]
 name = "i-slint-compiler"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2007,35 +1968,7 @@ dependencies = [
  "by_address",
  "derive_more",
  "fontdue",
- "i-slint-common 1.15.0",
- "image",
- "itertools 0.14.0",
- "linked_hash_set",
- "lyon_extra",
- "lyon_path",
- "num_enum",
- "proc-macro2",
- "quote",
- "rayon",
- "resvg",
- "rowan",
- "rspolib",
- "smol_str 0.3.5",
- "strum",
- "typed-index-collections",
- "url",
-]
-
-[[package]]
-name = "i-slint-compiler"
-version = "1.16.0"
-source = "git+https://github.com/slint-ui/slint#7cb82e2f30a40e5d4477e4994b90abd4a4a85a11"
-dependencies = [
- "annotate-snippets",
- "by_address",
- "derive_more",
- "fontdue",
- "i-slint-common 1.16.0",
+ "i-slint-common",
  "image",
  "itertools 0.14.0",
  "linked_hash_set",
@@ -2065,12 +1998,12 @@ dependencies = [
  "cfg-if",
  "chrono",
  "clru",
- "const-field-offset 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "const-field-offset",
  "derive_more",
  "euclid",
  "htmlparser",
- "i-slint-common 1.15.0",
- "i-slint-core-macros 1.15.0",
+ "i-slint-common",
+ "i-slint-core-macros",
  "image",
  "lyon_algorithms",
  "lyon_extra",
@@ -2096,52 +2029,7 @@ dependencies = [
  "unicode-linebreak",
  "unicode-script",
  "unicode-segmentation",
- "vtable 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "wasm-bindgen",
- "web-sys",
- "web-time",
-]
-
-[[package]]
-name = "i-slint-core"
-version = "1.16.0"
-source = "git+https://github.com/slint-ui/slint#7cb82e2f30a40e5d4477e4994b90abd4a4a85a11"
-dependencies = [
- "auto_enums",
- "bitflags 2.10.0",
- "cfg-if",
- "chrono",
- "clru",
- "const-field-offset 0.1.5 (git+https://github.com/slint-ui/slint)",
- "derive_more",
- "euclid",
- "htmlparser",
- "i-slint-common 1.16.0",
- "i-slint-core-macros 1.16.0",
- "image",
- "lyon_algorithms",
- "lyon_extra",
- "lyon_geom",
- "lyon_path",
- "num-traits",
- "once_cell",
- "parley",
- "pin-project",
- "pin-weak",
- "portable-atomic",
- "pulldown-cmark",
- "raw-window-handle",
- "resvg",
- "rgb",
- "scoped-tls-hkt",
- "scopeguard",
- "skrifa",
- "slab",
- "strum",
- "sys-locale",
- "thiserror 2.0.18",
- "unicode-segmentation",
- "vtable 0.3.0 (git+https://github.com/slint-ui/slint)",
+ "vtable",
  "wasm-bindgen",
  "web-sys",
  "web-time",
@@ -2159,29 +2047,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "i-slint-core-macros"
-version = "1.16.0"
-source = "git+https://github.com/slint-ui/slint#7cb82e2f30a40e5d4477e4994b90abd4a4a85a11"
-dependencies = [
- "quote",
- "serde_json",
- "syn",
-]
-
-[[package]]
 name = "i-slint-renderer-femtovg"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0ed83d03ba808941bc37f1466eae8c47566068178ef042b85e3d6233724c2e3"
 dependencies = [
  "cfg-if",
- "const-field-offset 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "const-field-offset",
  "derive_more",
  "femtovg",
  "glow",
- "i-slint-common 1.15.0",
- "i-slint-core 1.15.0",
- "i-slint-core-macros 1.15.0",
+ "i-slint-common",
+ "i-slint-core",
+ "i-slint-core-macros",
  "imgref",
  "lyon_path",
  "pin-weak",
@@ -2200,13 +2078,13 @@ dependencies = [
  "bytemuck",
  "cfg-if",
  "cfg_aliases",
- "const-field-offset 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "const-field-offset",
  "derive_more",
  "glow",
  "glutin",
- "i-slint-common 1.15.0",
- "i-slint-core 1.15.0",
- "i-slint-core-macros 1.15.0",
+ "i-slint-common",
+ "i-slint-core",
+ "i-slint-core-macros",
  "lyon_path",
  "objc2 0.6.3",
  "objc2-app-kit 0.3.2",
@@ -2222,7 +2100,7 @@ dependencies = [
  "skia-safe",
  "softbuffer",
  "unicode-segmentation",
- "vtable 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vtable",
  "windows 0.62.2",
  "write-fonts",
 ]
@@ -2238,27 +2116,8 @@ dependencies = [
  "derive_more",
  "euclid",
  "fontdue",
- "i-slint-common 1.15.0",
- "i-slint-core 1.15.0",
- "integer-sqrt",
- "lyon_path",
- "num-traits",
- "skrifa",
- "zeno",
-]
-
-[[package]]
-name = "i-slint-renderer-software"
-version = "1.16.0"
-source = "git+https://github.com/slint-ui/slint#7cb82e2f30a40e5d4477e4994b90abd4a4a85a11"
-dependencies = [
- "bytemuck",
- "clru",
- "derive_more",
- "euclid",
- "fontdue",
- "i-slint-common 1.16.0",
- "i-slint-core 1.16.0",
+ "i-slint-common",
+ "i-slint-core",
  "integer-sqrt",
  "lyon_path",
  "num-traits",
@@ -2808,8 +2667,8 @@ dependencies = [
 name = "minimal"
 version = "0.1.0"
 dependencies = [
- "slint 1.15.0",
- "slint-build 1.15.0",
+ "slint",
+ "slint-build",
  "slint-node-editor",
 ]
 
@@ -4236,40 +4095,21 @@ version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "432c306ed799f8ffe365ba90228c5c95f1f02b41a1275ec90274beb2de9bc9b2"
 dependencies = [
- "const-field-offset 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "const-field-offset",
  "fontique",
  "i-slint-backend-qt",
- "i-slint-backend-selector 1.15.0",
- "i-slint-common 1.15.0",
- "i-slint-core 1.15.0",
- "i-slint-core-macros 1.15.0",
+ "i-slint-backend-selector",
+ "i-slint-common",
+ "i-slint-core",
+ "i-slint-core-macros",
  "i-slint-renderer-femtovg",
- "i-slint-renderer-software 1.15.0",
+ "i-slint-renderer-software",
  "num-traits",
  "once_cell",
  "pin-weak",
- "slint-macros 1.15.0",
+ "slint-macros",
  "unicode-segmentation",
- "vtable 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "slint"
-version = "1.16.0"
-source = "git+https://github.com/slint-ui/slint#7cb82e2f30a40e5d4477e4994b90abd4a4a85a11"
-dependencies = [
- "const-field-offset 0.1.5 (git+https://github.com/slint-ui/slint)",
- "i-slint-backend-selector 1.16.0",
- "i-slint-common 1.16.0",
- "i-slint-core 1.16.0",
- "i-slint-core-macros 1.16.0",
- "i-slint-renderer-software 1.16.0",
- "num-traits",
- "once_cell",
- "pin-weak",
- "slint-macros 1.16.0",
- "unicode-segmentation",
- "vtable 0.3.0 (git+https://github.com/slint-ui/slint)",
+ "vtable",
 ]
 
 [[package]]
@@ -4279,19 +4119,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81baa6950be442989aedda43bc4318a174ebf902a50b1be4c1f8488cdfe1b023"
 dependencies = [
  "derive_more",
- "i-slint-compiler 1.15.0",
- "spin_on",
- "toml_edit 0.24.0+spec-1.1.0",
-]
-
-[[package]]
-name = "slint-build"
-version = "1.16.0"
-source = "git+https://github.com/slint-ui/slint#7cb82e2f30a40e5d4477e4994b90abd4a4a85a11"
-dependencies = [
- "derive_more",
- "fontique",
- "i-slint-compiler 1.16.0",
+ "i-slint-compiler",
  "spin_on",
  "toml_edit 0.24.0+spec-1.1.0",
 ]
@@ -4302,18 +4130,7 @@ version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7678ea0a654bfc0f86c1065ead013d0d4ccd59deccd05b7b339997d60d1e524c"
 dependencies = [
- "i-slint-compiler 1.15.0",
- "proc-macro2",
- "quote",
- "spin_on",
-]
-
-[[package]]
-name = "slint-macros"
-version = "1.16.0"
-source = "git+https://github.com/slint-ui/slint#7cb82e2f30a40e5d4477e4994b90abd4a4a85a11"
-dependencies = [
- "i-slint-compiler 1.16.0",
+ "i-slint-compiler",
  "proc-macro2",
  "quote",
  "spin_on",
@@ -4323,8 +4140,8 @@ dependencies = [
 name = "slint-node-editor"
 version = "0.1.0"
 dependencies = [
- "slint 1.16.0",
- "slint-build 1.16.0",
+ "slint",
+ "slint-build",
 ]
 
 [[package]]
@@ -5032,21 +4849,10 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "753be81c38dff787d177b5939af1fa16f72f0d0d21a6b7d74ae56e29cd26f2a6"
 dependencies = [
- "const-field-offset 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "const-field-offset",
  "portable-atomic",
  "stable_deref_trait",
- "vtable-macro 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "vtable"
-version = "0.3.0"
-source = "git+https://github.com/slint-ui/slint#7cb82e2f30a40e5d4477e4994b90abd4a4a85a11"
-dependencies = [
- "const-field-offset 0.1.5 (git+https://github.com/slint-ui/slint)",
- "portable-atomic",
- "stable_deref_trait",
- "vtable-macro 0.3.0 (git+https://github.com/slint-ui/slint)",
+ "vtable-macro",
 ]
 
 [[package]]
@@ -5054,16 +4860,6 @@ name = "vtable-macro"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8cfcf6171aa2b0f85718ca5888ca32f6edf61d1849f8e4b3786ad890e5b68f68"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "vtable-macro"
-version = "0.3.0"
-source = "git+https://github.com/slint-ui/slint#7cb82e2f30a40e5d4477e4994b90abd4a4a85a11"
 dependencies = [
  "proc-macro2",
  "quote",
