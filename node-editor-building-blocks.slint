@@ -339,7 +339,7 @@ export component BaseNode inherits Rectangle {
     callback pin-drag-ended(int, length, length);
     callback pin-position-changed(/* pin-id */ int, /* node-id */ int, /* pin-type */ int, /* rel-x */ length, /* rel-y */ length);
     callback clicked(int, bool);
-    callback drag-started(int, bool);
+    callback drag-started(int, bool, length, length);
     callback drag-moved(int, length, length);
     callback drag-ended(int, length, length);
     callback report-rect(int, length, length, length, length);
@@ -444,7 +444,7 @@ export component BaseNode inherits Rectangle {
                 if !is-dragging {
                     if abs((self.absolute-position.x + self.mouse-x) - start-abs-x) > drag-threshold || abs((self.absolute-position.y + self.mouse-y) - start-abs-y) > drag-threshold {
                         is-dragging = true;
-                        root.drag-started(node-id, selected);
+                        root.drag-started(node-id, selected, world-x, world-y);
                     }
                 }
                 if is-dragging {

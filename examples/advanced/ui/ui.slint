@@ -365,8 +365,8 @@ export component MainWindow inherits Window {
             clicked(id, shift) => {
                 editor.handle-node-click(id, shift);
             }
-            drag-started(id, already-selected) => {
-                editor.start-node-drag(id, already-selected);
+            drag-started(id, already-selected, wx, wy) => {
+                editor.start-node-drag(id, already-selected, wx, wy);
             }
             drag-moved(id, offset-x, offset-y) => {
                 editor.update-node-drag(offset-x, offset-y);
@@ -411,8 +411,8 @@ export component MainWindow inherits Window {
             clicked(id, shift) => {
                 editor.handle-node-click(id, shift);
             }
-            drag-started(id, already-selected) => {
-                editor.start-node-drag(id, already-selected);
+            drag-started(id, already-selected, wx, wy) => {
+                editor.start-node-drag(id, already-selected, wx, wy);
             }
             drag-moved(id, offset-x, offset-y) => {
                 editor.update-node-drag(offset-x, offset-y);

@@ -136,9 +136,9 @@ export component MainWindow inherits Window {
             report-position(pid, nid, pt, x, y) => {
                 editor.report-pin-position(pid, nid, pt, x, y);
             }
-            drag-started(id, already-selected) => {
+            drag-started(id, already-selected, wx, wy) => {
                 root.dragged-node-id = id;
-                editor.start-node-drag(id, already-selected);
+                editor.start-node-drag(id, already-selected, wx, wy);
             }
             drag-moved(id, dx, dy) => {
                 editor.update-node-drag(dx, dy);

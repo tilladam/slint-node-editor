@@ -171,6 +171,8 @@ export component NodeEditor {
     property <bool> internal-is-dragging: false;
     property <length> internal-drag-offset-x: 0px;
     property <length> internal-drag-offset-y: 0px;
+    property <length> internal-drag-origin-x: 0px;
+    property <length> internal-drag-origin-y: 0px;
 
     // === Callbacks TO Application (for computation) ===
     /// Called when grid needs to be regenerated (on pan/zoom/resize)
@@ -351,7 +353,7 @@ export component NodeEditor {
     }
 
     /// Start node drag
-    public function start-node-drag(node-id: int, already-selected: bool) {
+    public function start-node-drag(node-id: int, already-selected: bool, world-x: length, world-y: length) {
         if !already-selected {
             // Select the node when starting to drag an unselected node
             root.select-node(node-id, false);
@@ -359,6 +361,8 @@ export component NodeEditor {
         root.internal-is-dragging = true;
         root.internal-drag-offset-x = 0px;
         root.internal-drag-offset-y = 0px;
+        root.internal-drag-origin-x = world-x;
+        root.internal-drag-origin-y = world-y;
         root.node-drag-started(node-id);
     }
 
@@ -371,9 +375,12 @@ export component NodeEditor {
     /// End node drag
     public function end-node-drag(delta-x: length, delta-y: length) {
         // Call callback FIRST so Rust can update model with correct positions
+        // When grid-snapping, snap the final position (origin + delta) to grid,
+        // then compute the effective delta. This ensures nodes land on grid
+        // intersections regardless of their starting position.
         root.node-drag-ended(
-            root.grid-snapping ? root.snap-to-grid(delta-x / 1px) : delta-x / 1px,
-            root.grid-snapping ? root.snap-to-grid(delta-y / 1px) : delta-y / 1px
+            root.grid-snapping ? root.snap-to-grid((root.internal-drag-origin-x + delta-x) / 1px) - root.internal-drag-origin-x / 1px : delta-x / 1px,
+            root.grid-snapping ? root.snap-to-grid((root.internal-drag-origin-y + delta-y) / 1px) - root.internal-drag-origin-y / 1px : delta-y / 1px
         );
 
         // THEN reset visual offset (now report-rect will find model already updated)

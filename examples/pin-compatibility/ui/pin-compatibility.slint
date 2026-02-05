@@ -444,7 +444,7 @@ export component MainWindow inherits Window {
 
             report-rect(id, x, y, w, h) => { editor.report-node-rect(id, x, y, w, h); }
             report-position(pid, nid, pt, x, y) => { editor.report-pin-position(pid, nid, pt, x, y); }
-            drag-started(id, sel) => { root.dragged-node-id = id; editor.start-node-drag(id, sel); }
+            drag-started(id, sel, wx, wy) => { root.dragged-node-id = id; editor.start-node-drag(id, sel, wx, wy); }
             drag-moved(id, dx, dy) => { editor.update-node-drag(dx, dy); }
             drag-ended(id, dx, dy) => { root.dragged-node-id = 0; editor.end-node-drag(dx, dy); }
             pin-drag-started(id, x, y) => {
@@ -477,7 +477,7 @@ export component MainWindow inherits Window {
 
             report-rect(id, x, y, w, h) => { editor.report-node-rect(id, x, y, w, h); }
             report-position(pid, nid, pt, x, y) => { editor.report-pin-position(pid, nid, pt, x, y); }
-            drag-started(id, sel) => { root.dragged-node-id = id; editor.start-node-drag(id, sel); }
+            drag-started(id, sel, wx, wy) => { root.dragged-node-id = id; editor.start-node-drag(id, sel, wx, wy); }
             drag-moved(id, dx, dy) => { editor.update-node-drag(dx, dy); }
             drag-ended(id, dx, dy) => { root.dragged-node-id = 0; editor.end-node-drag(dx, dy); }
             pin-drag-started(id, x, y) => {
