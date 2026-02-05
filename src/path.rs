@@ -277,13 +277,13 @@ mod tests {
 
     #[test]
     fn test_bezier_path_small_distance() {
-        // Distance is 5.0, threshold is 10.0
+        // Distance is 5.0, threshold is 20.0 — should produce straight line
         let path = generate_bezier_path(0.0, 0.0, 5.0, 0.0, 1.0, 50.0);
         assert!(path.contains(" L "));
         assert!(!path.contains(" C "));
 
-        // Distance is 15.0, threshold is 10.0
-        let path2 = generate_bezier_path(0.0, 0.0, 15.0, 0.0, 1.0, 50.0);
+        // Distance is 25.0, threshold is 20.0 — should produce bezier curve
+        let path2 = generate_bezier_path(0.0, 0.0, 25.0, 0.0, 1.0, 50.0);
         assert!(path2.contains(" C "));
         assert!(!path2.contains(" L "));
     }
