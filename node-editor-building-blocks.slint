@@ -474,8 +474,10 @@ export component Pin inherits Rectangle {
     property <length> pin-size: base-size * zoom;
     property <length> pin-radius: pin-size / 2;
 
-    out property <length> center-x: self.x + pin-radius;
-    out property <length> center-y: self.y + pin-radius;
+    /// Pin center X relative to node top-left, UNSCALED by zoom
+    out property <length> center-x: (self.x + self.width / 2) / zoom;
+    /// Pin center Y relative to node top-left, UNSCALED by zoom
+    out property <length> center-y: (self.y + self.height / 2) / zoom;
 
     callback drag-started(int, length, length);
     callback drag-moved(int, length, length);
@@ -507,6 +509,11 @@ export component Pin inherits Rectangle {
             report-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
+    changed zoom => {
+        if (pin-id > 0) {
+            report-position(pin-id, node-id, pin-type, center-x, center-y);
+        }
+    }
     changed refresh-trigger => {
         if (pin-id > 0) {
             report-position(pin-id, node-id, pin-type, center-x, center-y);
@@ -519,20 +526,21 @@ export component Pin inherits Rectangle {
         pointer-event(event) => {
             if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                 drag-active = true;
-                root.drag-started(pin-id, node-screen-x + center-x, node-screen-y + center-y);
+                // These are for visual link preview, should be screen-space
+                root.drag-started(pin-id, node-screen-x + self.x + self.width/2, node-screen-y + self.y + self.height/2);
             }
             if event.kind == PointerEventKind.up && drag-active {
                 drag-active = false;
                 root.drag-ended(pin-id,
-                    node-screen-x + center-x + self.mouse-x - pin-radius,
-                    node-screen-y + center-y + self.mouse-y - pin-radius);
+                    node-screen-x + self.x + self.width/2 + self.mouse-x - pin-radius,
+                    node-screen-y + self.y + self.height/2 + self.mouse-y - pin-radius);
             }
         }
         moved => {
             if drag-active {
                 root.drag-moved(pin-id,
-                    node-screen-x + center-x + self.mouse-x - pin-radius,
-                    node-screen-y + center-y + self.mouse-y - pin-radius);
+                    node-screen-x + self.x + self.width/2 + self.mouse-x - pin-radius,
+                    node-screen-y + self.y + self.height/2 + self.mouse-y - pin-radius);
             }
         }
     }

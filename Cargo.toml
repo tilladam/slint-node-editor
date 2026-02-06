@@ -30,6 +30,17 @@ i-slint-backend-testing = { git = "https://github.com/slint-ui/slint" }
 [build-dependencies]
 slint-build = { git = "https://github.com/slint-ui/slint" }
 
-# [workspace]
-# members = ["examples/advanced", "examples/minimal", "examples/custom-shapes", "examples/animated-links", "examples/pin-compatibility"]
-# Workspace disabled when used as a path dependency
+[workspace]
+members = [
+    "examples/advanced",
+    "examples/minimal",
+    "examples/custom-shapes",
+    "examples/animated-links",
+    "examples/pin-compatibility",
+    "examples/zoom-stress-test",
+]
+
+[workspace.dependencies]
+slint = { git = "https://github.com/slint-ui/slint", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-femtovg"] }
+slint-build = { git = "https://github.com/slint-ui/slint" }
+slint-node-editor = { path = "." }

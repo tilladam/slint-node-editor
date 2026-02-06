@@ -469,23 +469,19 @@ let cache = tracker.cache(); // Use for hit testing
 
 ## Examples
 
+All examples are located in the `examples/` directory and can be run from the root using `cargo run -p <name>`:
+
 - **minimal:** A simple example using `NodeEditorController` with basic nodes and links.
-  - Path: `examples/minimal`
   - Run: `cargo run -p minimal`
 - **advanced:** A comprehensive example demonstrating custom nodes, widgets inside nodes, minimap, selection logic, link validation, and manual callback implementation.
-  - Path: `examples/advanced`
   - Run: `cargo run -p advanced`
 - **animated-links:** Demonstrates creative link animations (growing/snake effect) using de Casteljau's algorithm and glow effects.
-  - Path: `examples/animated-links`
   - Run: `cargo run -p animated-links`
 - **custom-shapes:** Shows how to implement custom link routing (e.g., orthogonal) and reactive styling.
-  - Path: `examples/custom-shapes`
   - Run: `cargo run -p custom-shapes`
 - **pin-compatibility:** Demonstrates type-safe connections with a compatibility matrix, visual validation feedback, and custom pin behaviors.
-  - Path: `examples/pin-compatibility`
   - Run: `cargo run -p pin-compatibility`
 - **zoom-stress-test:** Tests widget scaling at various zoom levels with Level of Detail (LOD) rendering. Shows how to implement LOD transitions for complex nodes.
-  - Path: `examples/zoom-stress-test`
   - Run: `cargo run -p zoom-stress-test`
 
 ## License

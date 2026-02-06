@@ -306,13 +306,13 @@ impl NodeEditorController {
                 let start_rect = cache.node_rects.get(&start_pos.node_id)?.rect();
                 let end_rect = cache.node_rects.get(&end_pos.node_id)?.rect();
 
-                // World→screen: node_world * zoom + pan + pin_rel (already screen-scaled)
+                // World→screen: (node_world + pin_rel) * zoom + pan
                 Some(SimpleLinkGeometry {
                     id,
-                    start_x: start_rect.0 * zoom + pan_x + start_pos.rel_x,
-                    start_y: start_rect.1 * zoom + pan_y + start_pos.rel_y,
-                    end_x: end_rect.0 * zoom + pan_x + end_pos.rel_x,
-                    end_y: end_rect.1 * zoom + pan_y + end_pos.rel_y,
+                    start_x: (start_rect.0 + start_pos.rel_x) * zoom + pan_x,
+                    start_y: (start_rect.1 + start_pos.rel_y) * zoom + pan_y,
+                    end_x: (end_rect.0 + end_pos.rel_x) * zoom + pan_x,
+                    end_y: (end_rect.1 + end_pos.rel_y) * zoom + pan_y,
                 })
             })
             .collect();
@@ -339,9 +339,9 @@ impl NodeEditorController {
 
         let pins = cache.pin_positions.iter().filter_map(|(&pin_id, pin)| {
             let rect = cache.node_rects.get(&pin.node_id)?.rect();
-            // World→screen
-            let sx = rect.0 * zoom + pan_x + pin.rel_x;
-            let sy = rect.1 * zoom + pan_y + pin.rel_y;
+            // World→screen: (node_world + pin_rel) * zoom + pan
+            let sx = (rect.0 + pin.rel_x) * zoom + pan_x;
+            let sy = (rect.1 + pin.rel_y) * zoom + pan_y;
             Some(crate::hit_test::SimplePinGeometry {
                 id: pin_id,
                 x: sx,
@@ -400,7 +400,7 @@ impl NodeEditorController {
         let cache = self.cache.borrow();
         let links = self.links.borrow();
 
-        // Compute world-space link endpoints: node_world + pin_rel/zoom
+        // Compute world-space link endpoints: node_world + pin_rel
         let link_geometries: Vec<SimpleLinkGeometry> = links
             .iter()
             .filter_map(|&(id, start_pin, end_pin)| {
@@ -411,10 +411,10 @@ impl NodeEditorController {
 
                 Some(SimpleLinkGeometry {
                     id,
-                    start_x: start_rect.0 + start_pos.rel_x / z,
-                    start_y: start_rect.1 + start_pos.rel_y / z,
-                    end_x: end_rect.0 + end_pos.rel_x / z,
-                    end_y: end_rect.1 + end_pos.rel_y / z,
+                    start_x: start_rect.0 + start_pos.rel_x,
+                    start_y: start_rect.1 + start_pos.rel_y,
+                    end_x: end_rect.0 + end_pos.rel_x,
+                    end_y: end_rect.1 + end_pos.rel_y,
                 })
             })
             .collect();

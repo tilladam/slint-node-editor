@@ -8,6 +8,8 @@ This is the **Slint Node Editor** library (`slint-node-editor`), a generic Slint
 
 ## Build Commands
 
+All examples can be run from the root directory using the `-p` (package) flag:
+
 ```bash
 # Build and run the full-featured example
 cargo run -p advanced
@@ -18,11 +20,17 @@ cargo run -p minimal
 # Build and run the custom shapes example
 cargo run -p custom-shapes
 
+# Build and run the animated links example
+cargo run -p animated-links
+
+# Build and run the pin compatibility example
+cargo run -p pin-compatibility
+
 # Build and run the zoom stress test (LOD system demo)
 cargo run -p zoom-stress-test
 
-# Check compilation without running
-cargo check
+# Check compilation of the library and all examples
+cargo check --workspace
 ```
 
 ## Key Files

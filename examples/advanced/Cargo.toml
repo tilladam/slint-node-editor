@@ -5,8 +5,8 @@ edition = "2021"
 publish = false
 
 [dependencies]
-slint = { version = "1.15", features = ["compat-1-2"] }
-slint-node-editor = { path = "../../" }
+slint = { workspace = true }
+slint-node-editor = { workspace = true }
 
 [build-dependencies]
-slint-build = "1.15"
+slint-build = { workspace = true }

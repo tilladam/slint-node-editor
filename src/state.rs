@@ -171,12 +171,12 @@ where
         ))
     }
 
-    /// Compute bezier path in screen space from world-space node rects and screen-scaled pin offsets.
+    /// Compute bezier path in screen space from world-space node rects and world-space relative pin offsets.
     ///
-    /// Node rects are stored in world coordinates. Pin rel_x/rel_y are in screen space
-    /// (zoom-scaled). The screen-space pin position is:
-    ///   screen_x = node_world_x * zoom + pan_x + pin_rel_x
-    ///   screen_y = node_world_y * zoom + pan_y + pin_rel_y
+    /// Node rects are stored in world coordinates. Pin rel_x/rel_y are also in world space
+    /// (unscaled). The screen-space pin position is:
+    ///   screen_x = (node_world_x + pin_rel_x) * zoom + pan_x
+    ///   screen_y = (node_world_y + pin_rel_y) * zoom + pan_y
     pub fn compute_link_path_screen(
         &self,
         start_pin: i32,
@@ -192,10 +192,10 @@ where
         let start_rect = self.node_rects.get(&start_pos.node_id)?.rect();
         let end_rect = self.node_rects.get(&end_pos.node_id)?.rect();
 
-        let sx = start_rect.0 * zoom + pan_x + start_pos.rel_x;
-        let sy = start_rect.1 * zoom + pan_y + start_pos.rel_y;
-        let ex = end_rect.0 * zoom + pan_x + end_pos.rel_x;
-        let ey = end_rect.1 * zoom + pan_y + end_pos.rel_y;
+        let sx = (start_rect.0 + start_pos.rel_x) * zoom + pan_x;
+        let sy = (start_rect.1 + start_pos.rel_y) * zoom + pan_y;
+        let ex = (end_rect.0 + end_pos.rel_x) * zoom + pan_x;
+        let ey = (end_rect.1 + end_pos.rel_y) * zoom + pan_y;
 
         Some(generate_bezier_path(sx, sy, ex, ey, zoom, bezier_min_offset))
     }
