@@ -229,6 +229,17 @@ impl NodeEditorController {
         self.cache.borrow_mut().handle_pin_report(pid, nid, ptype, x, y);
     }
 
+    /// Seed a node's world-space rect directly, bypassing screen→world conversion.
+    ///
+    /// Use this to pre-populate the geometry cache for nodes that haven't been
+    /// rendered by Slint yet (e.g. off-screen nodes whose link endpoints are
+    /// visible). The coordinates must be in world space.
+    pub fn seed_node_world_rect(&self, id: i32, x: f32, y: f32, w: f32, h: f32) {
+        self.cache
+            .borrow_mut()
+            .handle_node_rect_report(id, x, y, w, h);
+    }
+
     /// Handle node-drag-started: track the dragged node.
     pub fn handle_node_drag_started(&self, node_id: i32) {
         self.state.borrow_mut().dragged_node_id = node_id;
