@@ -339,6 +339,7 @@ export component BaseNode inherits Rectangle {
     callback pin-drag-ended(int, length, length);
     callback pin-position-changed(/* pin-id */ int, /* node-id */ int, /* pin-type */ int, /* rel-x */ length, /* rel-y */ length);
     callback clicked(int, bool);
+    callback double-clicked(int);
     callback drag-started(int, bool, length, length);
     callback drag-moved(int, length, length);
     callback drag-ended(int, length, length);
@@ -390,6 +391,13 @@ export component BaseNode inherits Rectangle {
         }
     }
 
+    // === Double-click detection ===
+    property <bool> dbl-click-armed: false;
+    dbl-click-timer := Timer {
+        interval: 400ms;
+        triggered => { root.dbl-click-armed = false; }
+    }
+
     // === Drag Handling ===
     TouchArea {
         property <bool> shift-held: false;
@@ -433,6 +441,14 @@ export component BaseNode inherits Rectangle {
                     // Click without drag - if we deferred selection, do it now
                     if was-selected-on-press && !shift-held {
                         root.clicked(node-id, shift-held);
+                    }
+                    // Double-click detection
+                    if root.dbl-click-armed {
+                        root.double-clicked(node-id);
+                        root.dbl-click-armed = false;
+                    } else {
+                        root.dbl-click-armed = true;
+                        dbl-click-timer.restart();
                     }
                 }
             }

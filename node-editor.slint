@@ -222,6 +222,8 @@ export component NodeEditor {
     callback delete-selected();
     callback add-node-requested();
     callback context-menu-requested();
+    callback node-double-clicked(/* node-id */ int);
+    callback navigate-up();
     callback node-drag-started(/* node-id */ int);
     callback node-drag-ended(/* delta-x */ float, /* delta-y */ float);
 
@@ -645,6 +647,8 @@ export component NodeEditor {
             } else if event.text == Key.Escape {
                 if root.internal-is-creating-link {
                     root.cancel-link-creation();
+                } else {
+                    root.navigate-up();
                 }
                 accept
             } else if event.modifiers.control && (event.text == "n" || event.text == "N") {
