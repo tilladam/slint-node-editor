@@ -147,7 +147,7 @@ where
         )
     }
 
-    /// Compute bezier path for a link
+    /// Compute bezier path for a link (same-space: node rects and pin offsets in same coordinate system)
     pub fn compute_link_path(
         &self,
         start_pin: i32,
@@ -169,6 +169,35 @@ where
             zoom,
             bezier_min_offset,
         ))
+    }
+
+    /// Compute bezier path in screen space from world-space node rects and screen-scaled pin offsets.
+    ///
+    /// Node rects are stored in world coordinates. Pin rel_x/rel_y are in screen space
+    /// (zoom-scaled). The screen-space pin position is:
+    ///   screen_x = node_world_x * zoom + pan_x + pin_rel_x
+    ///   screen_y = node_world_y * zoom + pan_y + pin_rel_y
+    pub fn compute_link_path_screen(
+        &self,
+        start_pin: i32,
+        end_pin: i32,
+        zoom: f32,
+        pan_x: f32,
+        pan_y: f32,
+        bezier_min_offset: f32,
+    ) -> Option<String> {
+        let start_pos = self.pin_positions.get(&start_pin)?;
+        let end_pos = self.pin_positions.get(&end_pin)?;
+
+        let start_rect = self.node_rects.get(&start_pos.node_id)?.rect();
+        let end_rect = self.node_rects.get(&end_pos.node_id)?.rect();
+
+        let sx = start_rect.0 * zoom + pan_x + start_pos.rel_x;
+        let sy = start_rect.1 * zoom + pan_y + start_pos.rel_y;
+        let ex = end_rect.0 * zoom + pan_x + end_pos.rel_x;
+        let ey = end_rect.1 * zoom + pan_y + end_pos.rel_y;
+
+        Some(generate_bezier_path(sx, sy, ex, ey, zoom, bezier_min_offset))
     }
 
     /// Standard handler for pin position reports from Slint
@@ -588,5 +617,54 @@ mod tests {
         let selected =
             cache.links_in_selection_box(500.0, 500.0, 50.0, 50.0, links_data.into_iter());
         assert!(selected.is_empty());
+    }
+
+    // ========================================================================
+    // compute_link_path_screen() - World→Screen Path Generation
+    // ========================================================================
+
+    #[test]
+    fn test_compute_link_path_screen_zoom1_pan0() {
+        let cache = setup_test_cache();
+        // At zoom=1, pan=0 the screen-space path should equal
+        // node_world + pin_rel (same as compute_link_path at zoom=1)
+        let path = cache
+            .compute_link_path_screen(1001, 2001, 1.0, 0.0, 0.0, 50.0)
+            .expect("Path should be generated");
+        assert!(path.starts_with("M "));
+        assert!(path.contains(" C "));
+    }
+
+    #[test]
+    fn test_compute_link_path_screen_with_pan() {
+        let cache = setup_test_cache();
+        // With pan offset, paths should differ from zero-pan
+        let path_no_pan = cache
+            .compute_link_path_screen(1001, 2001, 1.0, 0.0, 0.0, 50.0)
+            .unwrap();
+        let path_with_pan = cache
+            .compute_link_path_screen(1001, 2001, 1.0, 100.0, 50.0, 50.0)
+            .unwrap();
+        assert_ne!(path_no_pan, path_with_pan);
+    }
+
+    #[test]
+    fn test_compute_link_path_screen_with_zoom() {
+        let cache = setup_test_cache();
+        let path_z1 = cache
+            .compute_link_path_screen(1001, 2001, 1.0, 0.0, 0.0, 50.0)
+            .unwrap();
+        let path_z2 = cache
+            .compute_link_path_screen(1001, 2001, 2.0, 0.0, 0.0, 50.0)
+            .unwrap();
+        assert_ne!(path_z1, path_z2);
+    }
+
+    #[test]
+    fn test_compute_link_path_screen_missing_pin() {
+        let cache = setup_test_cache();
+        assert!(cache
+            .compute_link_path_screen(9999, 2001, 1.0, 0.0, 0.0, 50.0)
+            .is_none());
     }
 }
