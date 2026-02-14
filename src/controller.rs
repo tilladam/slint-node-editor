@@ -278,6 +278,16 @@ impl NodeEditorController {
         self.state.borrow_mut().links.clear();
     }
 
+    /// Clear the geometry cache (node rects and pin positions).
+    ///
+    /// Call this when navigating between subgraphs to prevent stale
+    /// pin-to-node associations from producing incorrect link paths.
+    pub fn clear_geometry(&self) {
+        let mut cache = self.cache.borrow_mut();
+        cache.node_rects.clear();
+        cache.pin_positions.clear();
+    }
+
     /// Compute link path for given pins (screen-space output from world-space cache).
     pub fn compute_link_path(&self, start_pin: i32, end_pin: i32) -> SharedString {
         let s = self.state.borrow();
