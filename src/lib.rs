@@ -56,6 +56,8 @@ pub mod graph;
 pub mod tracking;
 pub mod links;
 pub mod controller;
+#[cfg(feature = "layout")]
+pub mod layout;
 
 // Re-export traits and functions
 pub use hit_test::{
@@ -75,3 +77,5 @@ pub use graph::{
 pub use tracking::GeometryTracker;
 pub use links::LinkManager;
 pub use controller::NodeEditorController;
+#[cfg(feature = "layout")]
+pub use layout::{sugiyama_layout, sugiyama_layout_from_cache, Direction, NodePosition, SugiyamaConfig};

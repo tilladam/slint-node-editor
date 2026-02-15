@@ -23,6 +23,10 @@ include = [
 
 [dependencies]
 slint = { git = "https://github.com/slint-ui/slint", default-features = false, features = ["std", "compat-1-2"] }
+rust-sugiyama = { version = "0.4", optional = true }
+
+[features]
+layout = ["rust-sugiyama"]
 
 [dev-dependencies]
 i-slint-backend-testing = { git = "https://github.com/slint-ui/slint" }
@@ -38,6 +42,7 @@ members = [
     "examples/animated-links",
     "examples/pin-compatibility",
     "examples/zoom-stress-test",
+    "examples/sugiyama",
 ]
 
 [workspace.dependencies]

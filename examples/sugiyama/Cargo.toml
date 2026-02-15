@@ -1,0 +1,12 @@
+[package]
+name = "sugiyama"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+slint = { workspace = true }
+slint-node-editor = { workspace = true, features = ["layout"] }
+
+[build-dependencies]
+slint-build = { workspace = true }
