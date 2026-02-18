@@ -30,13 +30,21 @@ pub fn generate_bezier_path(
     }
 
     // Calculate control point offset (horizontal bezier)
+    let dist = dist_sq.sqrt();
     let dx_abs = dx.abs();
-    let offset = (dx_abs * 0.5).max(min_offset * zoom);
+    let full_offset = (dx_abs * 0.5).max(min_offset * zoom);
 
-    // Control points extend horizontally from start and end
-    let ctrl1_x = start_x + offset;
+    // Smoothly ramp up offset based on distance so the transition from the
+    // linear fallback is seamless. At the threshold the offset is ~0 (nearly
+    // linear) and it reaches the full value at 4× the threshold.
+    let ramp = ((dist - threshold) / (3.0 * threshold)).clamp(0.0, 1.0);
+    let offset = full_offset * ramp;
+
+    // Control points extend horizontally, following the direction of dx
+    let sign = if dx >= 0.0 { 1.0 } else { -1.0 };
+    let ctrl1_x = start_x + sign * offset;
     let ctrl1_y = start_y;
-    let ctrl2_x = end_x - offset;
+    let ctrl2_x = end_x - sign * offset;
     let ctrl2_y = end_y;
 
     // Generate SVG path: M (move to), C (cubic bezier)
@@ -95,12 +103,16 @@ pub fn generate_partial_bezier_path(
     }
 
     // Calculate full bezier control points
+    let dist = dist_sq.sqrt();
     let dx_abs = dx_full.abs();
-    let offset = (dx_abs * 0.5).max(min_offset * zoom);
+    let full_offset = (dx_abs * 0.5).max(min_offset * zoom);
+    let ramp = ((dist - threshold) / (3.0 * threshold)).clamp(0.0, 1.0);
+    let offset = full_offset * ramp;
 
+    let sign = if dx_full >= 0.0 { 1.0 } else { -1.0 };
     let p0 = (start_x, start_y);
-    let p1 = (start_x + offset, start_y);
-    let p2 = (end_x - offset, end_y);
+    let p1 = (start_x + sign * offset, start_y);
+    let p2 = (end_x - sign * offset, end_y);
     let p3 = (end_x, end_y);
 
     // De Casteljau's algorithm to split at t
@@ -167,13 +179,17 @@ impl CubicBezier {
             };
         }
 
+        let dist = dist_sq.sqrt();
         let dx_abs = dx.abs();
-        let offset = (dx_abs * 0.5).max(min_offset * zoom);
+        let full_offset = (dx_abs * 0.5).max(min_offset * zoom);
+        let ramp = ((dist - threshold) / (3.0 * threshold)).clamp(0.0, 1.0);
+        let offset = full_offset * ramp;
 
+        let sign = if dx >= 0.0 { 1.0 } else { -1.0 };
         CubicBezier {
             p0: (start_x, start_y),
-            p1: (start_x + offset, start_y),
-            p2: (end_x - offset, end_y),
+            p1: (start_x + sign * offset, start_y),
+            p2: (end_x - sign * offset, end_y),
             p3: (end_x, end_y),
         }
     }

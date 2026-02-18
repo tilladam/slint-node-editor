@@ -543,20 +543,21 @@ export component Pin inherits Rectangle {
             if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                 drag-active = true;
                 // These are for visual link preview, should be screen-space
-                root.drag-started(pin-id, node-screen-x + self.x + self.width/2, node-screen-y + self.y + self.height/2);
+                // root.x/root.y = Pin's position within the node layout
+                root.drag-started(pin-id, node-screen-x + root.x + self.x + self.width/2, node-screen-y + root.y + self.y + self.height/2);
             }
             if event.kind == PointerEventKind.up && drag-active {
                 drag-active = false;
                 root.drag-ended(pin-id,
-                    node-screen-x + self.x + self.width/2 + self.mouse-x - pin-radius,
-                    node-screen-y + self.y + self.height/2 + self.mouse-y - pin-radius);
+                    node-screen-x + root.x + self.mouse-x,
+                    node-screen-y + root.y + self.mouse-y);
             }
         }
         moved => {
             if drag-active {
                 root.drag-moved(pin-id,
-                    node-screen-x + self.x + self.width/2 + self.mouse-x - pin-radius,
-                    node-screen-y + self.y + self.height/2 + self.mouse-y - pin-radius);
+                    node-screen-x + root.x + self.mouse-x,
+                    node-screen-y + root.y + self.mouse-y);
             }
         }
     }
