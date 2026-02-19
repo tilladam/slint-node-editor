@@ -132,13 +132,46 @@ pub fn sugiyama_layout(
 
     // Collect results from all subgraphs, translating indices back to node IDs.
     // For horizontal layout, swap x/y so layers run left-to-right.
+    // Each subgraph is offset along the perpendicular axis so disconnected
+    // components (and isolated nodes) don't overlap.
+    let spacing = if config.vertex_spacing > 0.0 {
+        config.vertex_spacing
+    } else {
+        10.0
+    };
     let mut results = Vec::with_capacity(idx_to_id.len());
+    let mut perpendicular_offset = 0.0_f64;
+
     for (layout, _width, _height) in &subgraphs {
+        // Compute bounding box of this subgraph in output coordinates
+        let mut min_perp = f64::INFINITY;
+        let mut max_perp = f64::NEG_INFINITY;
+
+        let start = results.len();
         for &(idx, (x, y)) in layout {
             if let Some(&node_id) = idx_to_id.get(idx) {
                 let (px, py) = if horizontal { (y, x) } else { (x, y) };
                 results.push(NodePosition { id: node_id, x: px, y: py });
+
+                // Perpendicular axis is y for both directions
+                // Look up node height to get the full extent
+                let node_h = id_to_idx
+                    .get(&node_id)
+                    .and_then(|&i| vertices.get(i as usize))
+                    .map(|&(_, (w, h))| if horizontal { w } else { h })
+                    .unwrap_or(0.0);
+                min_perp = min_perp.min(py);
+                max_perp = max_perp.max(py + node_h);
             }
+        }
+
+        if start < results.len() {
+            // Shift this subgraph so its top edge sits at the running offset
+            let shift = perpendicular_offset - min_perp;
+            for pos in &mut results[start..] {
+                pos.y += shift;
+            }
+            perpendicular_offset += max_perp - min_perp + spacing;
         }
     }
 
@@ -361,6 +394,31 @@ mod tests {
         // Each subgraph should respect layer ordering
         assert!(pos[&1].1 < pos[&2].1);
         assert!(pos[&3].1 < pos[&4].1);
+    }
+
+    #[test]
+    fn test_isolated_nodes_do_not_overlap() {
+        // Three isolated nodes (no edges) — should not all land at the same position
+        let sizes = vec![
+            (1, (100.0, 50.0)),
+            (2, (100.0, 50.0)),
+            (3, (100.0, 50.0)),
+        ];
+        let result = sugiyama_layout(&[], &sizes, &SugiyamaConfig::default());
+        assert_eq!(result.len(), 3);
+
+        let pos = pos_map(result);
+        // All three should have distinct y values (stacked along perpendicular axis)
+        let ys: Vec<f64> = pos.values().map(|p| p.1).collect();
+        for i in 0..ys.len() {
+            for j in (i + 1)..ys.len() {
+                assert!(
+                    (ys[i] - ys[j]).abs() > 1.0,
+                    "isolated nodes should not overlap: y[{}]={}, y[{}]={}",
+                    i, ys[i], j, ys[j]
+                );
+            }
+        }
     }
 
     #[test]
