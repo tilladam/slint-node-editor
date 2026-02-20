@@ -273,7 +273,7 @@ fn test_zoom_affects_link_path() {
     let path_zoom_1 = harness.ctrl.compute_link_path(3, 4);
 
     // Change zoom
-    harness.ctrl.set_zoom(2.0);
+    harness.ctrl.set_viewport(2.0, 0.0, 0.0);
     let path_zoom_2 = harness.ctrl.compute_link_path(3, 4);
 
     // Paths should be different due to bezier offset scaling

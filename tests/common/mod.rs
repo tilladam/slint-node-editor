@@ -25,8 +25,10 @@ pub struct CallbackTracker {
     /// Count of delete_selected calls
     pub delete_selected: Rc<RefCell<usize>>,
     /// (node_id, x, y, width, height)
+    #[allow(clippy::type_complexity)]
     pub node_rect_changed: Rc<RefCell<Vec<(i32, f32, f32, f32, f32)>>>,
     /// (pin_id, node_id, pin_type, x, y)
+    #[allow(clippy::type_complexity)]
     pub pin_position_changed: Rc<RefCell<Vec<(i32, i32, i32, f32, f32)>>>,
     /// (zoom, pan_x, pan_y)
     pub update_viewport: Rc<RefCell<Vec<(f32, f32, f32)>>>,

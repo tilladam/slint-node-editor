@@ -138,7 +138,7 @@ impl MinimalTestHarness {
             let w = w.clone();
             move |z, pan_x, pan_y| {
                 if let Some(w) = w.upgrade() {
-                    ctrl.set_zoom(z);
+                    ctrl.set_viewport(z, pan_x, pan_y);
                     w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
                     tracker.update_viewport.borrow_mut().push((z, pan_x, pan_y));
                 }

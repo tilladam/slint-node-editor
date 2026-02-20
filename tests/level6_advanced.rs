@@ -37,10 +37,10 @@ fn test_default_zoom_is_one() {
 fn test_set_zoom() {
     let harness = MinimalTestHarness::new();
 
-    harness.ctrl.set_zoom(1.5);
+    harness.ctrl.set_viewport(1.5, 0.0, 0.0);
     assert_eq!(harness.ctrl.zoom(), 1.5);
 
-    harness.ctrl.set_zoom(0.5);
+    harness.ctrl.set_viewport(0.5, 0.0, 0.0);
     assert_eq!(harness.ctrl.zoom(), 0.5);
 }
 
@@ -51,7 +51,7 @@ fn test_zoom_affects_link_path_calculation() {
 
     let path_at_1x = harness.ctrl.compute_link_path(3, 4);
 
-    harness.ctrl.set_zoom(2.0);
+    harness.ctrl.set_viewport(2.0, 0.0, 0.0);
     let path_at_2x = harness.ctrl.compute_link_path(3, 4);
 
     // Paths should differ due to zoom affecting bezier control points
@@ -68,7 +68,7 @@ fn test_zoom_affects_grid_generation() {
 
     let grid_1x = harness.ctrl.generate_grid(800.0, 600.0, 0.0, 0.0);
 
-    harness.ctrl.set_zoom(2.0);
+    harness.ctrl.set_viewport(2.0, 0.0, 0.0);
     let grid_2x = harness.ctrl.generate_grid(800.0, 600.0, 0.0, 0.0);
 
     assert_ne!(
@@ -302,8 +302,8 @@ fn test_composite_validator() {
     setup_test_geometry(&harness);
 
     let validator = CompositeValidator::new()
-        .add(BasicLinkValidator::new(2))
-        .add(NoDuplicatesValidator);
+        .with(BasicLinkValidator::new(2))
+        .with(NoDuplicatesValidator);
 
     let cache = harness.ctrl.cache();
     let cache = cache.borrow();
@@ -461,7 +461,7 @@ fn test_find_links_connected_to_node() {
     harness.ctrl.cache().borrow_mut().handle_pin_report(7, 3, 2, 150.0, 50.0);
 
     // Find links connected to node 2 (pins 4 and 5)
-    let node2_pins = vec![4, 5];
+    let node2_pins = [4, 5];
     let mut connected = Vec::new();
 
     for i in 0..harness.links.row_count() {

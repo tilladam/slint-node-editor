@@ -85,6 +85,7 @@ where
     }
 
     /// Find link at position
+    #[allow(clippy::too_many_arguments)]
     pub fn find_link_at<'a, I>(
         &'a self,
         x: f32,

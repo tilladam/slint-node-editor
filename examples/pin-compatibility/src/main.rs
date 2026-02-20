@@ -227,8 +227,8 @@ fn main() {
             // Create composite validator with basic checks + type compatibility
             let validator: CompositeValidator<SimpleNodeGeometry, LinkData> =
                 CompositeValidator::new()
-                    .add(BasicLinkValidator::new(2)) // 2 = output pin type
-                    .add(TypeCompatibilityValidator);
+                    .with(BasicLinkValidator::new(2)) // 2 = output pin type
+                    .with(TypeCompatibilityValidator);
 
             let links_vec: Vec<LinkData> = links.iter().collect();
             matches!(
@@ -286,8 +286,8 @@ fn main() {
             // Create composite validator with basic checks + type compatibility
             let validator: CompositeValidator<SimpleNodeGeometry, LinkData> =
                 CompositeValidator::new()
-                    .add(BasicLinkValidator::new(2)) // 2 = output pin type
-                    .add(TypeCompatibilityValidator);
+                    .with(BasicLinkValidator::new(2)) // 2 = output pin type
+                    .with(TypeCompatibilityValidator);
 
             let links_vec: Vec<LinkData> = links.iter().collect();
             match validator.validate(start_pin, end_pin, &cache, &links_vec) {

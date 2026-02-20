@@ -100,7 +100,7 @@ impl GraphLogic {
     /// * `node_id` - The ID of the node being deleted/queried
     /// * `links` - Iterator over the links
     /// * `cache` - Geometry cache to look up pin ownership
-    pub fn find_links_connected_to_node<'a, I, L, N>(
+    pub fn find_links_connected_to_node<I, L, N>(
         node_id: i32,
         links: I,
         cache: &GeometryCache<N>,
@@ -459,8 +459,8 @@ where
 ///
 /// ```ignore
 /// let validator = CompositeValidator::new()
-///     .add(BasicLinkValidator::new(2))
-///     .add(NoDuplicatesValidator);
+///     .with(BasicLinkValidator::new(2))
+///     .with(NoDuplicatesValidator);
 ///
 /// let result = validator.validate(start_pin, end_pin, &cache, &links);
 /// ```
@@ -486,7 +486,7 @@ impl<N, L> CompositeValidator<N, L> {
     ///
     /// Validators are checked in the order they were added.
     /// The first validator to return Invalid will short-circuit.
-    pub fn add<V: LinkValidator<N, L> + 'static>(mut self, validator: V) -> Self {
+    pub fn with<V: LinkValidator<N, L> + 'static>(mut self, validator: V) -> Self {
         self.validators.push(Box::new(validator));
         self
     }
@@ -719,8 +719,8 @@ mod tests {
     fn test_composite_validator_passes_all() {
         let cache = setup_cache();
         let validator: CompositeValidator<_, TestLink> = CompositeValidator::new()
-            .add(BasicLinkValidator::new(2))
-            .add(NoDuplicatesValidator);
+            .with(BasicLinkValidator::new(2))
+            .with(NoDuplicatesValidator);
 
         let links = vec![];
 
@@ -732,8 +732,8 @@ mod tests {
     fn test_composite_validator_short_circuits_on_basic() {
         let cache = setup_cache();
         let validator: CompositeValidator<_, TestLink> = CompositeValidator::new()
-            .add(BasicLinkValidator::new(2))
-            .add(NoDuplicatesValidator);
+            .with(BasicLinkValidator::new(2))
+            .with(NoDuplicatesValidator);
 
         let links = vec![];
 
@@ -746,8 +746,8 @@ mod tests {
     fn test_composite_validator_short_circuits_on_duplicates() {
         let cache = setup_cache();
         let validator: CompositeValidator<_, TestLink> = CompositeValidator::new()
-            .add(BasicLinkValidator::new(2))
-            .add(NoDuplicatesValidator);
+            .with(BasicLinkValidator::new(2))
+            .with(NoDuplicatesValidator);
 
         let links = vec![TestLink {
             id: 1,

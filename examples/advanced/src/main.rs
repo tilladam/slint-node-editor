@@ -452,8 +452,8 @@ fn main() {
 
         // Validate link using the new validator framework
         let validator: CompositeValidator<_, LinkData> = CompositeValidator::new()
-            .add(BasicLinkValidator::new(output_type))
-            .add(NoDuplicatesValidator);
+            .with(BasicLinkValidator::new(output_type))
+            .with(NoDuplicatesValidator);
 
             let links_vec: Vec<LinkData> = links.iter().collect();
             match validator.validate(start_pin, end_pin, &cache, &links_vec) {

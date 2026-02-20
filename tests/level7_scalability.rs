@@ -687,7 +687,7 @@ fn test_compute_link_path_1k_links() {
 
     for (_, start_pin, end_pin) in &links {
         let path = cache.compute_link_path(*start_pin, *end_pin, 1.0, 50.0);
-        assert!(path.is_some() || true); // Some might be None if pins don't exist
+        let _ = path; // Some might be None if pins don't exist
     }
 
     let elapsed = start.elapsed();

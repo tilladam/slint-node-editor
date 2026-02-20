@@ -218,7 +218,7 @@ fn test_deleting_node_should_also_remove_connected_links() {
 
     // Find links connected to node 1
     // Pin IDs for node 1 are: 2 (input) and 3 (output)
-    let node_pins = vec![2, 3]; // node_id * 2 and node_id * 2 + 1
+    let node_pins = [2, 3]; // node_id * 2 and node_id * 2 + 1
 
     // Remove connected links
     let mut links_to_remove = Vec::new();
