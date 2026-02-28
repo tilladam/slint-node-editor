@@ -307,33 +307,6 @@ impl NodeEditorController {
             .into()
     }
 
-    /// Compute link path with viewport values passed directly from the UI.
-    ///
-    /// Use this instead of `compute_link_path` when called from a Slint pure
-    /// callback to guarantee the zoom/pan values match the UI's current state.
-    pub fn compute_link_path_with_viewport(
-        &self,
-        start_pin: i32,
-        end_pin: i32,
-        zoom: f32,
-        pan_x: f32,
-        pan_y: f32,
-    ) -> SharedString {
-        let s = self.state.borrow();
-        self.cache
-            .borrow()
-            .compute_link_path_screen(
-                start_pin,
-                end_pin,
-                zoom,
-                pan_x,
-                pan_y,
-                s.bezier_offset,
-            )
-            .unwrap_or_default()
-            .into()
-    }
-
     /// Generate grid commands for current viewport.
     pub fn generate_grid(&self, width: f32, height: f32, pan_x: f32, pan_y: f32) -> SharedString {
         let s = self.state.borrow();
