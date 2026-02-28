@@ -211,7 +211,9 @@ export component NodeEditor {
     /// Compute link path from pin IDs. Used to render links from `links` property.
     /// Returns SVG path commands string, or empty string if pins not found.
     /// The version parameter forces re-evaluation when geometry changes (pass geometry-version).
-    pure callback compute-link-path(/* start-pin-id */ int, /* end-pin-id */ int, /* version */ int) -> string;
+    /// Zoom and pan are passed directly so the pure callback always uses the exact
+    /// viewport values that Slint is using for node positioning.
+    pure callback compute-link-path(/* start-pin-id */ int, /* end-pin-id */ int, /* version */ int, /* zoom */ float, /* pan-x */ float, /* pan-y */ float) -> string;
 
     // === Callbacks TO Application (events) ===
     callback link-requested(/* start-pin */ int, /* end-pin */ int);
@@ -562,7 +564,7 @@ export component NodeEditor {
 
     // Render links from `links` property (new API)
     for link in root.links: Link {
-        path-commands: root.compute-link-path(link.start-pin-id, link.end-pin-id, root.geometry-version);
+        path-commands: root.compute-link-path(link.start-pin-id, link.end-pin-id, root.geometry-version, root.zoom, root.pan-x / 1px, root.pan-y / 1px);
         link-color: link.color;
         line-width: link.line-width > 0 ? link.line-width * 1px : 2px;
         selected: root.is-link-selected(link.id, root.selection-version);

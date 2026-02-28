@@ -194,7 +194,7 @@ fn main() {
     window.on_compute_link_path({
         let ctrl = ctrl.clone();
         let w = window.as_weak();
-        move |start_pin, end_pin, _version| {
+        move |start_pin, end_pin, _version, _zoom: f32, _pan_x: f32, _pan_y: f32| {
             let w = match w.upgrade() {
                 Some(w) => w,
                 None => return SharedString::default(),

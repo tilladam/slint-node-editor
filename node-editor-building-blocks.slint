@@ -370,12 +370,12 @@ export component BaseNode inherits Rectangle {
         }
     }
 
-    changed screen-x => {
+    changed drag-offset-x => {
         if (node-id > 0) {
             report-rect(node-id, screen-x, screen-y, self.width, self.height);
         }
     }
-    changed screen-y => {
+    changed drag-offset-y => {
         if (node-id > 0) {
             report-rect(node-id, screen-x, screen-y, self.width, self.height);
         }

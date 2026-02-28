@@ -172,19 +172,21 @@ impl NodeEditorController {
     /// Returns a callback for `compute-link-path`.
     ///
     /// Computes screen-space bezier paths from world-space cache data.
-    pub fn compute_link_path_callback(&self) -> impl Fn(i32, i32, i32) -> SharedString {
+    /// Zoom and pan are passed directly from Slint to guarantee they match
+    /// the values used for node positioning (eliminates sync issues).
+    pub fn compute_link_path_callback(&self) -> impl Fn(i32, i32, i32, f32, f32, f32) -> SharedString {
         let cache = self.cache.clone();
         let state = self.state.clone();
-        move |start_pin, end_pin, _version| {
+        move |start_pin, end_pin, _version, zoom, pan_x, pan_y| {
             let s = state.borrow();
             cache
                 .borrow()
                 .compute_link_path_screen(
                     start_pin,
                     end_pin,
-                    s.zoom,
-                    s.pan_x,
-                    s.pan_y,
+                    zoom,
+                    pan_x,
+                    pan_y,
                     s.bezier_offset,
                 )
                 .unwrap_or_default()
@@ -299,6 +301,33 @@ impl NodeEditorController {
                 s.zoom,
                 s.pan_x,
                 s.pan_y,
+                s.bezier_offset,
+            )
+            .unwrap_or_default()
+            .into()
+    }
+
+    /// Compute link path with viewport values passed directly from the UI.
+    ///
+    /// Use this instead of `compute_link_path` when called from a Slint pure
+    /// callback to guarantee the zoom/pan values match the UI's current state.
+    pub fn compute_link_path_with_viewport(
+        &self,
+        start_pin: i32,
+        end_pin: i32,
+        zoom: f32,
+        pan_x: f32,
+        pan_y: f32,
+    ) -> SharedString {
+        let s = self.state.borrow();
+        self.cache
+            .borrow()
+            .compute_link_path_screen(
+                start_pin,
+                end_pin,
+                zoom,
+                pan_x,
+                pan_y,
                 s.bezier_offset,
             )
             .unwrap_or_default()
