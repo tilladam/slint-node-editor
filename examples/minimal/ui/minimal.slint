@@ -1,4 +1,10 @@
-import { NodeEditor, BaseNode, Pin, PinTypes, LinkData } from "@slint-node-editor/node-editor.slint";
+import {
+    NodeEditor,
+    BaseNode,
+    Pin,
+    PinTypes,
+    LinkData,
+} from "@slint-node-editor/node-editor.slint";
 
 export struct NodeData {
     id: int,
@@ -12,47 +18,59 @@ export { LinkData }
 
 component SimpleNode inherits BaseNode {
     in property <string> title: "Node";
-    width: 150px * self.zoom;
-    height: 100px * self.zoom;
+    // Set visual size on BaseNode for proper hit-testing/reporting
+    visual-width: 150px;
+    visual-height: 100px;
 
+    // Total size includes culling margin on all sides
+    width: self.visual-width + self.culling-margin * 2;
+    height: self.visual-height + self.culling-margin * 2;
+
+    // Visual content wrapper - offset by culling-margin so it appears at the correct position
     Rectangle {
+        x: root.culling-margin;
+        y: root.culling-margin;
+        width: root.visual-width;
+        height: root.visual-height;
         background: root.selected ? #4a6a9a : #333;
-        border-radius: 4px * root.zoom;
-        border-width: 1px * root.zoom;
+        border-radius: 4px;
+        border-width: 1px;
         border-color: #666;
 
         Text {
             text: root.title;
             color: white;
-            font-size: 14px * root.zoom;
+            font-size: 14px;
         }
     }
 
-    // Single input pin
+    // Single input pin - offset by culling-margin
     Pin {
-        x: 0px;
-        y: parent.height / 2 - self.height / 2;
+        x: root.culling-margin;
+        y: root.culling-margin + root.visual-height / 2 - self.height / 2;
         pin-id: root.node-id * 2;
         node-id: root.node-id;
         pin-type: PinTypes.input;
-        zoom: root.zoom;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
+        report-offset-x: root.culling-margin;
+        report-offset-y: root.culling-margin;
         report-position(id, nid, type, x, y) => {
             root.report-position(id, nid, type, x, y);
         }
     }
 
-    // Single output pin
+    // Single output pin - offset by culling-margin
     Pin {
-        x: parent.width - self.width;
-        y: parent.height / 2 - self.height / 2;
+        x: root.culling-margin + root.visual-width - self.width;
+        y: root.culling-margin + root.visual-height / 2 - self.height / 2;
         pin-id: root.node-id * 2 + 1;
         node-id: root.node-id;
         pin-type: PinTypes.output;
-        zoom: root.zoom;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
+        report-offset-x: root.culling-margin;
+        report-offset-y: root.culling-margin;
         report-position(id, nid, type, x, y) => {
             root.report-position(id, nid, type, x, y);
         }

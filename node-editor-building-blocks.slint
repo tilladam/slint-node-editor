@@ -209,8 +209,7 @@ export component Minimap inherits Rectangle {
         root.path-version,
         root.scale,
         root.minimap-padding / 1px - (root.graph-min-x / 1px) * root.scale,
-        root.minimap-padding / 1px - (root.graph-min-y / 1px) * root.scale
-    );
+        root.minimap-padding / 1px - (root.graph-min-y / 1px) * root.scale);
 
     // Use computed path, or nodes-path if provided externally
     property <string> effective-path: root.nodes-path != "" ? root.nodes-path : root.computed-path;
@@ -312,17 +311,34 @@ export component Link inherits Path {
 }
 
 /// Base component for all node types in the node editor.
+/// Nodes are positioned in WORLD coordinates - the parent NodeEditor applies
+/// transform-scale for zoom, so no zoom multiplication is needed here.
+///
+/// Culling: To prevent premature culling near screen edges, set `culling-margin`
+/// to extend the element's bounds. The visual content should be placed inside
+/// a child element positioned at (culling-margin, culling-margin).
 export component BaseNode inherits Rectangle {
     // === Common Properties ===
     in property <int> node-id;
     in property <bool> selected: false;
     in property <length> world-x;
     in property <length> world-y;
-    in property <float> zoom: 1.0;
-    in property <length> pan-x: 0px;
+    in property <float> zoom: 1.0;  // Still passed for coordinate conversions
+    in property <length> pan-x: 0px;  // Still passed for coordinate conversions
     in property <length> pan-y: 0px;
     in property <length> drag-offset-x: 0px;
     in property <length> drag-offset-y: 0px;
+
+    // === Culling Margin ===
+    // Extra margin around node bounds to prevent premature culling when using transform-scale.
+    // Set to 0px for no margin (old behavior). Visual content should be offset by this amount.
+    in property <length> culling-margin: 500px;
+
+    // === Visual Size ===
+    // The size of the actual visual content (for reporting to Rust for hit-testing).
+    // Children should set these to match their visual content dimensions.
+    in property <length> visual-width: 150px;
+    in property <length> visual-height: 100px;
 
     // === Styling Properties (overridable) ===
     in property <color> background-color: #2d2d2d;
@@ -346,48 +362,52 @@ export component BaseNode inherits Rectangle {
     callback report-rect(int, length, length, length, length);
 
     // === Computed Properties ===
-    out property <length> screen-x: (world-x + drag-offset-x) * zoom + pan-x;
-    out property <length> screen-y: (world-y + drag-offset-y) * zoom + pan-y;
+    // World position (for positioning inside scaled container)
+    property <length> pos-x: world-x + drag-offset-x;
+    property <length> pos-y: world-y + drag-offset-y;
+    // Screen position (for coordinate conversions when needed)
+    out property <length> screen-x: pos-x * zoom + pan-x;
+    out property <length> screen-y: pos-y * zoom + pan-y;
 
     // === Common Styling ===
-    x: screen-x;
-    y: screen-y;
-    background: selected ? background-color-selected : background-color;
-    border-radius: border-radius-base * zoom;
-    border-width: selected ? border-width-selected * zoom : border-width-normal * zoom;
-    border-color: selected ? border-color-selected : border-color-normal;
+    // Position offset by culling-margin so bounds extend earlier for culling detection
+    x: pos-x - culling-margin;
+    y: pos-y - culling-margin;
+    // BaseNode is transparent - visual styling should be in child elements
+    background: transparent;
+    clip: false;
 
-    // Report rect on changes
+    // Report rect on changes (in WORLD coordinates, using visual size for hit-testing)
     init => {
         if (node-id > 0) {
-            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+            report-rect(node-id, pos-x, pos-y, visual-width, visual-height);
         }
     }
 
     changed node-id => {
         if (node-id > 0) {
-            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+            report-rect(node-id, pos-x, pos-y, visual-width, visual-height);
         }
     }
 
     changed drag-offset-x => {
         if (node-id > 0) {
-            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+            report-rect(node-id, pos-x, pos-y, visual-width, visual-height);
         }
     }
     changed drag-offset-y => {
         if (node-id > 0) {
-            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+            report-rect(node-id, pos-x, pos-y, visual-width, visual-height);
         }
     }
     changed width => {
         if (node-id > 0) {
-            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+            report-rect(node-id, pos-x, pos-y, visual-width, visual-height);
         }
     }
     changed height => {
         if (node-id > 0) {
-            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+            report-rect(node-id, pos-x, pos-y, visual-width, visual-height);
         }
     }
 
@@ -395,11 +415,19 @@ export component BaseNode inherits Rectangle {
     property <bool> dbl-click-armed: false;
     dbl-click-timer := Timer {
         interval: 400ms;
-        triggered => { root.dbl-click-armed = false; }
+        triggered => {
+            root.dbl-click-armed = false;
+        }
     }
 
     // === Drag Handling ===
+    // TouchArea covers only the visual content area (not the culling margin)
     TouchArea {
+        x: root.culling-margin;
+        y: root.culling-margin;
+        width: root.visual-width;
+        height: root.visual-height;
+
         property <bool> shift-held: false;
         property <bool> is-dragging: false;
         property <length> drag-threshold: 5px;
@@ -478,22 +506,26 @@ export component Pin inherits Rectangle {
     in property <int> pin-id;
     in property <int> node-id;  // Node this pin belongs to (for position reporting)
     in property <int> pin-type;  // Type of pin (input/output/custom)
-    in property <float> zoom: 1.0;
+    in property <float> zoom: 1.0;  // Kept for API compatibility, but not used for sizing
     in property <color> base-color: #888888;
     in property <color> hover-color: #aaaaaa;
     in property <length> base-size: 12px;
-    in property <length> node-screen-x: 0px;
+    in property <length> node-screen-x: 0px;  // Still needed for drag preview coordinates
     in property <length> node-screen-y: 0px;
     /// Increment this to force pin position re-reporting (workaround for init timing)
     in property <int> refresh-trigger: 0;
+    /// Offset to subtract from position when reporting (for culling margin compensation)
+    in property <length> report-offset-x: 0px;
+    in property <length> report-offset-y: 0px;
 
-    property <length> pin-size: base-size * zoom;
+    // Pin size is constant in world space - zoom is handled by parent transform-scale
+    property <length> pin-size: base-size;
     property <length> pin-radius: pin-size / 2;
 
-    /// Pin center X relative to node top-left, UNSCALED by zoom
-    out property <length> center-x: (self.x + self.width / 2) / zoom;
-    /// Pin center Y relative to node top-left, UNSCALED by zoom
-    out property <length> center-y: (self.y + self.height / 2) / zoom;
+    /// Pin center X relative to node visual top-left (after subtracting offset)
+    out property <length> center-x: self.x + self.width / 2 - report-offset-x;
+    /// Pin center Y relative to node visual top-left (after subtracting offset)
+    out property <length> center-y: self.y + self.height / 2 - report-offset-y;
 
     callback drag-started(int, length, length);
     callback drag-moved(int, length, length);
@@ -544,7 +576,7 @@ export component Pin inherits Rectangle {
                 drag-active = true;
                 // These are for visual link preview, should be screen-space
                 // root.x/root.y = Pin's position within the node layout
-                root.drag-started(pin-id, node-screen-x + root.x + self.x + self.width/2, node-screen-y + root.y + self.y + self.height/2);
+                root.drag-started(pin-id, node-screen-x + root.x + self.x + self.width / 2, node-screen-y + root.y + self.y + self.height / 2);
             }
             if event.kind == PointerEventKind.up && drag-active {
                 drag-active = false;

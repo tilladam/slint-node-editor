@@ -171,22 +171,20 @@ impl NodeEditorController {
 
     /// Returns a callback for `compute-link-path`.
     ///
-    /// Computes screen-space bezier paths from world-space cache data.
-    /// Zoom and pan are passed directly from Slint to guarantee they match
-    /// the values used for node positioning (eliminates sync issues).
+    /// Computes world-space bezier paths from world-space cache data.
+    /// The parent container applies transform-scale for zoom and positioning for pan,
+    /// so link paths are computed in world coordinates.
     pub fn compute_link_path_callback(&self) -> impl Fn(i32, i32, i32, f32, f32, f32) -> SharedString {
         let cache = self.cache.clone();
         let state = self.state.clone();
-        move |start_pin, end_pin, _version, zoom, pan_x, pan_y| {
+        move |start_pin, end_pin, _version, _zoom, _pan_x, _pan_y| {
+            // Compute path in world coordinates - parent container handles zoom/pan
             let s = state.borrow();
             cache
                 .borrow()
-                .compute_link_path_screen(
+                .compute_link_path_world(
                     start_pin,
                     end_pin,
-                    zoom,
-                    pan_x,
-                    pan_y,
                     s.bezier_offset,
                 )
                 .unwrap_or_default()
@@ -204,21 +202,16 @@ impl NodeEditorController {
 
     // === Direct handlers ===
 
-    /// Handle node-rect-changed: convert screen→world and update cache.
+    /// Handle node-rect-changed: update cache with world coordinates.
     ///
-    /// The UI reports node rects in screen coordinates. This method converts
-    /// to world coordinates before caching, making the cache zoom/pan invariant.
+    /// The UI now reports node rects in world coordinates (BaseNode positions
+    /// itself using world-x + drag-offset-x, without zoom/pan conversion).
+    /// No conversion needed - values are stored directly.
     pub fn handle_node_rect(&self, id: i32, x: f32, y: f32, w: f32, h: f32) {
-        let s = self.state.borrow();
-        let z = s.safe_zoom();
-        let world_x = (x - s.pan_x) / z;
-        let world_y = (y - s.pan_y) / z;
-        let world_w = w / z;
-        let world_h = h / z;
-        drop(s);
+        // Since nodes now report world coordinates directly, no conversion needed
         self.cache
             .borrow_mut()
-            .handle_node_rect_report(id, world_x, world_y, world_w, world_h);
+            .handle_node_rect_report(id, x, y, w, h);
     }
 
     /// Handle pin-position-changed: update cache.

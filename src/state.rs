@@ -201,6 +201,33 @@ where
         Some(generate_bezier_path(sx, sy, ex, ey, zoom, bezier_min_offset))
     }
 
+    /// Compute bezier path in WORLD coordinates (for use inside a scaled container).
+    ///
+    /// Node rects and pin positions are in world coordinates. Output path is also
+    /// in world coordinates - no zoom/pan transformation applied. The parent
+    /// container's transform-scale handles the visual scaling.
+    pub fn compute_link_path_world(
+        &self,
+        start_pin: i32,
+        end_pin: i32,
+        bezier_min_offset: f32,
+    ) -> Option<String> {
+        let start_pos = self.pin_positions.get(&start_pin)?;
+        let end_pos = self.pin_positions.get(&end_pin)?;
+
+        let start_rect = self.node_rects.get(&start_pos.node_id)?.rect();
+        let end_rect = self.node_rects.get(&end_pos.node_id)?.rect();
+
+        // World coordinates - no zoom/pan transformation
+        let sx = start_rect.0 + start_pos.rel_x;
+        let sy = start_rect.1 + start_pos.rel_y;
+        let ex = end_rect.0 + end_pos.rel_x;
+        let ey = end_rect.1 + end_pos.rel_y;
+
+        // Use zoom=1.0 for bezier offset calculation (scaling handled by container)
+        Some(generate_bezier_path(sx, sy, ex, ey, 1.0, bezier_min_offset))
+    }
+
     /// Standard handler for pin position reports from Slint
     pub fn handle_pin_report(
         &mut self,
