@@ -171,20 +171,21 @@ impl NodeEditorController {
 
     /// Returns a callback for `compute-link-path`.
     ///
-    /// Computes world-space bezier paths from world-space cache data.
-    /// The parent container applies transform-scale for zoom and positioning for pan,
-    /// so link paths are computed in world coordinates.
+    /// Computes bezier paths for use inside a scaled container at origin.
+    /// Positions are calculated so that after transform-scale, links appear at correct screen position.
     pub fn compute_link_path_callback(&self) -> impl Fn(i32, i32, i32, f32, f32, f32) -> SharedString {
         let cache = self.cache.clone();
         let state = self.state.clone();
-        move |start_pin, end_pin, _version, _zoom, _pan_x, _pan_y| {
-            // Compute path in world coordinates - parent container handles zoom/pan
+        move |start_pin, end_pin, _version, zoom, pan_x, pan_y| {
             let s = state.borrow();
             cache
                 .borrow()
                 .compute_link_path_world(
                     start_pin,
                     end_pin,
+                    zoom,
+                    pan_x,
+                    pan_y,
                     s.bezier_offset,
                 )
                 .unwrap_or_default()

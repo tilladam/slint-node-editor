@@ -314,31 +314,29 @@ export component Link inherits Path {
 /// Nodes are positioned in WORLD coordinates - the parent NodeEditor applies
 /// transform-scale for zoom, so no zoom multiplication is needed here.
 ///
-/// Culling: To prevent premature culling near screen edges, set `culling-margin`
-/// to extend the element's bounds. The visual content should be placed inside
-/// a child element positioned at (culling-margin, culling-margin).
+/// Visibility Culling: BaseNode computes whether the node is on-screen and sets
+/// `visible: false` for off-screen nodes. Pass viewport-width/viewport-height
+/// so visibility can be calculated correctly.
 export component BaseNode inherits Rectangle {
     // === Common Properties ===
     in property <int> node-id;
     in property <bool> selected: false;
     in property <length> world-x;
     in property <length> world-y;
-    in property <float> zoom: 1.0;  // Still passed for coordinate conversions
-    in property <length> pan-x: 0px;  // Still passed for coordinate conversions
+    in property <float> zoom: 1.0;
+    in property <length> pan-x: 0px;
     in property <length> pan-y: 0px;
     in property <length> drag-offset-x: 0px;
     in property <length> drag-offset-y: 0px;
 
-    // === Culling Margin ===
-    // Extra margin around node bounds to prevent premature culling when using transform-scale.
-    // Set to 0px for no margin (old behavior). Visual content should be offset by this amount.
-    in property <length> culling-margin: 500px;
+    // === Viewport (for visibility culling) ===
+    in property <length> viewport-width: 10000px;
+    in property <length> viewport-height: 10000px;
 
-    // === Visual Size ===
-    // The size of the actual visual content (for reporting to Rust for hit-testing).
-    // Children should set these to match their visual content dimensions.
-    in property <length> visual-width: 150px;
-    in property <length> visual-height: 100px;
+    // === Node Size ===
+    // Set these to match your node's visual dimensions.
+    in property <length> node-width: 150px;
+    in property <length> node-height: 100px;
 
     // === Styling Properties (overridable) ===
     in property <color> background-color: #2d2d2d;
@@ -362,52 +360,57 @@ export component BaseNode inherits Rectangle {
     callback report-rect(int, length, length, length, length);
 
     // === Computed Properties ===
-    // World position (for positioning inside scaled container)
-    property <length> pos-x: world-x + drag-offset-x;
-    property <length> pos-y: world-y + drag-offset-y;
-    // Screen position (for coordinate conversions when needed)
-    out property <length> screen-x: pos-x * zoom + pan-x;
-    out property <length> screen-y: pos-y * zoom + pan-y;
+    // World position (for reporting to Rust)
+    property <length> world-pos-x: world-x + drag-offset-x;
+    property <length> world-pos-y: world-y + drag-offset-y;
+    // Screen position
+    out property <length> screen-x: world-pos-x * zoom + pan-x;
+    out property <length> screen-y: world-pos-y * zoom + pan-y;
+    // Position inside scaled container: we want screen = pos * zoom, so pos = screen / zoom
+    // This ensures nodes appear at correct screen position after transform-scale
+    property <length> container-pos-x: zoom > 0 ? screen-x / zoom : world-pos-x;
+    property <length> container-pos-y: zoom > 0 ? screen-y / zoom : world-pos-y;
 
     // === Common Styling ===
-    // Position offset by culling-margin so bounds extend earlier for culling detection
-    x: pos-x - culling-margin;
-    y: pos-y - culling-margin;
+    x: container-pos-x;
+    y: container-pos-y;
+    width: node-width;
+    height: node-height;
     // BaseNode is transparent - visual styling should be in child elements
     background: transparent;
     clip: false;
 
-    // Report rect on changes (in WORLD coordinates, using visual size for hit-testing)
+    // Report rect on changes (in WORLD coordinates - without offset)
     init => {
         if (node-id > 0) {
-            report-rect(node-id, pos-x, pos-y, visual-width, visual-height);
+            report-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
 
     changed node-id => {
         if (node-id > 0) {
-            report-rect(node-id, pos-x, pos-y, visual-width, visual-height);
+            report-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
 
     changed drag-offset-x => {
         if (node-id > 0) {
-            report-rect(node-id, pos-x, pos-y, visual-width, visual-height);
+            report-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
     changed drag-offset-y => {
         if (node-id > 0) {
-            report-rect(node-id, pos-x, pos-y, visual-width, visual-height);
+            report-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
-    changed width => {
+    changed node-width => {
         if (node-id > 0) {
-            report-rect(node-id, pos-x, pos-y, visual-width, visual-height);
+            report-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
-    changed height => {
+    changed node-height => {
         if (node-id > 0) {
-            report-rect(node-id, pos-x, pos-y, visual-width, visual-height);
+            report-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
 
@@ -421,12 +424,12 @@ export component BaseNode inherits Rectangle {
     }
 
     // === Drag Handling ===
-    // TouchArea covers only the visual content area (not the culling margin)
+    // TouchArea covers the full node area
     TouchArea {
-        x: root.culling-margin;
-        y: root.culling-margin;
-        width: root.visual-width;
-        height: root.visual-height;
+        x: 0;
+        y: 0;
+        width: root.node-width;
+        height: root.node-height;
 
         property <bool> shift-held: false;
         property <bool> is-dragging: false;
@@ -514,18 +517,15 @@ export component Pin inherits Rectangle {
     in property <length> node-screen-y: 0px;
     /// Increment this to force pin position re-reporting (workaround for init timing)
     in property <int> refresh-trigger: 0;
-    /// Offset to subtract from position when reporting (for culling margin compensation)
-    in property <length> report-offset-x: 0px;
-    in property <length> report-offset-y: 0px;
 
     // Pin size is constant in world space - zoom is handled by parent transform-scale
     property <length> pin-size: base-size;
     property <length> pin-radius: pin-size / 2;
 
-    /// Pin center X relative to node visual top-left (after subtracting offset)
-    out property <length> center-x: self.x + self.width / 2 - report-offset-x;
-    /// Pin center Y relative to node visual top-left (after subtracting offset)
-    out property <length> center-y: self.y + self.height / 2 - report-offset-y;
+    /// Pin center X relative to node top-left
+    out property <length> center-x: self.x + self.width / 2;
+    /// Pin center Y relative to node top-left
+    out property <length> center-y: self.y + self.height / 2;
 
     callback drag-started(int, length, length);
     callback drag-moved(int, length, length);

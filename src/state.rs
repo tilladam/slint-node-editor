@@ -201,15 +201,18 @@ where
         Some(generate_bezier_path(sx, sy, ex, ey, zoom, bezier_min_offset))
     }
 
-    /// Compute bezier path in WORLD coordinates (for use inside a scaled container).
+    /// Compute bezier path for use inside a scaled container at origin.
     ///
-    /// Node rects and pin positions are in world coordinates. Output path is also
-    /// in world coordinates - no zoom/pan transformation applied. The parent
-    /// container's transform-scale handles the visual scaling.
+    /// Container is at (0,0) with transform-scale: zoom.
+    /// We compute positions such that after scaling, links appear at correct screen position.
+    /// Position inside container = screen / zoom = (world * zoom + pan) / zoom = world + pan/zoom
     pub fn compute_link_path_world(
         &self,
         start_pin: i32,
         end_pin: i32,
+        zoom: f32,
+        pan_x: f32,
+        pan_y: f32,
         bezier_min_offset: f32,
     ) -> Option<String> {
         let start_pos = self.pin_positions.get(&start_pin)?;
@@ -218,13 +221,20 @@ where
         let start_rect = self.node_rects.get(&start_pos.node_id)?.rect();
         let end_rect = self.node_rects.get(&end_pos.node_id)?.rect();
 
-        // World coordinates - no zoom/pan transformation
-        let sx = start_rect.0 + start_pos.rel_x;
-        let sy = start_rect.1 + start_pos.rel_y;
-        let ex = end_rect.0 + end_pos.rel_x;
-        let ey = end_rect.1 + end_pos.rel_y;
+        // World coordinates
+        let world_sx = start_rect.0 + start_pos.rel_x;
+        let world_sy = start_rect.1 + start_pos.rel_y;
+        let world_ex = end_rect.0 + end_pos.rel_x;
+        let world_ey = end_rect.1 + end_pos.rel_y;
 
-        // Use zoom=1.0 for bezier offset calculation (scaling handled by container)
+        // Container positions: screen / zoom = (world * zoom + pan) / zoom = world + pan/zoom
+        let safe_zoom = if zoom > 0.001 { zoom } else { 1.0 };
+        let sx = world_sx + pan_x / safe_zoom;
+        let sy = world_sy + pan_y / safe_zoom;
+        let ex = world_ex + pan_x / safe_zoom;
+        let ey = world_ey + pan_y / safe_zoom;
+
+        // Use zoom=1.0 for bezier offset since scaling is handled by container
         Some(generate_bezier_path(sx, sy, ex, ey, 1.0, bezier_min_offset))
     }
 
