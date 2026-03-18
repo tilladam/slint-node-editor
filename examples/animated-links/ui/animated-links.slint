@@ -131,8 +131,8 @@ component SimpleNode inherits BaseNode {
         zoom: root.zoom;
         base-color: accent-color.darker(30%);
         hover-color: accent-color;
-        node-screen-x: root.screen-x;
-        node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x;
+        node-screen-y: root.pos-y;
         report-position(id, nid, type, x, y) => {
             root.report-position(id, nid, type, x, y);
         }
@@ -151,8 +151,8 @@ component SimpleNode inherits BaseNode {
         zoom: root.zoom;
         base-color: accent-color.darker(30%);
         hover-color: accent-color;
-        node-screen-x: root.screen-x;
-        node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x;
+        node-screen-y: root.pos-y;
         report-position(id, nid, type, x, y) => {
             root.report-position(id, nid, type, x, y);
         }
@@ -238,8 +238,6 @@ export component MainWindow inherits Window {
             world-x: data.x * 1px;
             world-y: data.y * 1px;
             zoom: editor.zoom;
-            pan-x: editor.pan-x;
-            pan-y: editor.pan-y;
             drag-offset-x: data.id == root.dragged-node-id ? editor.drag-offset-x : 0px;
             drag-offset-y: data.id == root.dragged-node-id ? editor.drag-offset-y : 0px;
 

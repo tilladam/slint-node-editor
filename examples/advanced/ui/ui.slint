@@ -79,37 +79,39 @@ component Node inherits BaseNode {
     in property <int> input-pin-id: PinId.make(self.node-id, PinTypes.input);
     in property <int> output-pin-id: PinId.make(self.node-id, PinTypes.output);
 
-    // Pin dimensions (scaled by zoom)
-    property <length> pin-size: NodeConstants.pin-size * self.zoom;
-    property <length> pin-radius: pin-size / 2;
+    // Base dimensions (from global constants) - no zoom multiplication
+    node-width: NodeConstants.node-base-width;
+    node-height: NodeConstants.node-base-height;
 
-    // Base dimensions (from global constants)
-    property <length> base-width: NodeConstants.node-base-width;
-    property <length> base-height: NodeConstants.node-base-height;
+    // Expose pin positions (center of pin circles, in world coordinates)
+    out property <length> input-pin-x: self.pos-x + input-pin.center-x;
+    out property <length> input-pin-y: self.pos-y + input-pin.center-y;
+    out property <length> output-pin-x: self.pos-x + output-pin.center-x;
+    out property <length> output-pin-y: self.pos-y + output-pin.center-y;
 
-    // Expose pin positions (center of pin circles, in parent coordinates)
-    out property <length> input-pin-x: self.screen-x + input-pin.center-x;
-    out property <length> input-pin-y: self.screen-y + input-pin.center-y;
-    out property <length> output-pin-x: self.screen-x + output-pin.center-x;
-    out property <length> output-pin-y: self.screen-y + output-pin.center-y;
-
-    // Set dimensions
-    width: base-width * self.zoom;
-    height: base-height * self.zoom;
-
-    // Title bar
+    // Visual background
     Rectangle {
-        x: 8px * root.zoom;
-        y: 8px * root.zoom;
-        width: parent.width - 16px * root.zoom;
-        height: 24px * root.zoom;
+        width: 100%;
+        height: 100%;
+        background: root.selected ? root.background-color-selected : root.background-color;
+        border-radius: root.border-radius-base;
+        border-width: root.selected ? root.border-width-selected : root.border-width-normal;
+        border-color: root.selected ? root.border-color-selected : root.border-color-normal;
+    }
+
+    // Title bar - no zoom multiplication
+    Rectangle {
+        x: 8px;
+        y: 8px;
+        width: parent.width - 16px;
+        height: 24px;
         background: root.selected ? #4a6a9a : #3d3d3d;
-        border-radius: 4px * root.zoom;
+        border-radius: 4px;
 
         Text {
             text: root.title;
             color: white;
-            font-size: 14px * root.zoom;
+            font-size: 14px;
             horizontal-alignment: center;
             vertical-alignment: center;
         }
@@ -125,14 +127,13 @@ component Node inherits BaseNode {
 
     // Input pin (green) - with drag-to-link support
     input-pin := Pin {
-        x: 8px * root.zoom;
-        y: (8px + 24px + 8px) * root.zoom;  // below title bar
+        x: 8px;
+        y: 8px + 24px + 8px;  // below title bar
         pin-id: root.input-pin-id;
         node-id: root.node-id;
         pin-type: PinTypes.input;
-        zoom: root.zoom;
-        node-screen-x: root.screen-x;
-        node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x;
+        node-screen-y: root.pos-y;
         base-color: #4CAF50;
         hover-color: #66BB6A;
         base-size: NodeConstants.pin-size;
@@ -152,14 +153,13 @@ component Node inherits BaseNode {
 
     // Output pin (blue) - with drag-to-link support
     output-pin := Pin {
-        x: parent.width - 8px * root.zoom - root.pin-size;
-        y: (8px + 24px + 8px) * root.zoom;  // below title bar
+        x: root.node-width - 8px - NodeConstants.pin-size;
+        y: 8px + 24px + 8px;  // below title bar
         pin-id: root.output-pin-id;
         node-id: root.node-id;
         pin-type: PinTypes.output;
-        zoom: root.zoom;
-        node-screen-x: root.screen-x;
-        node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x;
+        node-screen-y: root.pos-y;
         base-color: #2196F3;
         hover-color: #42A5F5;
         base-size: NodeConstants.pin-size;
@@ -315,8 +315,8 @@ export component MainWindow inherits Window {
         grid-commands <=> root.grid-commands;
         links <=> root.links;
 
-        // Set pin hit radius from globals
-        pin-hit-radius: NodeConstants.pin-size * zoom * 0.66;
+        // Set pin hit radius from globals - no zoom multiplication
+        pin-hit-radius: NodeConstants.pin-size * 0.66;
         link-hover-distance: 8px;
 
         // Callbacks aliased to root
@@ -360,8 +360,6 @@ export component MainWindow inherits Window {
             drag-offset-x: editor.is-selected(node-data.id, editor.selection-version) ? editor.drag-offset-x : 0px;
             drag-offset-y: editor.is-selected(node-data.id, editor.selection-version) ? editor.drag-offset-y : 0px;
             zoom: zoom;
-            pan-x: pan-x;
-            pan-y: pan-y;
             clicked(id, shift) => {
                 editor.handle-node-click(id, shift);
             }
@@ -402,8 +400,6 @@ export component MainWindow inherits Window {
             drag-offset-x: editor.is-selected(filter-data.id, editor.selection-version) ? editor.drag-offset-x : 0px;
             drag-offset-y: editor.is-selected(filter-data.id, editor.selection-version) ? editor.drag-offset-y : 0px;
             zoom: zoom;
-            pan-x: pan-x;
-            pan-y: pan-y;
             filter-type-index: filter-data.filter-type-index;
             enabled: filter-data.enabled;
             processed-count: filter-data.processed-count;

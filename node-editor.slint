@@ -577,12 +577,12 @@ export component NodeEditor {
     }
 
     // === Layer 2: World Content (scaled) ===
-    // Container at origin with transform-scale. Nodes position themselves such that
-    // after scaling, they appear at the correct screen position.
-    // Node position = (world * zoom + pan) / zoom, so after scale: position * zoom = world * zoom + pan ✓
+    // Container at pan position with transform-scale for zoom.
+    // Everything inside uses pure world coordinates.
+    // Math: (world_pos * zoom) + pan = screen_position
     world-content := Rectangle {
-        x: 0px;
-        y: 0px;
+        x: root.pan-x;
+        y: root.pan-y;
         width: 100000px;  // Large enough for any world content
         height: 100000px;
         transform-origin: { x: 0, y: 0 };
@@ -590,16 +590,16 @@ export component NodeEditor {
         background: transparent;
         clip: false;
 
-        // Render links from `links` property
+        // Render links from `links` property (pure world coordinates)
         for link in root.links: Link {
-            path-commands: root.compute-link-path(link.start-pin-id, link.end-pin-id, root.geometry-version, root.zoom, root.pan-x / 1px, root.pan-y / 1px);
+            path-commands: root.compute-link-path(link.start-pin-id, link.end-pin-id, root.geometry-version, 1.0, 0.0, 0.0);
             link-color: link.color;
             line-width: link.line-width > 0 ? link.line-width * 1px : 2px;
             selected: root.is-link-selected(link.id, root.selection-version);
             hovered: root.hovered-link-id == link.id;
         }
 
-        // User-provided children (nodes)
+        // User-provided children (nodes) - pure world coordinates
         @children
     }
 

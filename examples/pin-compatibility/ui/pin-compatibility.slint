@@ -145,7 +145,7 @@ component SourceNode inherits BaseNode {
         x: parent.width - self.width;
         y: (L.first-pin-y + 0 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 100; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.execute; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -156,7 +156,7 @@ component SourceNode inherits BaseNode {
         x: parent.width - self.width;
         y: (L.first-pin-y + 1 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 101; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.integer; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -167,7 +167,7 @@ component SourceNode inherits BaseNode {
         x: parent.width - self.width;
         y: (L.first-pin-y + 2 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 102; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.float_; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -178,7 +178,7 @@ component SourceNode inherits BaseNode {
         x: parent.width - self.width;
         y: (L.first-pin-y + 3 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 103; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.string; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -189,7 +189,7 @@ component SourceNode inherits BaseNode {
         x: parent.width - self.width;
         y: (L.first-pin-y + 4 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 104; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.boolean; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -200,7 +200,7 @@ component SourceNode inherits BaseNode {
         x: parent.width - self.width;
         y: (L.first-pin-y + 5 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 105; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.object; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -211,7 +211,7 @@ component SourceNode inherits BaseNode {
         x: parent.width - self.width;
         y: (L.first-pin-y + 6 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 106; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.array; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -222,7 +222,7 @@ component SourceNode inherits BaseNode {
         x: parent.width - self.width;
         y: (L.first-pin-y + 7 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 107; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.any; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -272,7 +272,7 @@ component SinkNode inherits BaseNode {
         x: 0px;
         y: (L.first-pin-y + 0 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 200; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.execute; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -283,7 +283,7 @@ component SinkNode inherits BaseNode {
         x: 0px;
         y: (L.first-pin-y + 1 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 201; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.integer; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -294,7 +294,7 @@ component SinkNode inherits BaseNode {
         x: 0px;
         y: (L.first-pin-y + 2 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 202; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.float_; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -305,7 +305,7 @@ component SinkNode inherits BaseNode {
         x: 0px;
         y: (L.first-pin-y + 3 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 203; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.string; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -316,7 +316,7 @@ component SinkNode inherits BaseNode {
         x: 0px;
         y: (L.first-pin-y + 4 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 204; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.boolean; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -327,7 +327,7 @@ component SinkNode inherits BaseNode {
         x: 0px;
         y: (L.first-pin-y + 5 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 205; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.object; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -338,7 +338,7 @@ component SinkNode inherits BaseNode {
         x: 0px;
         y: (L.first-pin-y + 6 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 206; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.array; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -349,7 +349,7 @@ component SinkNode inherits BaseNode {
         x: 0px;
         y: (L.first-pin-y + 7 * L.pin-spacing + 6px) * root.zoom - self.height/2;
         pin-id: 207; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
-        node-screen-x: root.screen-x; node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x; node-screen-y: root.pos-y;
         base-color: PinColors.any; valid-target-pin-id: root.valid-target-pin-id;
         report-position(id, nid, t, x, y) => { root.report-position(id, nid, t, x, y); }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
@@ -435,8 +435,6 @@ export component MainWindow inherits Window {
             world-x: nodes.length > 0 ? nodes[0].x * 1px : 100px;
             world-y: nodes.length > 0 ? nodes[0].y * 1px : 100px;
             zoom: editor.zoom;
-            pan-x: editor.pan-x;
-            pan-y: editor.pan-y;
             drag-offset-x: 1 == root.dragged-node-id ? editor.drag-offset-x : 0px;
             drag-offset-y: 1 == root.dragged-node-id ? editor.drag-offset-y : 0px;
             pin-refresh-trigger: root.pin-refresh-counter;
@@ -468,8 +466,6 @@ export component MainWindow inherits Window {
             world-x: nodes.length > 1 ? nodes[1].x * 1px : 350px;
             world-y: nodes.length > 1 ? nodes[1].y * 1px : 100px;
             zoom: editor.zoom;
-            pan-x: editor.pan-x;
-            pan-y: editor.pan-y;
             drag-offset-x: 2 == root.dragged-node-id ? editor.drag-offset-x : 0px;
             drag-offset-y: 2 == root.dragged-node-id ? editor.drag-offset-y : 0px;
             pin-refresh-trigger: root.pin-refresh-counter;

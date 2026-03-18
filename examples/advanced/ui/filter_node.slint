@@ -35,8 +35,9 @@ export struct FilterNodeData {
 export component ControlPin inherits Pin {
     in-out property <bool> pulse-state: false;
     border-radius: 4px;
-    width: pulse-state ? 24px * self.zoom : 10px * self.zoom;  // 20% bigger when pulsed (20 * 1.2 = 24)
-    height: pulse-state ? 24px * self.zoom : 10px * self.zoom;
+    // No zoom multiplication - transform-scale handles it
+    width: pulse-state ? 24px : 10px;  // 20% bigger when pulsed (20 * 1.2 = 24)
+    height: pulse-state ? 24px : 10px;
     background: #FFC107;
     border-color: #FF9800;
 
@@ -75,10 +76,8 @@ export component FilterNode inherits BaseNode {
     callback toggle-enabled(int);             // node-id
     callback reset-clicked(int);              // node-id
 
-    // Pin dimensions (scaled by root.zoom)
+    // Pin dimensions - no zoom multiplication
     property <length> base-pin-size: 12px;
-    property <length> pin-size: base-pin-size * self.zoom;
-    property <length> pin-radius: pin-size / 2;
     property <length> pin-margin: 4px;
 
     // Layout constants
@@ -87,36 +86,43 @@ export component FilterNode inherits BaseNode {
     property <length> content-padding: 8px;
     property <length> pin-area-width: 24px;  // Space for pins on each side
 
-    // Base dimensions - sized to fit content
-    // Width must accommodate: pin areas (24px×2) + padding (8px×2) + "Type:" label + ComboBox
-    // Height = VL-padding + title + HL-padding-top + 3*rows + VL-padding
+    // Base dimensions - sized to fit content (no zoom multiplication)
     property <length> base-width: 260px;
     property <length> base-height: content-padding + title-height + content-padding + (row-height * 3) + content-padding;
 
-    // Pin Y positions - centered on each content row
-    // Account for: VerticalLayout padding + title + HorizontalLayout padding-top + row offset
-    property <length> row-1-center: (content-padding + title-height + content-padding + row-height / 2) * self.zoom;
-    property <length> row-2-center: (content-padding + title-height + content-padding + row-height + row-height / 2) * self.zoom;
+    // Set node dimensions for BaseNode
+    node-width: base-width;
+    node-height: base-height;
 
-    // Set dimensions
-    width: base-width * self.zoom;
-    height: base-height * self.zoom;
+    // Pin Y positions - centered on each content row (no zoom multiplication)
+    property <length> row-1-center: content-padding + title-height + content-padding + row-height / 2;
+    property <length> row-2-center: content-padding + title-height + content-padding + row-height + row-height / 2;
 
-    // Main layout
+    // Visual background
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: root.selected ? root.background-color-selected : root.background-color;
+        border-radius: root.border-radius-base;
+        border-width: root.selected ? root.border-width-selected : root.border-width-normal;
+        border-color: root.selected ? root.border-color-selected : root.border-color-normal;
+    }
+
+    // Main layout - no zoom multiplication on any dimensions
     VerticalLayout {
-        padding: root.content-padding * root.zoom;
+        padding: root.content-padding;
         spacing: 0px;
 
         // Title bar
         Rectangle {
-            height: root.title-height * root.zoom;
+            height: root.title-height;
             background: root.selected ? #6a4a9a : #4a3d5d;
-            border-radius: 4px * root.zoom;
+            border-radius: 4px;
 
             Text {
                 text: root.title;
                 color: white;
-                font-size: 14px * root.zoom;
+                font-size: 14px;
                 horizontal-alignment: center;
                 vertical-alignment: center;
             }
@@ -124,60 +130,60 @@ export component FilterNode inherits BaseNode {
 
         // Content area with left/right margins for pins
         HorizontalLayout {
-            padding-top: root.content-padding * root.zoom;
+            padding-top: root.content-padding;
 
             // Left pin labels column
             VerticalLayout {
-                width: pin-area-width * root.zoom;
+                width: pin-area-width;
                 spacing: 0px;
 
                 // Row 1: Data input label
                 Rectangle {
-                    height: row-height * root.zoom;
+                    height: row-height;
                     Text {
-                        x: 16px * root.zoom;
+                        x: 16px;
                         text: "In";
                         color: #888;
-                        font-size: 10px * root.zoom;
+                        font-size: 10px;
                         vertical-alignment: center;
                     }
                 }
 
                 // Row 2: Control input label
                 Rectangle {
-                    height: row-height * root.zoom;
+                    height: row-height;
                     Text {
-                        x: 16px * root.zoom;
+                        x: 16px;
                         text: "Ctrl";
                         color: #888;
-                        font-size: 10px * root.zoom;
+                        font-size: 10px;
                         vertical-alignment: center;
                     }
                 }
 
                 // Row 3: empty
                 Rectangle {
-                    height: row-height * root.zoom;
+                    height: row-height;
                 }
             }
 
             // Center content
             VerticalLayout {
-                spacing: 4px * root.zoom;
+                spacing: 4px;
                 horizontal-stretch: 1;
 
                 // Row 1: Filter type selector
                 HorizontalLayout {
-                    height: row-height * root.zoom;
-                    spacing: 8px * root.zoom;
+                    height: row-height;
+                    spacing: 8px;
                     alignment: stretch;
-                    padding-top: 4px * root.zoom;
-                    padding-bottom: 4px * root.zoom;
+                    padding-top: 4px;
+                    padding-bottom: 4px;
 
                     Text {
                         text: "Type:";
                         color: #aaa;
-                        font-size: 11px * root.zoom;
+                        font-size: 11px;
                         vertical-alignment: center;
                     }
 
@@ -193,34 +199,34 @@ export component FilterNode inherits BaseNode {
 
                 // Row 2: Status row
                 HorizontalLayout {
-                    height: row-height * root.zoom;
-                    spacing: 12px * root.zoom;
+                    height: row-height;
+                    spacing: 12px;
                     alignment: start;
-                    padding-top: 4px * root.zoom;
-                    padding-bottom: 4px * root.zoom;
+                    padding-top: 4px;
+                    padding-bottom: 4px;
 
                     Text {
                         text: root.enabled ? "Active" : "Bypassed";
                         color: root.enabled ? #8f8 : #f88;
-                        font-size: 12px * root.zoom;
+                        font-size: 12px;
                         vertical-alignment: center;
                     }
 
                     Text {
                         text: "Count: " + root.processed-count;
                         color: #888;
-                        font-size: 11px * root.zoom;
+                        font-size: 11px;
                         vertical-alignment: center;
                     }
                 }
 
                 // Row 3: Button row
                 HorizontalLayout {
-                    height: row-height * root.zoom;
-                    spacing: 8px * root.zoom;
+                    height: row-height;
+                    spacing: 8px;
                     alignment: start;
-                    padding-top: 2px * root.zoom;
-                    padding-bottom: 2px * root.zoom;
+                    padding-top: 2px;
+                    padding-bottom: 2px;
 
                     Button {
                         text: root.enabled ? "Bypass" : "Enable";
@@ -240,18 +246,18 @@ export component FilterNode inherits BaseNode {
 
             // Right pin labels column
             VerticalLayout {
-                width: pin-area-width * root.zoom;
+                width: pin-area-width;
                 spacing: 0px;
 
                 // Row 1: Data output label
                 Rectangle {
-                    height: row-height * root.zoom;
+                    height: row-height;
                     Text {
                         x: 0px;
-                        width: parent.width - 16px * root.zoom;
+                        width: parent.width - 16px;
                         text: "Out";
                         color: #888;
-                        font-size: 10px * root.zoom;
+                        font-size: 10px;
                         vertical-alignment: center;
                         horizontal-alignment: right;
                     }
@@ -259,7 +265,7 @@ export component FilterNode inherits BaseNode {
 
                 // Rows 2-3: empty
                 Rectangle {
-                    height: row-height * root.zoom * 2;
+                    height: row-height * 2;
                 }
             }
         }
@@ -279,14 +285,13 @@ export component FilterNode inherits BaseNode {
 
     // Data Input pin (green, left side, row 1)
     data-input-pin := Pin {
-        x: root.pin-margin * root.zoom;
-        y: root.row-1-center - root.pin-radius;
+        x: root.pin-margin;
+        y: root.row-1-center - base-pin-size / 2;
         pin-id: root.data-input-pin-id;
         node-id: root.node-id;
         pin-type: FilterPinTypes.data-input;
-        zoom: root.zoom;
-        node-screen-x: root.screen-x;
-        node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x;
+        node-screen-y: root.pos-y;
         base-color: #4CAF50;
         hover-color: #66BB6A;
         base-size: root.base-pin-size;
@@ -306,14 +311,13 @@ export component FilterNode inherits BaseNode {
 
     // Control Input pin (yellow, left side, row 2)
     control-input-pin := ControlPin {
-        x: root.pin-margin * root.zoom;
-        y: root.row-2-center - root.pin-radius;
+        x: root.pin-margin;
+        y: root.row-2-center - base-pin-size / 2;
         pin-id: root.control-input-pin-id;
         node-id: root.node-id;
         pin-type: FilterPinTypes.control-input;
-        zoom: root.zoom;
-        node-screen-x: root.screen-x;
-        node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x;
+        node-screen-y: root.pos-y;
         base-color: #FFC107;
         hover-color: #FFD54F;
         base-size: root.base-pin-size;
@@ -333,14 +337,13 @@ export component FilterNode inherits BaseNode {
 
     // Data Output pin (blue, right side, row 1)
     data-output-pin := Pin {
-        x: parent.width - root.pin-margin * root.zoom - root.pin-size;
-        y: root.row-1-center - root.pin-radius;
+        x: root.node-width - root.pin-margin - base-pin-size;
+        y: root.row-1-center - base-pin-size / 2;
         pin-id: root.data-output-pin-id;
         node-id: root.node-id;
         pin-type: FilterPinTypes.data-output;
-        zoom: root.zoom;
-        node-screen-x: root.screen-x;
-        node-screen-y: root.screen-y;
+        node-screen-x: root.pos-x;
+        node-screen-y: root.pos-y;
         base-color: #2196F3;
         hover-color: #42A5F5;
         base-size: root.base-pin-size;
