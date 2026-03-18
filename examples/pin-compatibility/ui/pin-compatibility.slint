@@ -84,20 +84,20 @@ component ValidatedPin inherits Rectangle {
     Rectangle {
         visible: root.is-valid-target;
         x: root.pin-size;
-        y: -4px * root.zoom;
-        width: 16px * root.zoom;
-        height: 16px * root.zoom;
+        y: -4px ;
+        width: 16px ;
+        height: 16px ;
         background: #22c55e;
         border-radius: self.width / 2;
 
         // Checkmark using Path
         Path {
-            x: 3px * root.zoom;
-            y: 4px * root.zoom;
-            width: 10px * root.zoom;
-            height: 8px * root.zoom;
+            x: 3px ;
+            y: 4px ;
+            width: 10px ;
+            height: 8px ;
             stroke: white;
-            stroke-width: 2px * root.zoom;
+            stroke-width: 2px ;
             fill: transparent;
             commands: "M 0 4 L 3 7 L 9 1";
         }
@@ -109,41 +109,41 @@ component SourceNode inherits BaseNode {
     in property <string> title: "Source";
     in property <int> pin-refresh-trigger: 0;
     in property <int> valid-target-pin-id: 0;
-    width: L.node-width * self.zoom;
-    height: L.node-height * self.zoom;
+    width: L.node-width ;
+    height: L.node-height ;
 
     callback report-position(int, int, int, length, length);
 
     Rectangle {
         background: root.selected ? #4a6a9a : #2d2d2d;
-        border-radius: 6px * root.zoom;
-        border-width: 1px * root.zoom;
+        border-radius: 6px ;
+        border-width: 1px ;
         border-color: #555;
 
         // Title
         Text {
-            x: 8px * root.zoom;
-            y: 6px * root.zoom;
+            x: 8px ;
+            y: 6px ;
             text: root.title;
             color: white;
-            font-size: 12px * root.zoom;
+            font-size: 12px ;
             font-weight: 600;
         }
 
         // Pin labels
         for label[idx] in ["Execute", "Integer", "Float", "String", "Boolean", "Object", "Array", "Any"]: Text {
-            x: 8px * root.zoom;
-            y: (L.first-pin-y + idx * L.pin-spacing) * root.zoom;
+            x: 8px ;
+            y: (L.first-pin-y + idx * L.pin-spacing) ;
             text: label;
             color: #aaa;
-            font-size: 10px * root.zoom;
+            font-size: 10px ;
         }
     }
 
     // Output pins - direct children of node
     ValidatedPin {
         x: parent.width - self.width;
-        y: (L.first-pin-y + 0 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 0 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 100; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.execute; valid-target-pin-id: root.valid-target-pin-id;
@@ -154,7 +154,7 @@ component SourceNode inherits BaseNode {
     }
     ValidatedPin {
         x: parent.width - self.width;
-        y: (L.first-pin-y + 1 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 1 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 101; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.integer; valid-target-pin-id: root.valid-target-pin-id;
@@ -165,7 +165,7 @@ component SourceNode inherits BaseNode {
     }
     ValidatedPin {
         x: parent.width - self.width;
-        y: (L.first-pin-y + 2 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 2 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 102; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.float_; valid-target-pin-id: root.valid-target-pin-id;
@@ -176,7 +176,7 @@ component SourceNode inherits BaseNode {
     }
     ValidatedPin {
         x: parent.width - self.width;
-        y: (L.first-pin-y + 3 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 3 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 103; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.string; valid-target-pin-id: root.valid-target-pin-id;
@@ -187,7 +187,7 @@ component SourceNode inherits BaseNode {
     }
     ValidatedPin {
         x: parent.width - self.width;
-        y: (L.first-pin-y + 4 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 4 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 104; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.boolean; valid-target-pin-id: root.valid-target-pin-id;
@@ -198,7 +198,7 @@ component SourceNode inherits BaseNode {
     }
     ValidatedPin {
         x: parent.width - self.width;
-        y: (L.first-pin-y + 5 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 5 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 105; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.object; valid-target-pin-id: root.valid-target-pin-id;
@@ -209,7 +209,7 @@ component SourceNode inherits BaseNode {
     }
     ValidatedPin {
         x: parent.width - self.width;
-        y: (L.first-pin-y + 6 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 6 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 106; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.array; valid-target-pin-id: root.valid-target-pin-id;
@@ -220,7 +220,7 @@ component SourceNode inherits BaseNode {
     }
     ValidatedPin {
         x: parent.width - self.width;
-        y: (L.first-pin-y + 7 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 7 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 107; node-id: root.node-id; pin-type: PinTypes.output; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.any; valid-target-pin-id: root.valid-target-pin-id;
@@ -236,41 +236,41 @@ component SinkNode inherits BaseNode {
     in property <string> title: "Sink";
     in property <int> pin-refresh-trigger: 0;
     in property <int> valid-target-pin-id: 0;
-    width: L.node-width * self.zoom;
-    height: L.node-height * self.zoom;
+    width: L.node-width ;
+    height: L.node-height ;
 
     callback report-position(int, int, int, length, length);
 
     Rectangle {
         background: root.selected ? #4a6a9a : #2d2d2d;
-        border-radius: 6px * root.zoom;
-        border-width: 1px * root.zoom;
+        border-radius: 6px ;
+        border-width: 1px ;
         border-color: #555;
 
         // Title
         Text {
-            x: 8px * root.zoom;
-            y: 6px * root.zoom;
+            x: 8px ;
+            y: 6px ;
             text: root.title;
             color: white;
-            font-size: 12px * root.zoom;
+            font-size: 12px ;
             font-weight: 600;
         }
 
         // Pin labels
         for label[idx] in ["Execute", "Integer", "Float", "String", "Boolean", "Object", "Array", "Any"]: Text {
-            x: 20px * root.zoom;
-            y: (L.first-pin-y + idx * L.pin-spacing) * root.zoom;
+            x: 20px ;
+            y: (L.first-pin-y + idx * L.pin-spacing) ;
             text: label;
             color: #aaa;
-            font-size: 10px * root.zoom;
+            font-size: 10px ;
         }
     }
 
     // Input pins - direct children of node
     ValidatedPin {
         x: 0px;
-        y: (L.first-pin-y + 0 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 0 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 200; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.execute; valid-target-pin-id: root.valid-target-pin-id;
@@ -281,7 +281,7 @@ component SinkNode inherits BaseNode {
     }
     ValidatedPin {
         x: 0px;
-        y: (L.first-pin-y + 1 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 1 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 201; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.integer; valid-target-pin-id: root.valid-target-pin-id;
@@ -292,7 +292,7 @@ component SinkNode inherits BaseNode {
     }
     ValidatedPin {
         x: 0px;
-        y: (L.first-pin-y + 2 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 2 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 202; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.float_; valid-target-pin-id: root.valid-target-pin-id;
@@ -303,7 +303,7 @@ component SinkNode inherits BaseNode {
     }
     ValidatedPin {
         x: 0px;
-        y: (L.first-pin-y + 3 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 3 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 203; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.string; valid-target-pin-id: root.valid-target-pin-id;
@@ -314,7 +314,7 @@ component SinkNode inherits BaseNode {
     }
     ValidatedPin {
         x: 0px;
-        y: (L.first-pin-y + 4 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 4 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 204; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.boolean; valid-target-pin-id: root.valid-target-pin-id;
@@ -325,7 +325,7 @@ component SinkNode inherits BaseNode {
     }
     ValidatedPin {
         x: 0px;
-        y: (L.first-pin-y + 5 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 5 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 205; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.object; valid-target-pin-id: root.valid-target-pin-id;
@@ -336,7 +336,7 @@ component SinkNode inherits BaseNode {
     }
     ValidatedPin {
         x: 0px;
-        y: (L.first-pin-y + 6 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 6 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 206; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.array; valid-target-pin-id: root.valid-target-pin-id;
@@ -347,7 +347,7 @@ component SinkNode inherits BaseNode {
     }
     ValidatedPin {
         x: 0px;
-        y: (L.first-pin-y + 7 * L.pin-spacing + 6px) * root.zoom - self.height/2;
+        y: (L.first-pin-y + 7 * L.pin-spacing + 6px)  - self.height/2;
         pin-id: 207; node-id: root.node-id; pin-type: PinTypes.input; zoom: root.zoom; refresh-trigger: root.pin-refresh-trigger;
         node-screen-x: root.screen-x; node-screen-y: root.screen-y;
         base-color: PinColors.any; valid-target-pin-id: root.valid-target-pin-id;

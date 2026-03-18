@@ -12,19 +12,19 @@ export { LinkData }
 
 component SimpleNode inherits BaseNode {
     in property <string> title: "Node";
-    width: 150px * self.zoom;
-    height: 100px * self.zoom;
+    width: 150px ;
+    height: 100px ;
 
     Rectangle {
         background: root.selected ? #4a6a9a : #333;
-        border-radius: 4px * root.zoom;
-        border-width: 1px * root.zoom;
+        border-radius: 4px ;
+        border-width: 1px ;
         border-color: #666;
 
         Text {
             text: root.title;
             color: white;
-            font-size: 14px * root.zoom;
+            font-size: 14px ;
         }
     }
 

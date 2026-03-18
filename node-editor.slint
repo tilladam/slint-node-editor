@@ -40,8 +40,9 @@ import {
     Link,
     BaseNode,
     Pin,
+    WorldContent,
 } from "node-editor-building-blocks.slint";
-export { PinTypes, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, Minimap, Link, BaseNode, Pin }
+export { PinTypes, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, Minimap, Link, BaseNode, Pin, WorldContent }
 
 /// Modifier key for triggering box selection over nodes/links
 export enum BoxSelectionModifier {
@@ -580,15 +581,22 @@ export component NodeEditor {
     // Container at origin with transform-scale. Nodes position themselves such that
     // after scaling, they appear at the correct screen position.
     // Node position = (world * zoom + pan) / zoom, so after scale: position * zoom = world * zoom + pan ✓
-    world-content := Rectangle {
+    // WorldContent exposes zoom/pan/viewport so child nodes auto-inherit these values.
+    world-content := WorldContent {
         x: 0px;
         y: 0px;
         width: 100000px;  // Large enough for any world content
         height: 100000px;
         transform-origin: { x: 0, y: 0 };
         transform-scale: root.zoom;
-        background: transparent;
         clip: false;
+        
+        // Expose transform state to child nodes
+        zoom: root.zoom;
+        pan-x: root.pan-x;
+        pan-y: root.pan-y;
+        viewport-width: root.width;
+        viewport-height: root.height;
 
         // Render links from `links` property
         for link in root.links: Link {

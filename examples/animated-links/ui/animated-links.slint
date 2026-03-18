@@ -85,13 +85,13 @@ component AnimatedLink inherits Rectangle {
 component SimpleNode inherits BaseNode {
     in property <string> title: "Node";
     in property <color> accent-color: #4a9eff;
-    width: 150px * self.zoom;
-    height: 100px * self.zoom;
+    width: 150px ;
+    height: 100px ;
 
     Rectangle {
         background: root.selected ? accent-color.darker(60%) : #333;
-        border-radius: 6px * root.zoom;
-        border-width: root.selected ? 2px * root.zoom : 1px * root.zoom;
+        border-radius: 6px ;
+        border-width: root.selected ? 2px  : 1px ;
         border-color: root.selected ? accent-color : #666;
 
         // Animated gradient overlay
@@ -99,16 +99,16 @@ component SimpleNode inherits BaseNode {
             x: 0;
             y: 0;
             width: parent.width;
-            height: 30px * root.zoom;
-            border-radius: 6px * root.zoom;
+            height: 30px ;
+            border-radius: 6px ;
             background: @linear-gradient(180deg, accent-color.with-alpha(0.3) 0%, transparent 100%);
             clip: true;
 
             // Only round top corners
             Rectangle {
-                y: parent.height - 6px * root.zoom;
+                y: parent.height - 6px ;
                 width: parent.width;
-                height: 6px * root.zoom;
+                height: 6px ;
                 background: root.selected ? accent-color.darker(60%) : #333;
             }
         }
@@ -116,7 +116,7 @@ component SimpleNode inherits BaseNode {
         Text {
             text: root.title;
             color: white;
-            font-size: 14px * root.zoom;
+            font-size: 14px ;
             font-weight: 600;
         }
     }

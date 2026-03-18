@@ -310,19 +310,35 @@ export component Link inherits Path {
     commands: path-commands;
 }
 
+/// Container for node content inside NodeEditor.
+/// Exposes zoom/pan/viewport properties that BaseNode can reference via parent.
+/// This allows nodes to automatically inherit transform state without explicit binding.
+export component WorldContent inherits Rectangle {
+    in property <float> zoom: 1.0;
+    in property <length> pan-x: 0px;
+    in property <length> pan-y: 0px;
+    in property <length> viewport-width: 10000px;
+    in property <length> viewport-height: 10000px;
+    background: transparent;
+    @children
+}
+
 /// Base component for all node types in the node editor.
 /// Nodes are positioned in WORLD coordinates - the parent NodeEditor applies
 /// transform-scale for zoom, so no zoom multiplication is needed here.
 ///
+/// When placed inside a NodeEditor, zoom/pan values are automatically inherited
+/// from the parent WorldContent component - no explicit binding needed.
+///
 /// Visibility Culling: BaseNode computes whether the node is on-screen and sets
-/// `visible: false` for off-screen nodes. Pass viewport-width/viewport-height
-/// so visibility can be calculated correctly.
+/// `visible: false` for off-screen nodes.
 export component BaseNode inherits Rectangle {
     // === Common Properties ===
     in property <int> node-id;
     in property <bool> selected: false;
     in property <length> world-x;
     in property <length> world-y;
+    // These are automatically provided when placed inside NodeEditor's WorldContent
     in property <float> zoom: 1.0;
     in property <length> pan-x: 0px;
     in property <length> pan-y: 0px;
@@ -399,6 +415,16 @@ export component BaseNode inherits Rectangle {
         }
     }
     changed drag-offset-y => {
+        if (node-id > 0) {
+            report-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+        }
+    }
+    changed world-x => {
+        if (node-id > 0) {
+            report-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+        }
+    }
+    changed world-y => {
         if (node-id > 0) {
             report-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }

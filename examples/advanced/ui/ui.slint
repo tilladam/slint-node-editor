@@ -80,7 +80,7 @@ component Node inherits BaseNode {
     in property <int> output-pin-id: PinId.make(self.node-id, PinTypes.output);
 
     // Pin dimensions (scaled by zoom)
-    property <length> pin-size: NodeConstants.pin-size * self.zoom;
+    property <length> pin-size: NodeConstants.pin-size ;
     property <length> pin-radius: pin-size / 2;
 
     // Base dimensions (from global constants)
@@ -94,22 +94,22 @@ component Node inherits BaseNode {
     out property <length> output-pin-y: self.screen-y + output-pin.center-y;
 
     // Set dimensions
-    width: base-width * self.zoom;
-    height: base-height * self.zoom;
+    width: base-width ;
+    height: base-height ;
 
     // Title bar
     Rectangle {
-        x: 8px * root.zoom;
-        y: 8px * root.zoom;
-        width: parent.width - 16px * root.zoom;
-        height: 24px * root.zoom;
+        x: 8px ;
+        y: 8px ;
+        width: parent.width - 16px ;
+        height: 24px ;
         background: root.selected ? #4a6a9a : #3d3d3d;
-        border-radius: 4px * root.zoom;
+        border-radius: 4px ;
 
         Text {
             text: root.title;
             color: white;
-            font-size: 14px * root.zoom;
+            font-size: 14px ;
             horizontal-alignment: center;
             vertical-alignment: center;
         }
@@ -125,8 +125,8 @@ component Node inherits BaseNode {
 
     // Input pin (green) - with drag-to-link support
     input-pin := Pin {
-        x: 8px * root.zoom;
-        y: (8px + 24px + 8px) * root.zoom;  // below title bar
+        x: 8px ;
+        y: (8px + 24px + 8px) ;  // below title bar
         pin-id: root.input-pin-id;
         node-id: root.node-id;
         pin-type: PinTypes.input;
@@ -152,8 +152,8 @@ component Node inherits BaseNode {
 
     // Output pin (blue) - with drag-to-link support
     output-pin := Pin {
-        x: parent.width - 8px * root.zoom - root.pin-size;
-        y: (8px + 24px + 8px) * root.zoom;  // below title bar
+        x: parent.width - 8px  - root.pin-size;
+        y: (8px + 24px + 8px) ;  // below title bar
         pin-id: root.output-pin-id;
         node-id: root.node-id;
         pin-type: PinTypes.output;
