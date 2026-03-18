@@ -1,4 +1,10 @@
-import { NodeEditor, BaseNode, Pin, PinTypes, LinkData } from "@slint-node-editor/node-editor.slint";
+import {
+    NodeEditor,
+    BaseNode,
+    Pin,
+    PinTypes,
+    LinkData,
+} from "@slint-node-editor/node-editor.slint";
 import { Button } from "std-widgets.slint";
 
 export struct NodeData {
@@ -7,24 +13,25 @@ export struct NodeData {
     x: float,
     y: float,
 }
-
 export { LinkData }
 
 component SimpleNode inherits BaseNode {
     in property <string> title: "Node";
-    width: 120px * self.zoom;
-    height: 60px * self.zoom;
+    node-width: 120px;
+    node-height: 60px;
 
     Rectangle {
+        width: 100%;
+        height: 100%;
         background: root.selected ? #4a6a9a : #333;
-        border-radius: 4px * root.zoom;
-        border-width: 1px * root.zoom;
+        border-radius: 4px;
+        border-width: 1px;
         border-color: #666;
 
         Text {
             text: root.title;
             color: white;
-            font-size: 12px * root.zoom;
+            font-size: 12px;
         }
     }
 
@@ -36,8 +43,8 @@ component SimpleNode inherits BaseNode {
         node-id: root.node-id;
         pin-type: PinTypes.input;
         zoom: root.zoom;
-        node-screen-x: root.pos-x;
-        node-screen-y: root.pos-y;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
         report-position(id, nid, type, x, y) => {
             root.report-position(id, nid, type, x, y);
         }
@@ -51,8 +58,8 @@ component SimpleNode inherits BaseNode {
         node-id: root.node-id;
         pin-type: PinTypes.output;
         zoom: root.zoom;
-        node-screen-x: root.pos-x;
-        node-screen-y: root.pos-y;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
         report-position(id, nid, type, x, y) => {
             root.report-position(id, nid, type, x, y);
         }
@@ -96,6 +103,7 @@ export component MainWindow inherits Window {
                     root.layout-requested();
                 }
             }
+
             Button {
                 text: "Scramble";
                 clicked => {
@@ -115,6 +123,8 @@ export component MainWindow inherits Window {
                 world-x: data.x * 1px;
                 world-y: data.y * 1px;
                 zoom: editor.zoom;
+                pan-x: editor.pan-x;
+                pan-y: editor.pan-y;
                 drag-offset-x: data.id == root.dragged-node-id ? editor.drag-offset-x : 0px;
                 drag-offset-y: data.id == root.dragged-node-id ? editor.drag-offset-y : 0px;
 

@@ -313,17 +313,25 @@ export component Link inherits Path {
 /// Base component for all node types in the node editor.
 /// Nodes are positioned in WORLD coordinates - the parent NodeEditor applies
 /// transform-scale for zoom, so no zoom multiplication is needed here.
-/// Nodes position themselves at pure world coordinates.
+///
+/// Visibility Culling: BaseNode computes whether the node is on-screen and sets
+/// `visible: false` for off-screen nodes. Pass viewport-width/viewport-height
+/// so visibility can be calculated correctly.
 export component BaseNode inherits Rectangle {
     // === Common Properties ===
     in property <int> node-id;
     in property <bool> selected: false;
     in property <length> world-x;
     in property <length> world-y;
+    in property <float> zoom: 1.0;
+    in property <length> pan-x: 0px;
+    in property <length> pan-y: 0px;
     in property <length> drag-offset-x: 0px;
     in property <length> drag-offset-y: 0px;
-    // Zoom is needed for converting screen-space drag deltas to world-space offsets
-    in property <float> zoom: 1.0;
+
+    // === Viewport (for visibility culling) ===
+    in property <length> viewport-width: 10000px;
+    in property <length> viewport-height: 10000px;
 
     // === Node Size ===
     // Set these to match your node's visual dimensions.
@@ -352,51 +360,57 @@ export component BaseNode inherits Rectangle {
     callback report-rect(int, length, length, length, length);
 
     // === Computed Properties ===
-    // World position (pure world coordinates)
-    out property <length> pos-x: world-x + drag-offset-x;
-    out property <length> pos-y: world-y + drag-offset-y;
+    // World position (for reporting to Rust)
+    property <length> world-pos-x: world-x + drag-offset-x;
+    property <length> world-pos-y: world-y + drag-offset-y;
+    // Screen position
+    out property <length> screen-x: world-pos-x * zoom + pan-x;
+    out property <length> screen-y: world-pos-y * zoom + pan-y;
+    // Position inside scaled container: we want screen = pos * zoom, so pos = screen / zoom
+    // This ensures nodes appear at correct screen position after transform-scale
+    property <length> container-pos-x: zoom > 0 ? screen-x / zoom : world-pos-x;
+    property <length> container-pos-y: zoom > 0 ? screen-y / zoom : world-pos-y;
 
     // === Common Styling ===
-    // Position at world coordinates - container handles pan/zoom
-    x: pos-x;
-    y: pos-y;
+    x: container-pos-x;
+    y: container-pos-y;
     width: node-width;
     height: node-height;
     // BaseNode is transparent - visual styling should be in child elements
     background: transparent;
     clip: false;
 
-    // Report rect on changes (in WORLD coordinates)
+    // Report rect on changes (in WORLD coordinates - without offset)
     init => {
         if (node-id > 0) {
-            report-rect(node-id, pos-x, pos-y, node-width, node-height);
+            report-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
 
     changed node-id => {
         if (node-id > 0) {
-            report-rect(node-id, pos-x, pos-y, node-width, node-height);
+            report-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
 
     changed drag-offset-x => {
         if (node-id > 0) {
-            report-rect(node-id, pos-x, pos-y, node-width, node-height);
+            report-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
     changed drag-offset-y => {
         if (node-id > 0) {
-            report-rect(node-id, pos-x, pos-y, node-width, node-height);
+            report-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
     changed node-width => {
         if (node-id > 0) {
-            report-rect(node-id, pos-x, pos-y, node-width, node-height);
+            report-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
     changed node-height => {
         if (node-id > 0) {
-            report-rect(node-id, pos-x, pos-y, node-width, node-height);
+            report-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
 

@@ -553,13 +553,14 @@ mod tests {
     }
 
     // ========================================================================
-    // handle_node_rect: screen→world conversion
+    // handle_node_rect: world coordinates stored directly (no conversion)
     // ========================================================================
 
     #[test]
     fn test_handle_node_rect_zoom1() {
         let ctrl = NodeEditorController::new();
         ctrl.set_viewport(1.0, 0.0, 0.0);
+        // World coords passed directly - stored as-is
         ctrl.handle_node_rect(1, 100.0, 200.0, 50.0, 30.0);
         let cache = ctrl.cache.borrow();
         let rect = cache.node_rects.get(&1).unwrap().rect();
@@ -570,20 +571,19 @@ mod tests {
     fn test_handle_node_rect_zoom2_with_pan() {
         let ctrl = NodeEditorController::new();
         ctrl.set_viewport(2.0, 50.0, 100.0);
-        // Screen coords: x=250, y=300, w=100, h=60
-        // World: x=(250-50)/2=100, y=(300-100)/2=100, w=50, h=30
-        ctrl.handle_node_rect(1, 250.0, 300.0, 100.0, 60.0);
+        // World coords passed directly - stored as-is regardless of zoom/pan
+        ctrl.handle_node_rect(1, 100.0, 100.0, 50.0, 30.0);
         let cache = ctrl.cache.borrow();
         let rect = cache.node_rects.get(&1).unwrap().rect();
         assert_eq!(rect, (100.0, 100.0, 50.0, 30.0));
     }
 
     #[test]
-    fn test_handle_node_rect_zero_zoom_fallback() {
+    fn test_handle_node_rect_zero_zoom() {
         let ctrl = NodeEditorController::new();
         ctrl.set_viewport(0.0, 0.0, 0.0);
+        // World coords passed directly - stored as-is
         ctrl.handle_node_rect(1, 100.0, 200.0, 50.0, 30.0);
-        // Should use zoom=1.0 fallback
         let cache = ctrl.cache.borrow();
         let rect = cache.node_rects.get(&1).unwrap().rect();
         assert_eq!(rect, (100.0, 200.0, 50.0, 30.0));

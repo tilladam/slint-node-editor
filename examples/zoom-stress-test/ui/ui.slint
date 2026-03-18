@@ -7,7 +7,11 @@
 // - Hit targets are adequate for interaction
 // - Layout consistency across zoom levels
 
-import { NodeEditor, Link, LinkData } from "@slint-node-editor/node-editor.slint";
+import {
+    NodeEditor,
+    Link,
+    LinkData,
+} from "@slint-node-editor/node-editor.slint";
 import { InputNode, InputNodeData } from "input_node.slint";
 import { ControlNode, ControlNodeData } from "control_node.slint";
 import { DisplayNode, DisplayNodeData } from "display_node.slint";
@@ -71,8 +75,7 @@ export component MainWindow inherits Window {
             root.width / 2,
             root.height / 2,
             (root.width / 2 - root.pan-x) / root.zoom / 1px,
-            (root.height / 2 - root.pan-y) / root.zoom / 1px
-        );
+            (root.height / 2 - root.pan-y) / root.zoom / 1px);
     }
 
     editor := NodeEditor {
@@ -99,6 +102,8 @@ export component MainWindow inherits Window {
             title: data.title;
             world-x: data.world-x * 1px;
             world-y: data.world-y * 1px;
+            pan-x: editor.pan-x;
+            pan-y: editor.pan-y;
             zoom: editor.zoom;
             text-value: data.text-value;
             spin-value: data.spin-value;
@@ -142,6 +147,8 @@ export component MainWindow inherits Window {
             title: data.title;
             world-x: data.world-x * 1px;
             world-y: data.world-y * 1px;
+            pan-x: editor.pan-x;
+            pan-y: editor.pan-y;
             zoom: editor.zoom;
             check-a: data.check-a;
             check-b: data.check-b;
@@ -192,6 +199,8 @@ export component MainWindow inherits Window {
             title: data.title;
             world-x: data.world-x * 1px;
             world-y: data.world-y * 1px;
+            pan-x: editor.pan-x;
+            pan-y: editor.pan-y;
             zoom: editor.zoom;
             progress: data.progress;
             status-text: data.status-text;
@@ -245,14 +254,8 @@ export component MainWindow inherits Window {
             }
 
             Text {
-                text: zoom < 0.5 ? "Very small" :
-                      zoom < 0.8 ? "Small" :
-                      zoom < 1.2 ? "Normal" :
-                      zoom < 2.0 ? "Large" : "Very large";
-                color: zoom < 0.5 ? #f88 :
-                       zoom < 0.8 ? #fa8 :
-                       zoom < 1.2 ? #8f8 :
-                       zoom < 2.0 ? #8af : #f8f;
+                text: zoom < 0.5 ? "Very small" : zoom < 0.8 ? "Small" : zoom < 1.2 ? "Normal" : zoom < 2.0 ? "Large" : "Very large";
+                color: zoom < 0.5 ? #f88 : zoom < 0.8 ? #fa8 : zoom < 1.2 ? #8f8 : zoom < 2.0 ? #8af : #f8f;
                 font-size: 11px;
                 horizontal-alignment: center;
             }

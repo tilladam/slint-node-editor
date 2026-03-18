@@ -45,8 +45,8 @@ component SimpleNode inherits BaseNode {
         pin-id: root.node-id * 2;
         node-id: root.node-id;
         pin-type: PinTypes.input;
-        node-screen-x: root.pos-x;
-        node-screen-y: root.pos-y;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
         report-position(id, nid, type, x, y) => {
             root.report-position(id, nid, type, x, y);
         }
@@ -59,8 +59,8 @@ component SimpleNode inherits BaseNode {
         pin-id: root.node-id * 2 + 1;
         node-id: root.node-id;
         pin-type: PinTypes.output;
-        node-screen-x: root.pos-x;
-        node-screen-y: root.pos-y;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
         report-position(id, nid, type, x, y) => {
             root.report-position(id, nid, type, x, y);
         }
@@ -112,6 +112,10 @@ export component MainWindow inherits Window {
             world-x: data.x * 1px;
             world-y: data.y * 1px;
             zoom: editor.zoom;
+            pan-x: editor.pan-x;
+            pan-y: editor.pan-y;
+            viewport-width: editor.width;
+            viewport-height: editor.height;
             drag-offset-x: data.id == root.dragged-node-id ? editor.drag-offset-x : 0px;
             drag-offset-y: data.id == root.dragged-node-id ? editor.drag-offset-y : 0px;
 
