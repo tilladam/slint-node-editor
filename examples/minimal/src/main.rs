@@ -7,11 +7,8 @@ slint::include_modules!();
 fn main() {
     let window = MainWindow::new().unwrap();
     let w = window.as_weak();
-    
-    // Create setup helper - manages controller and state
-    let setup = NodeEditorSetup::new();
 
-    // Set up nodes (keep reference for drag updates)
+    // Set up nodes
     let nodes = Rc::new(VecModel::from(vec![
         NodeData { id: 1, title: SharedString::from("Node A"), x: 100.0, y: 100.0 },
         NodeData { id: 2, title: SharedString::from("Node B"), x: 400.0, y: 200.0 },
@@ -28,14 +25,9 @@ fn main() {
             line_width: 2.0,
         },
     ]))));
-
-    // Wire geometry callbacks using helper (3 lines instead of 20+)
-    window.global::<GeometryCallbacks>().on_report_node_rect(setup.on_report_node_rect());
-    window.global::<GeometryCallbacks>().on_report_pin_position(setup.on_report_pin_position());
-    window.global::<GeometryCallbacks>().on_start_node_drag(setup.on_start_node_drag());
     
-    // Wire drag end with model update
-    window.global::<GeometryCallbacks>().on_end_node_drag(setup.on_end_node_drag({
+    // Create setup with model update logic - this is the ONLY callback you provide
+    let setup = NodeEditorSetup::new({
         let nodes = nodes.clone();
         move |node_id, delta_x, delta_y| {
             for i in 0..nodes.row_count() {
@@ -49,10 +41,17 @@ fn main() {
                 }
             }
         }
-    }));
+    });
 
-    // Wire computational callbacks (1 line each)
-    window.global::<NodeEditorComputations>().on_compute_link_path(setup.on_compute_link_path());
+    // Wire geometry callbacks
+    let gc = window.global::<GeometryCallbacks>();
+    gc.on_report_node_rect(setup.report_node_rect());
+    gc.on_report_pin_position(setup.report_pin_position());
+    gc.on_start_node_drag(setup.start_node_drag());
+    gc.on_end_node_drag(setup.end_node_drag());
+    
+    // Wire computational callbacks
+    window.global::<NodeEditorComputations>().on_compute_link_path(setup.compute_link_path());
     
     window.global::<NodeEditorComputations>().on_viewport_changed({
         let ctrl = setup.controller().clone();
@@ -66,7 +65,7 @@ fn main() {
     });
     
     // Initial grid generation
-    window.set_grid_commands(setup.controller().generate_initial_grid(window.get_width_(), window.get_height_()));
+    window.set_grid_commands(setup.generate_initial_grid(window.get_width_(), window.get_height_()));
 
     window.run().unwrap();
 }

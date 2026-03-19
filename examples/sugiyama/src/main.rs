@@ -27,7 +27,6 @@ fn build_node_index(nodes: &VecModel<NodeData>) -> HashMap<i32, usize> {
 
 fn main() {
     let window = MainWindow::new().unwrap();
-    let setup = NodeEditorSetup::new();
     let w = window.as_weak();
 
     // Create a DAG with 8 nodes:
@@ -134,13 +133,8 @@ fn main() {
         }
     });
 
-    // Wire geometry callbacks using helper (4 lines instead of 20+)
-    window.global::<GeometryCallbacks>().on_report_node_rect(setup.on_report_node_rect());
-    window.global::<GeometryCallbacks>().on_report_pin_position(setup.on_report_pin_position());
-    window.global::<GeometryCallbacks>().on_start_node_drag(setup.on_start_node_drag());
-    
-    // Wire drag end with model update
-    window.global::<GeometryCallbacks>().on_end_node_drag(setup.on_end_node_drag({
+    // Create setup with model update logic
+    let setup = NodeEditorSetup::new({
         let nodes = nodes.clone();
         move |node_id, delta_x, delta_y| {
             for i in 0..nodes.row_count() {
@@ -154,10 +148,17 @@ fn main() {
                 }
             }
         }
-    }));
+    });
+
+    // Wire geometry callbacks
+    let gc = window.global::<GeometryCallbacks>();
+    gc.on_report_node_rect(setup.report_node_rect());
+    gc.on_report_pin_position(setup.report_pin_position());
+    gc.on_start_node_drag(setup.start_node_drag());
+    gc.on_end_node_drag(setup.end_node_drag());
 
     // Wire computational callbacks
-    window.global::<NodeEditorComputations>().on_compute_link_path(setup.on_compute_link_path());
+    window.global::<NodeEditorComputations>().on_compute_link_path(setup.compute_link_path());
     
     window.global::<NodeEditorComputations>().on_viewport_changed({
         let ctrl = setup.controller().clone();
@@ -171,7 +172,7 @@ fn main() {
     });
 
     // Generate initial grid
-    window.set_grid_commands(setup.controller().generate_initial_grid(
+    window.set_grid_commands(setup.generate_initial_grid(
         window.get_width_(),
         window.get_height_(),
     ));

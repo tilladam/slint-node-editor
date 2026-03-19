@@ -1,13 +1,14 @@
 //! Simplified setup helpers for NodeEditor with globals architecture.
 //!
-//! The [`NodeEditorSetup`] eliminates boilerplate by providing pre-configured closures
-//! that you can directly wire to the globals. This reduces the typical 40+ lines of
-//! callback wiring to just a few lines.
+//! The [`NodeEditorSetup`] provides automatic callback handling. You only need
+//! to provide a closure that updates your model when nodes are moved.
 //!
 //! # Example
 //!
 //! ```ignore
 //! use slint_node_editor::NodeEditorSetup;
+//! use slint::{Model, VecModel};
+//! use std::rc::Rc;
 //!
 //! slint::include_modules!();
 //!
@@ -15,19 +16,30 @@
 //!     let window = MainWindow::new().unwrap();
 //!     let nodes = Rc::new(VecModel::from(vec![/* your nodes */]));
 //!     
-//!     // Create setup helper
-//!     let setup = NodeEditorSetup::new();
+//!     // Create setup with your model update logic
+//!     let setup = NodeEditorSetup::new({
+//!         let nodes = nodes.clone();
+//!         move |node_id, delta_x, delta_y| {
+//!             for i in 0..nodes.row_count() {
+//!                 if let Some(mut node) = nodes.row_data(i) {
+//!                     if node.id == node_id {
+//!                         node.x += delta_x;
+//!                         node.y += delta_y;
+//!                         nodes.set_row_data(i, node);
+//!                         break;
+//!                     }
+//!                 }
+//!             }
+//!         }
+//!     });
 //!     
-//!     // Wire geometry callbacks
-//!     window.global::<GeometryCallbacks>().on_report_node_rect(setup.on_report_node_rect());
-//!     window.global::<GeometryCallbacks>().on_report_pin_position(setup.on_report_pin_position());
-//!     window.global::<GeometryCallbacks>().on_start_node_drag(setup.on_start_node_drag());
-//!     window.global::<GeometryCallbacks>().on_end_node_drag(setup.on_end_node_drag(|node_id, dx, dy| {
-//!         // Update your model
-//!     }));
-//!     
-//!     // Wire computations
-//!     window.global::<NodeEditorComputations>().on_compute_link_path(setup.on_compute_link_path());
+//!     // Wire callbacks (5 lines for complete setup)
+//!     let gc = window.global::<GeometryCallbacks>();
+//!     gc.on_report_node_rect(setup.report_node_rect());
+//!     gc.on_report_pin_position(setup.report_pin_position());
+//!     gc.on_start_node_drag(setup.start_node_drag());
+//!     gc.on_end_node_drag(setup.end_node_drag());
+//!     window.global::<NodeEditorComputations>().on_compute_link_path(setup.compute_link_path());
 //!     
 //!     window.run().unwrap();
 //! }
@@ -37,29 +49,34 @@ use crate::controller::NodeEditorController;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// Setup helper that bundles NodeEditorController and common state.
+/// Setup helper that bundles NodeEditorController and automatic model updates.
 ///
-/// This helper reduces boilerplate by:
+/// This helper eliminates boilerplate by:
 /// - Managing the controller lifecycle
-/// - Tracking dragged node ID
-/// - Providing pre-configured closures for all callbacks
-pub struct NodeEditorSetup {
+/// - Tracking dragged node ID internally  
+/// - Calling your model-update closure automatically on drag end
+pub struct NodeEditorSetup<F>
+where
+    F: Fn(i32, f32, f32) + 'static,
+{
     controller: Rc<NodeEditorController>,
     dragged_node_id: Rc<RefCell<i32>>,
+    on_node_moved: Rc<F>,
 }
 
-impl Default for NodeEditorSetup {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl NodeEditorSetup {
-    /// Create a new setup helper with a fresh controller and state.
-    pub fn new() -> Self {
+impl<F> NodeEditorSetup<F>
+where
+    F: Fn(i32, f32, f32) + 'static,
+{
+    /// Create a new setup helper with a node-moved callback.
+    ///
+    /// The callback receives `(node_id, delta_x, delta_y)` when a node drag ends.
+    /// This is the ONLY callback you need to provide - everything else is handled internally.
+    pub fn new(on_node_moved: F) -> Self {
         Self {
             controller: Rc::new(NodeEditorController::new()),
             dragged_node_id: Rc::new(RefCell::new(0i32)),
+            on_node_moved: Rc::new(on_node_moved),
         }
     }
 
@@ -68,122 +85,59 @@ impl NodeEditorSetup {
         &self.controller
     }
 
-    /// Get the ID of the currently dragged node (0 if none).
-    pub fn dragged_node_id(&self) -> i32 {
-        *self.dragged_node_id.borrow()
-    }
-
-    /// Create a closure for `GeometryCallbacks.on_report_node_rect`.
-    ///
-    /// Wire this directly:
-    /// ```ignore
-    /// window.global::<GeometryCallbacks>()
-    ///     .on_report_node_rect(setup.on_report_node_rect());
-    /// ```
-    pub fn on_report_node_rect(&self) -> impl Fn(i32, f32, f32, f32, f32) + 'static {
+    /// Callback for `GeometryCallbacks.on_report_node_rect`.
+    pub fn report_node_rect(&self) -> impl Fn(i32, f32, f32, f32, f32) + 'static {
         let ctrl = self.controller.clone();
-        move |id, x, y, width, h| {
-            ctrl.handle_node_rect(id, x, y, width, h);
+        move |id, x, y, w, h| {
+            ctrl.handle_node_rect(id, x, y, w, h);
         }
     }
 
-    /// Create a closure for `GeometryCallbacks.on_report_pin_position`.
-    ///
-    /// Wire this directly:
-    /// ```ignore
-    /// window.global::<GeometryCallbacks>()
-    ///     .on_report_pin_position(setup.on_report_pin_position());
-    /// ```
-    pub fn on_report_pin_position(&self) -> impl Fn(i32, i32, i32, f32, f32) + 'static {
+    /// Callback for `GeometryCallbacks.on_report_pin_position`.
+    pub fn report_pin_position(&self) -> impl Fn(i32, i32, i32, f32, f32) + 'static {
         let ctrl = self.controller.clone();
         move |pin_id, node_id, pin_type, x, y| {
             ctrl.handle_pin_position(pin_id, node_id, pin_type, x, y);
         }
     }
 
-    /// Create a closure for `GeometryCallbacks.on_start_node_drag`.
-    ///
-    /// Wire this directly:
-    /// ```ignore
-    /// window.global::<GeometryCallbacks>()
-    ///     .on_start_node_drag(setup.on_start_node_drag());
-    /// ```
-    pub fn on_start_node_drag(&self) -> impl Fn(i32, bool, f32, f32) + 'static {
+    /// Callback for `GeometryCallbacks.on_start_node_drag`.
+    pub fn start_node_drag(&self) -> impl Fn(i32, bool, f32, f32) + 'static {
         let dragged = self.dragged_node_id.clone();
         move |node_id, _, _, _| {
             *dragged.borrow_mut() = node_id;
         }
     }
 
-    /// Create a closure for `GeometryCallbacks.on_end_node_drag`.
-    ///
-    /// This takes a user callback that receives `(node_id, delta_x, delta_y)`
-    /// for updating the node model.
-    ///
-    /// # Example
-    /// ```ignore
-    /// window.global::<GeometryCallbacks>().on_end_node_drag(
-    ///     setup.on_end_node_drag({
-    ///         let nodes = nodes.clone();
-    ///         move |node_id, dx, dy| {
-    ///             // Update your model here
-    ///         }
-    ///     })
-    /// );
-    /// ```
-    pub fn on_end_node_drag<F>(&self, update_model: F) -> impl Fn(f32, f32) + 'static
-    where
-        F: Fn(i32, f32, f32) + 'static,
-    {
+    /// Callback for `GeometryCallbacks.on_end_node_drag`.
+    /// 
+    /// This automatically calls your model-update closure with the dragged node ID.
+    pub fn end_node_drag(&self) -> impl Fn(f32, f32) + 'static {
         let dragged = self.dragged_node_id.clone();
+        let on_moved = self.on_node_moved.clone();
         move |delta_x, delta_y| {
             let node_id = *dragged.borrow();
-            update_model(node_id, delta_x, delta_y);
+            on_moved(node_id, delta_x, delta_y);
         }
     }
 
-    /// Create a closure for `NodeEditorComputations.on_compute_link_path`.
-    ///
-    /// Wire this directly:
-    /// ```ignore
-    /// window.global::<NodeEditorComputations>()
-    ///     .on_compute_link_path(setup.on_compute_link_path());
-    /// ```
-    pub fn on_compute_link_path(&self) -> impl Fn(i32, i32, i32, f32, f32, f32) -> slint::SharedString + 'static {
+    /// Callback for `NodeEditorComputations.on_compute_link_path`.
+    pub fn compute_link_path(&self) -> impl Fn(i32, i32, i32, f32, f32, f32) -> slint::SharedString + 'static {
         self.controller.compute_link_path_callback()
     }
 
-    /// Create a closure for `NodeEditorComputations.on_viewport_changed`.
-    ///
-    /// This handles viewport updates and grid regeneration.
-    ///
-    /// # Example
-    /// ```ignore
-    /// window.global::<NodeEditorComputations>().on_viewport_changed(
-    ///     setup.on_viewport_changed(&window.as_weak(), |w| {
-    ///         (w.get_width_(), w.get_height_())
-    ///     })
-    /// );
-    /// ```
-    pub fn on_viewport_changed<W, F>(
-        &self,
-        window: &slint::Weak<W>,
-        get_dimensions: F,
-    ) -> impl Fn(f32, f32, f32) + 'static
-    where
-        W: slint::ComponentHandle + 'static,
-        F: Fn(&W) -> (f32, f32) + 'static,
-    {
-        let ctrl = self.controller.clone();
-        let w = window.clone();
-        move |zoom, pan_x, pan_y| {
-            ctrl.set_viewport(zoom, pan_x, pan_y);
-            if let Some(window) = w.upgrade() {
-                let (_width, _height) = get_dimensions(&window);
-                let _grid = ctrl.generate_grid(_width, _height, pan_x, pan_y);
-                // Note: Can't set grid_commands here without knowing the window type
-                // Caller must do: w.set_grid_commands(grid);
-            }
-        }
+    /// Generate the initial grid commands.
+    pub fn generate_initial_grid(&self, width: f32, height: f32) -> slint::SharedString {
+        self.controller.generate_initial_grid(width, height)
+    }
+
+    /// Generate grid commands for the current viewport.
+    pub fn generate_grid(&self, width: f32, height: f32, pan_x: f32, pan_y: f32) -> slint::SharedString {
+        self.controller.generate_grid(width, height, pan_x, pan_y)
+    }
+
+    /// Set the viewport state.
+    pub fn set_viewport(&self, zoom: f32, pan_x: f32, pan_y: f32) {
+        self.controller.set_viewport(zoom, pan_x, pan_y);
     }
 }
