@@ -56,6 +56,7 @@ pub mod graph;
 pub mod tracking;
 pub mod links;
 pub mod controller;
+pub mod setup;
 #[cfg(feature = "layout")]
 pub mod layout;
 
@@ -77,5 +78,6 @@ pub use graph::{
 pub use tracking::GeometryTracker;
 pub use links::LinkManager;
 pub use controller::NodeEditorController;
+pub use setup::NodeEditorSetup;
 #[cfg(feature = "layout")]
 pub use layout::{sugiyama_layout, sugiyama_layout_from_cache, Direction, NodePosition, SugiyamaConfig};

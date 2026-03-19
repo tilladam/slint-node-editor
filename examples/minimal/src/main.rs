@@ -1,17 +1,15 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::NodeEditorController;
+use slint_node_editor::NodeEditorSetup;
 use std::rc::Rc;
-use std::cell::RefCell;
 
 slint::include_modules!();
 
 fn main() {
     let window = MainWindow::new().unwrap();
-    let ctrl = NodeEditorController::new();
     let w = window.as_weak();
     
-    // Track dragged node ID locally
-    let dragged_node_id = Rc::new(RefCell::new(0i32));
+    // Create setup helper - manages controller and state
+    let setup = NodeEditorSetup::new();
 
     // Set up nodes (keep reference for drag updates)
     let nodes = Rc::new(VecModel::from(vec![
@@ -31,43 +29,15 @@ fn main() {
         },
     ]))));
 
-    // Wire GeometryCallbacks to controller
-    window.global::<GeometryCallbacks>().on_report_node_rect({
-        let ctrl = ctrl.clone();
-        move |id, x, y, width, h| {
-            ctrl.handle_node_rect(id, x, y, width, h);
-        }
-    });
-
-    window.global::<GeometryCallbacks>().on_report_pin_position({
-        let ctrl = ctrl.clone();
-        move |pid, nid, ptype, x, y| {
-            ctrl.handle_pin_position(pid, nid, ptype, x, y);
-        }
-    });
+    // Wire geometry callbacks using helper (3 lines instead of 20+)
+    window.global::<GeometryCallbacks>().on_report_node_rect(setup.on_report_node_rect());
+    window.global::<GeometryCallbacks>().on_report_pin_position(setup.on_report_pin_position());
+    window.global::<GeometryCallbacks>().on_start_node_drag(setup.on_start_node_drag());
     
-    window.global::<GeometryCallbacks>().on_start_node_drag({
-        let dragged = dragged_node_id.clone();
-        move |node_id, _already_selected, _world_x, _world_y| {
-            *dragged.borrow_mut() = node_id;
-        }
-    });
-
-    window.global::<GeometryCallbacks>().on_update_node_drag({
-        let w = w.clone();
-        move |offset_x, offset_y| {
-            if let Some(w) = w.upgrade() {
-                let drag_state = w.global::<DragState>();
-                drag_state.set_drag_offset_x(offset_x);
-                drag_state.set_drag_offset_y(offset_y);
-            }
-        }
-    });
-
-    window.global::<GeometryCallbacks>().on_end_node_drag({
-        let dragged = dragged_node_id.clone();
-        move |delta_x, delta_y| {
-            let node_id = *dragged.borrow();
+    // Wire drag end with model update
+    window.global::<GeometryCallbacks>().on_end_node_drag(setup.on_end_node_drag({
+        let nodes = nodes.clone();
+        move |node_id, delta_x, delta_y| {
             for i in 0..nodes.row_count() {
                 if let Some(mut node) = nodes.row_data(i) {
                     if node.id == node_id {
@@ -79,28 +49,24 @@ fn main() {
                 }
             }
         }
-    });
+    }));
 
-    // Wire global computational callbacks
-    let computations = window.global::<NodeEditorComputations>();
+    // Wire computational callbacks (1 line each)
+    window.global::<NodeEditorComputations>().on_compute_link_path(setup.on_compute_link_path());
     
-    // Link path computation
-    computations.on_compute_link_path(ctrl.compute_link_path_callback());
-
-    // Viewport updates
-    computations.on_viewport_changed({
-        let ctrl = ctrl.clone();
+    window.global::<NodeEditorComputations>().on_viewport_changed({
+        let ctrl = setup.controller().clone();
         let w = w.clone();
-        move |z, pan_x, pan_y| {
+        move |zoom, pan_x, pan_y| {
             if let Some(w) = w.upgrade() {
-                ctrl.set_viewport(z, pan_x, pan_y);
+                ctrl.set_viewport(zoom, pan_x, pan_y);
                 w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
             }
         }
     });
     
     // Initial grid generation
-    window.set_grid_commands(ctrl.generate_initial_grid(window.get_width_(), window.get_height_()));
+    window.set_grid_commands(setup.controller().generate_initial_grid(window.get_width_(), window.get_height_()));
 
     window.run().unwrap();
 }

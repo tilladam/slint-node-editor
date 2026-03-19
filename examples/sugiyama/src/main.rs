@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::{sugiyama_layout, Direction, NodeEditorController, SugiyamaConfig};
+use slint_node_editor::{sugiyama_layout, Direction, NodeEditorSetup, SugiyamaConfig};
 
 slint::include_modules!();
 
@@ -27,7 +27,7 @@ fn build_node_index(nodes: &VecModel<NodeData>) -> HashMap<i32, usize> {
 
 fn main() {
     let window = MainWindow::new().unwrap();
-    let ctrl = NodeEditorController::new();
+    let setup = NodeEditorSetup::new();
     let w = window.as_weak();
 
     // Create a DAG with 8 nodes:
@@ -79,6 +79,7 @@ fn main() {
     window.on_layout_requested({
         let nodes = nodes.clone();
         let dag_edges = dag_edges.clone();
+        let w = w.clone();
         move || {
             let node_sizes: Vec<(i32, (f64, f64))> = (0..nodes.row_count())
                 .filter_map(|i| nodes.row_data(i))
@@ -103,12 +104,19 @@ fn main() {
                     }
                 }
             }
+            
+            // Increment version to trigger link recalculation
+            if let Some(w) = w.upgrade() {
+                let geom_ver = w.global::<GeometryVersion>();
+                geom_ver.set_version(geom_ver.get_version() + 1);
+            }
         }
     });
 
     // Scramble button callback
     window.on_scramble_requested({
         let nodes = nodes.clone();
+        let w = w.clone();
         move || {
             for i in 0..nodes.row_count() {
                 if let Some(mut node) = nodes.row_data(i) {
@@ -117,53 +125,24 @@ fn main() {
                     nodes.set_row_data(i, node);
                 }
             }
-        }
-    });
-
-    // Core callbacks
-    window.on_compute_link_path(ctrl.compute_link_path_callback());
-    window.on_node_drag_started(ctrl.node_drag_started_callback());
-
-    window.on_node_rect_changed({
-        let ctrl = ctrl.clone();
-        move |id, x, y, width, h| {
-            ctrl.handle_node_rect(id, x, y, width, h);
-        }
-    });
-
-    window.on_pin_position_changed({
-        let ctrl = ctrl.clone();
-        move |pid, nid, ptype, x, y| {
-            ctrl.handle_pin_position(pid, nid, ptype, x, y);
-        }
-    });
-
-    window.on_request_grid_update({
-        let ctrl = ctrl.clone();
-        let w = w.clone();
-        move || {
+            
+            // Increment version to trigger link recalculation
             if let Some(w) = w.upgrade() {
-                w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
+                let geom_ver = w.global::<GeometryVersion>();
+                geom_ver.set_version(geom_ver.get_version() + 1);
             }
         }
     });
 
-    window.on_update_viewport({
-        let ctrl = ctrl.clone();
-        let w = w.clone();
-        move |z, pan_x, pan_y| {
-            if let Some(w) = w.upgrade() {
-                ctrl.set_viewport(z, pan_x, pan_y);
-                w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
-            }
-        }
-    });
-
-    window.on_node_drag_ended({
-        let ctrl = ctrl.clone();
+    // Wire geometry callbacks using helper (4 lines instead of 20+)
+    window.global::<GeometryCallbacks>().on_report_node_rect(setup.on_report_node_rect());
+    window.global::<GeometryCallbacks>().on_report_pin_position(setup.on_report_pin_position());
+    window.global::<GeometryCallbacks>().on_start_node_drag(setup.on_start_node_drag());
+    
+    // Wire drag end with model update
+    window.global::<GeometryCallbacks>().on_end_node_drag(setup.on_end_node_drag({
         let nodes = nodes.clone();
-        move |delta_x, delta_y| {
-            let node_id = ctrl.dragged_node_id();
+        move |node_id, delta_x, delta_y| {
             for i in 0..nodes.row_count() {
                 if let Some(mut node) = nodes.row_data(i) {
                     if node.id == node_id {
@@ -175,8 +154,27 @@ fn main() {
                 }
             }
         }
+    }));
+
+    // Wire computational callbacks
+    window.global::<NodeEditorComputations>().on_compute_link_path(setup.on_compute_link_path());
+    
+    window.global::<NodeEditorComputations>().on_viewport_changed({
+        let ctrl = setup.controller().clone();
+        let w = w.clone();
+        move |zoom, pan_x, pan_y| {
+            if let Some(w) = w.upgrade() {
+                ctrl.set_viewport(zoom, pan_x, pan_y);
+                w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
+            }
+        }
     });
 
-    window.invoke_request_grid_update();
+    // Generate initial grid
+    window.set_grid_commands(setup.controller().generate_initial_grid(
+        window.get_width_(),
+        window.get_height_(),
+    ));
+
     window.run().unwrap();
 }
