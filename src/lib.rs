@@ -81,3 +81,31 @@ pub use controller::NodeEditorController;
 pub use setup::NodeEditorSetup;
 #[cfg(feature = "layout")]
 pub use layout::{sugiyama_layout, sugiyama_layout_from_cache, Direction, NodePosition, SugiyamaConfig};
+
+/// Wire up all NodeEditor callbacks with a single macro call.
+///
+/// This macro eliminates the boilerplate of wiring geometry and computation callbacks.
+/// It expands in your crate where the generated Slint types are available.
+///
+/// # Example
+///
+/// ```ignore
+/// use slint_node_editor::{NodeEditorSetup, wire_node_editor};
+///
+/// let setup = NodeEditorSetup::new(|node_id, dx, dy| {
+///     // Update your model
+/// });
+///
+/// wire_node_editor!(window, setup);
+/// ```
+#[macro_export]
+macro_rules! wire_node_editor {
+    ($window:expr, $setup:expr) => {{
+        let gc = $window.global::<GeometryCallbacks>();
+        gc.on_report_node_rect($setup.report_node_rect());
+        gc.on_report_pin_position($setup.report_pin_position());
+        gc.on_start_node_drag($setup.start_node_drag());
+        gc.on_end_node_drag($setup.end_node_drag());
+        $window.global::<NodeEditorComputations>().on_compute_link_path($setup.compute_link_path());
+    }};
+}

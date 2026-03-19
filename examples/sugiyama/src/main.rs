@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::{sugiyama_layout, Direction, NodeEditorSetup, SugiyamaConfig};
+use slint_node_editor::{sugiyama_layout, wire_node_editor, Direction, NodeEditorSetup, SugiyamaConfig};
 
 slint::include_modules!();
 
@@ -29,37 +29,41 @@ fn main() {
     let window = MainWindow::new().unwrap();
     let w = window.as_weak();
 
-    // Create a DAG with 8 nodes:
-    //
-    //   1 ──► 2 ──► 4 ──► 7
-    //   │     │     │
-    //   ▼     ▼     ▼
-    //   3 ──► 5 ──► 6 ──► 8
-    //
-    let nodes = Rc::new(VecModel::from(vec![
-        NodeData { id: 1, title: SharedString::from("Input"),     x: 50.0,  y: 50.0 },
-        NodeData { id: 2, title: SharedString::from("Parse"),     x: 50.0,  y: 120.0 },
-        NodeData { id: 3, title: SharedString::from("Validate"),  x: 50.0,  y: 190.0 },
-        NodeData { id: 4, title: SharedString::from("Transform"), x: 50.0,  y: 260.0 },
-        NodeData { id: 5, title: SharedString::from("Filter"),    x: 50.0,  y: 330.0 },
-        NodeData { id: 6, title: SharedString::from("Merge"),     x: 50.0,  y: 400.0 },
-        NodeData { id: 7, title: SharedString::from("Format"),    x: 50.0,  y: 470.0 },
-        NodeData { id: 8, title: SharedString::from("Output"),    x: 50.0,  y: 540.0 },
-    ]));
+    // Create a 50x50 grid of nodes (2500 nodes total)
+    const GRID_SIZE: i32 = 50;
+    let mut node_vec = Vec::with_capacity((GRID_SIZE * GRID_SIZE) as usize);
+    for row in 0..GRID_SIZE {
+        for col in 0..GRID_SIZE {
+            let id = row * GRID_SIZE + col + 1; // 1-based IDs
+            node_vec.push(NodeData {
+                id,
+                title: SharedString::from(format!("{},{}", row, col)),
+                x: (col * 140) as f32 + 50.0,
+                y: (row * 80) as f32 + 50.0,
+            });
+        }
+    }
+    let nodes = Rc::new(VecModel::from(node_vec));
     window.set_nodes(ModelRc::from(nodes.clone()));
 
-    // DAG edges as (source_node_id, target_node_id) — single source of truth
-    // Pin encoding: input = id*2, output = id*2+1
-    let dag_edges: Vec<(i32, i32)> = vec![
-        (1, 2), (1, 3),
-        (2, 4), (2, 5),
-        (3, 5),
-        (4, 6), (4, 7),
-        (5, 6),
-        (6, 8), (7, 8),
-    ];
+    // Create edges: each node connects to right neighbor and bottom neighbor
+    // This creates a DAG flowing right and down
+    let mut dag_edges: Vec<(i32, i32)> = Vec::new();
+    for row in 0..GRID_SIZE {
+        for col in 0..GRID_SIZE {
+            let id = row * GRID_SIZE + col + 1;
+            // Connect to right neighbor
+            if col < GRID_SIZE - 1 {
+                dag_edges.push((id, id + 1));
+            }
+            // Connect to bottom neighbor
+            if row < GRID_SIZE - 1 {
+                dag_edges.push((id, id + GRID_SIZE));
+            }
+        }
+    }
 
-    // Derive LinkData from dag_edges so they can't drift out of sync
+    // Derive LinkData from dag_edges
     let link_color = Color::from_argb_u8(255, 100, 180, 255);
     let link_data: Vec<LinkData> = dag_edges
         .iter()
@@ -150,15 +154,8 @@ fn main() {
         }
     });
 
-    // Wire geometry callbacks
-    let gc = window.global::<GeometryCallbacks>();
-    gc.on_report_node_rect(setup.report_node_rect());
-    gc.on_report_pin_position(setup.report_pin_position());
-    gc.on_start_node_drag(setup.start_node_drag());
-    gc.on_end_node_drag(setup.end_node_drag());
-
-    // Wire computational callbacks
-    window.global::<NodeEditorComputations>().on_compute_link_path(setup.compute_link_path());
+    // Wire all callbacks with one macro call
+    wire_node_editor!(window, setup);
     
     window.global::<NodeEditorComputations>().on_viewport_changed({
         let ctrl = setup.controller().clone();

@@ -1,5 +1,5 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::NodeEditorSetup;
+use slint_node_editor::{NodeEditorSetup, wire_node_editor};
 use std::rc::Rc;
 
 slint::include_modules!();
@@ -26,7 +26,7 @@ fn main() {
         },
     ]))));
     
-    // Create setup with model update logic - this is the ONLY callback you provide
+    // Create setup with model update logic
     let setup = NodeEditorSetup::new({
         let nodes = nodes.clone();
         move |node_id, delta_x, delta_y| {
@@ -43,16 +43,10 @@ fn main() {
         }
     });
 
-    // Wire geometry callbacks
-    let gc = window.global::<GeometryCallbacks>();
-    gc.on_report_node_rect(setup.report_node_rect());
-    gc.on_report_pin_position(setup.report_pin_position());
-    gc.on_start_node_drag(setup.start_node_drag());
-    gc.on_end_node_drag(setup.end_node_drag());
+    // Wire all callbacks with one macro call
+    wire_node_editor!(window, setup);
     
-    // Wire computational callbacks
-    window.global::<NodeEditorComputations>().on_compute_link_path(setup.compute_link_path());
-    
+    // Viewport change handling (for grid updates)
     window.global::<NodeEditorComputations>().on_viewport_changed({
         let ctrl = setup.controller().clone();
         let w = w.clone();
