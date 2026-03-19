@@ -3,6 +3,9 @@ import {
     BaseNode,
     Pin,
     PinTypes,
+    DragState,
+    GeometryCallbacks,
+    NodeEditorComputations,
     LinkData,
 } from "@slint-node-editor/node-editor.slint";
 
@@ -13,8 +16,8 @@ export struct NodeData {
     y: float,
 }
 
-// Re-export LinkData for Rust
-export { LinkData }
+// Re-export for Rust
+export { LinkData, DragState, GeometryCallbacks, NodeEditorComputations }
 
 component SimpleNode inherits BaseNode {
     in property <string> title: "Node";
@@ -22,7 +25,7 @@ component SimpleNode inherits BaseNode {
     node-width: 150px;
     node-height: 100px;
 
-    // Visual content
+    // Visual content - Add any bespoke UI here!
     Rectangle {
         width: 100%;
         height: 100%;
@@ -38,7 +41,7 @@ component SimpleNode inherits BaseNode {
         }
     }
 
-    // Single input pin
+    // Pins - no callback forwarding needed!
     Pin {
         x: 0px;
         y: root.node-height / 2 - self.height / 2;
@@ -47,12 +50,8 @@ component SimpleNode inherits BaseNode {
         pin-type: PinTypes.input;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
-        report-position(id, nid, type, x, y) => {
-            root.report-position(id, nid, type, x, y);
-        }
     }
 
-    // Single output pin
     Pin {
         x: root.node-width - self.width;
         y: root.node-height / 2 - self.height / 2;
@@ -61,13 +60,7 @@ component SimpleNode inherits BaseNode {
         pin-type: PinTypes.output;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
-        report-position(id, nid, type, x, y) => {
-            root.report-position(id, nid, type, x, y);
-        }
     }
-
-    // Helper to bubble up report-position
-    callback report-position(int, int, int, length, length);
 }
 
 export component MainWindow inherits Window {
@@ -78,64 +71,24 @@ export component MainWindow inherits Window {
     in property <[NodeData]> nodes;
     in property <[LinkData]> links <=> editor.links;
     in-out property <string> grid_commands <=> editor.grid-commands;
-    in-out property <int> dragged-node-id: 0;
 
     // Size for grid generation (used by Rust)
     out property <float> width_: self.width / 1px;
     out property <float> height_: self.height / 1px;
 
-    // Callbacks to Rust
-    callback node-rect-changed <=> editor.node-rect-changed;
-    callback pin-position-changed <=> editor.pin-position-changed;
-    callback request-grid-update <=> editor.request-grid-update;
-
-    // Function to refresh links after geometry is reported
-    public function refresh-links() {
-        editor.refresh-links();
-    }
-    callback update-viewport(/* zoom */ float, /* pan-x */ float, /* pan-y */ float);
-    callback node-drag-started <=> editor.node-drag-started;
-    callback node-drag-ended <=> editor.node-drag-ended;
-    pure callback compute-link-path <=> editor.compute-link-path;
-
     editor := NodeEditor {
         width: 100%;
         height: 100%;
+        grid-snapping: true;  // Disable grid snapping for testing
 
-        viewport-changed => {
-            root.update-viewport(self.zoom, self.pan-x / 1px, self.pan-y / 1px);
-        }
-
+        // Zero boilerplate! Drag offsets computed automatically in BaseNode
         for data in root.nodes: SimpleNode {
             node-id: data.id;
             title: data.title;
             world-x: data.x * 1px;
             world-y: data.y * 1px;
-            zoom: editor.zoom;
-            pan-x: editor.pan-x;
-            pan-y: editor.pan-y;
             viewport-width: editor.width;
             viewport-height: editor.height;
-            drag-offset-x: data.id == root.dragged-node-id ? editor.drag-offset-x : 0px;
-            drag-offset-y: data.id == root.dragged-node-id ? editor.drag-offset-y : 0px;
-
-            report-rect(id, x, y, w, h) => {
-                editor.report-node-rect(id, x, y, w, h);
-            }
-            report-position(pid, nid, pt, x, y) => {
-                editor.report-pin-position(pid, nid, pt, x, y);
-            }
-            drag-started(id, already-selected, wx, wy) => {
-                root.dragged-node-id = id;
-                editor.start-node-drag(id, already-selected, wx, wy);
-            }
-            drag-moved(id, dx, dy) => {
-                editor.update-node-drag(dx, dy);
-            }
-            drag-ended(id, dx, dy) => {
-                root.dragged-node-id = 0;
-                editor.end-node-drag(dx, dy);
-            }
         }
     }
 }

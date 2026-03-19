@@ -91,8 +91,11 @@ impl MinimalTestHarness {
         let links = Rc::new(VecModel::from(links));
         window.set_links(ModelRc::from(links.clone()));
 
+        // Wire global computational callbacks
+        let computations = window.global::<NodeEditorComputations>();
+        
         // Core callbacks - controller handles the logic
-        window.on_compute_link_path(ctrl.compute_link_path_callback());
+        computations.on_compute_link_path(ctrl.compute_link_path_callback());
         window.on_node_drag_started({
             let ctrl = ctrl.clone();
             let tracker = tracker.clone();
@@ -132,7 +135,7 @@ impl MinimalTestHarness {
             }
         });
 
-        window.on_update_viewport({
+        computations.on_viewport_changed({
             let ctrl = ctrl.clone();
             let tracker = tracker.clone();
             let w = w.clone();

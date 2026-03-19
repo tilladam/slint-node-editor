@@ -1,6 +1,7 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::NodeEditorController;
 use std::rc::Rc;
+use std::cell::RefCell;
 
 slint::include_modules!();
 
@@ -8,6 +9,9 @@ fn main() {
     let window = MainWindow::new().unwrap();
     let ctrl = NodeEditorController::new();
     let w = window.as_weak();
+    
+    // Track dragged node ID locally
+    let dragged_node_id = Rc::new(RefCell::new(0i32));
 
     // Set up nodes (keep reference for drag updates)
     let nodes = Rc::new(VecModel::from(vec![
@@ -27,52 +31,43 @@ fn main() {
         },
     ]))));
 
-    // Core callbacks - controller handles the logic
-    window.on_compute_link_path(ctrl.compute_link_path_callback());
-    window.on_node_drag_started(ctrl.node_drag_started_callback());
-
-    // Geometry tracking - update cache
-    window.on_node_rect_changed({
+    // Wire GeometryCallbacks to controller
+    window.global::<GeometryCallbacks>().on_report_node_rect({
         let ctrl = ctrl.clone();
         move |id, x, y, width, h| {
             ctrl.handle_node_rect(id, x, y, width, h);
         }
     });
 
-    window.on_pin_position_changed({
+    window.global::<GeometryCallbacks>().on_report_pin_position({
         let ctrl = ctrl.clone();
         move |pid, nid, ptype, x, y| {
             ctrl.handle_pin_position(pid, nid, ptype, x, y);
         }
     });
+    
+    window.global::<GeometryCallbacks>().on_start_node_drag({
+        let dragged = dragged_node_id.clone();
+        move |node_id, _already_selected, _world_x, _world_y| {
+            *dragged.borrow_mut() = node_id;
+        }
+    });
 
-    // Grid updates
-    window.on_request_grid_update({
-        let ctrl = ctrl.clone();
+    window.global::<GeometryCallbacks>().on_update_node_drag({
         let w = w.clone();
-        move || {
+        move |offset_x, offset_y| {
             if let Some(w) = w.upgrade() {
-                w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
+                let drag_state = w.global::<DragState>();
+                drag_state.set_drag_offset_x(offset_x);
+                drag_state.set_drag_offset_y(offset_y);
             }
         }
     });
 
-    window.on_update_viewport({
-        let ctrl = ctrl.clone();
-        let w = w.clone();
-        move |z, pan_x, pan_y| {
-            if let Some(w) = w.upgrade() {
-                ctrl.set_zoom(z);
-                w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
-            }
-        }
-    });
-
-    // Node drag - update positions in model
-    window.on_node_drag_ended({
-        let ctrl = ctrl.clone();
+    window.global::<GeometryCallbacks>().on_end_node_drag({
+        let dragged = dragged_node_id.clone();
         move |delta_x, delta_y| {
-            let node_id = ctrl.dragged_node_id();
+            let node_id = *dragged.borrow();
             for i in 0..nodes.row_count() {
                 if let Some(mut node) = nodes.row_data(i) {
                     if node.id == node_id {
@@ -86,6 +81,26 @@ fn main() {
         }
     });
 
-    window.invoke_request_grid_update();
+    // Wire global computational callbacks
+    let computations = window.global::<NodeEditorComputations>();
+    
+    // Link path computation
+    computations.on_compute_link_path(ctrl.compute_link_path_callback());
+
+    // Viewport updates
+    computations.on_viewport_changed({
+        let ctrl = ctrl.clone();
+        let w = w.clone();
+        move |z, pan_x, pan_y| {
+            if let Some(w) = w.upgrade() {
+                ctrl.set_viewport(z, pan_x, pan_y);
+                w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
+            }
+        }
+    });
+    
+    // Initial grid generation
+    window.set_grid_commands(ctrl.generate_initial_grid(window.get_width_(), window.get_height_()));
+
     window.run().unwrap();
 }

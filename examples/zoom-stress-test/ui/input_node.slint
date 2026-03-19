@@ -11,7 +11,7 @@
 // - Minimal (zoom <= 0.25): Colored rectangle with title
 
 import { LineEdit, SpinBox, ComboBox } from "std-widgets.slint";
-import { Pin, PinTypes, BaseNode } from "@slint-node-editor/node-editor.slint";
+import { Pin, PinTypes, BaseNode, ViewportState } from "@slint-node-editor/node-editor.slint";
 
 // Input node data passed from Rust
 export struct InputNodeData {
@@ -47,8 +47,8 @@ export component InputNode inherits BaseNode {
     in property <length> min-node-height: 40px;
 
     // LOD level: 2=full, 1=simplified, 0=minimal
-    property <int> lod-level: self.zoom > lod-full-threshold ? 2
-                            : self.zoom > lod-simplified-threshold ? 1
+    property <int> lod-level: ViewportState.zoom > lod-full-threshold ? 2
+                            : ViewportState.zoom > lod-simplified-threshold ? 1
                             : 0;
 
     // === Layout constants ===

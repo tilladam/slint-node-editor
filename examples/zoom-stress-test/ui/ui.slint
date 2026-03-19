@@ -102,9 +102,6 @@ export component MainWindow inherits Window {
             title: data.title;
             world-x: data.world-x * 1px;
             world-y: data.world-y * 1px;
-            pan-x: editor.pan-x;
-            pan-y: editor.pan-y;
-            zoom: editor.zoom;
             text-value: data.text-value;
             spin-value: data.spin-value;
             combo-index: data.combo-index;
@@ -114,22 +111,6 @@ export component MainWindow inherits Window {
             min-node-width: editor.min-node-width;
             min-node-height: editor.min-node-height;
 
-            report-rect(id, x, y, w, h) => {
-                editor.report-node-rect(id, x, y, w, h);
-            }
-            pin-position-changed(pin-id, node-id, pin-type, x, y) => {
-                editor.report-pin-position(pin-id, node-id, pin-type, x, y);
-            }
-            pin-drag-started(pin-id, x, y) => {
-                editor.start-link-from-pin(pin-id, x, y);
-            }
-            pin-drag-moved(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-            }
-            pin-drag-ended(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-                editor.complete-link-creation();
-            }
             text-changed(id, val) => {
                 root.input-text-changed(id, val);
             }
@@ -147,9 +128,6 @@ export component MainWindow inherits Window {
             title: data.title;
             world-x: data.world-x * 1px;
             world-y: data.world-y * 1px;
-            pan-x: editor.pan-x;
-            pan-y: editor.pan-y;
-            zoom: editor.zoom;
             check-a: data.check-a;
             check-b: data.check-b;
             switch-value: data.switch-value;
@@ -160,22 +138,6 @@ export component MainWindow inherits Window {
             min-node-width: editor.min-node-width;
             min-node-height: editor.min-node-height;
 
-            report-rect(id, x, y, w, h) => {
-                editor.report-node-rect(id, x, y, w, h);
-            }
-            pin-position-changed(pin-id, node-id, pin-type, x, y) => {
-                editor.report-pin-position(pin-id, node-id, pin-type, x, y);
-            }
-            pin-drag-started(pin-id, x, y) => {
-                editor.start-link-from-pin(pin-id, x, y);
-            }
-            pin-drag-moved(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-            }
-            pin-drag-ended(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-                editor.complete-link-creation();
-            }
             check-a-toggled(id, val) => {
                 root.control-check-a-toggled(id, val);
             }
@@ -199,9 +161,6 @@ export component MainWindow inherits Window {
             title: data.title;
             world-x: data.world-x * 1px;
             world-y: data.world-y * 1px;
-            pan-x: editor.pan-x;
-            pan-y: editor.pan-y;
-            zoom: editor.zoom;
             progress: data.progress;
             status-text: data.status-text;
             color-r: data.color-r;
@@ -213,23 +172,6 @@ export component MainWindow inherits Window {
             lod-simplified-threshold: editor.lod-simplified-threshold;
             min-node-width: editor.min-node-width;
             min-node-height: editor.min-node-height;
-
-            report-rect(id, x, y, w, h) => {
-                editor.report-node-rect(id, x, y, w, h);
-            }
-            pin-position-changed(pin-id, node-id, pin-type, x, y) => {
-                editor.report-pin-position(pin-id, node-id, pin-type, x, y);
-            }
-            pin-drag-started(pin-id, x, y) => {
-                editor.start-link-from-pin(pin-id, x, y);
-            }
-            pin-drag-moved(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-            }
-            pin-drag-ended(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-                editor.complete-link-creation();
-            }
         }
     }
 

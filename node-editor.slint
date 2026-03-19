@@ -32,6 +32,11 @@
 // Import building blocks and re-export for users
 import {
     PinTypes,
+    ViewportState,
+    DragState,
+    GeometryVersion,
+    GeometryCallbacks,
+    NodeEditorComputations,
     NodeStyleDefaults,
     MinimapNode,
     MinimapPosition,
@@ -40,9 +45,8 @@ import {
     Link,
     BaseNode,
     Pin,
-    WorldContent,
 } from "node-editor-building-blocks.slint";
-export { PinTypes, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, Minimap, Link, BaseNode, Pin, WorldContent }
+export { PinTypes, ViewportState, DragState, GeometryVersion, GeometryCallbacks, NodeEditorComputations, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, Minimap, Link, BaseNode, Pin }
 
 /// Modifier key for triggering box selection over nodes/links
 export enum BoxSelectionModifier {
@@ -69,6 +73,13 @@ export component NodeEditor {
     in-out property <length> pan-x: 0px;
     in-out property <length> pan-y: 0px;
     in-out property <float> zoom: 1.0;
+
+    // Sync viewport state to global for child components
+    init => {
+        ViewportState.zoom = root.zoom;
+        ViewportState.pan-x = root.pan-x;
+        ViewportState.pan-y = root.pan-y;
+    }
 
     // === Grid properties ===
     in property <length> grid-spacing: 24px;
@@ -124,6 +135,7 @@ export component NodeEditor {
 
     // === Node drag state ===
     out property <bool> is-dragging: root.internal-is-dragging;
+    out property <int> dragged-node-id: root.internal-dragged-node-id;
     out property <length> drag-offset-x: root.internal-drag-offset-x;
     out property <length> drag-offset-y: root.internal-drag-offset-y;
 
@@ -180,6 +192,7 @@ export component NodeEditor {
     property <length> internal-link-end-y;
 
     property <bool> internal-is-dragging: false;
+    property <int> internal-dragged-node-id: 0;
     property <length> internal-drag-offset-x: 0px;
     property <length> internal-drag-offset-y: 0px;
     property <length> internal-drag-origin-x: 0px;
@@ -219,19 +232,11 @@ export component NodeEditor {
     /// Compute link preview path
     callback compute-link-preview-path(/* start-x */ length, /* start-y */ length, /* end-x */ length, /* end-y */ length) -> string;
 
-    /// Compute link path from pin IDs. Used to render links from `links` property.
-    /// Returns SVG path commands string, or empty string if pins not found.
-    /// The version parameter forces re-evaluation when geometry changes (pass geometry-version).
-    /// Zoom and pan are passed directly so the pure callback always uses the exact
-    /// viewport values that Slint is using for node positioning.
-    pure callback compute-link-path(/* start-pin-id */ int, /* end-pin-id */ int, /* version */ int, /* zoom */ float, /* pan-x */ float, /* pan-y */ float) -> string;
-
     // === Callbacks TO Application (events) ===
     callback link-requested(/* start-pin */ int, /* end-pin */ int);
     callback link-cancelled();
     callback link-hovered();
     callback selection-changed();
-    callback viewport-changed();
     callback delete-selected();
     callback add-node-requested();
     callback context-menu-requested();
@@ -246,11 +251,6 @@ export component NodeEditor {
     /// Pin position reporting (for application-side tracking)
     /// Note: node-id and pin-type are passed explicitly so the library doesn't prescribe any pin ID encoding scheme
     callback pin-position-changed(/* pin-id */ int, /* node-id */ int, /* pin-type */ int, /* rel-x */ length, /* rel-y */ length);
-
-    // === Selection Checking (implemented by application) ===
-    // Note: version parameter forces re-evaluation when selection changes (pure callback cache invalidation)
-    pure callback is-selected(/* node-id */ int, /* version */ int) -> bool;
-    pure callback is-link-selected(/* link-id */ int, /* version */ int) -> bool;
 
     // === Selection version counter (for dependency tracking) ===
     // This counter is incremented whenever selection changes, allowing bindings
@@ -267,13 +267,13 @@ export component NodeEditor {
 
     /// Report node rectangle change. Auto-increments geometry-version.
     public function report-node-rect(id: int, x: length, y: length, w: length, h: length) {
-        root.geometry-version += 1;
+        GeometryVersion.version += 1;
         root.node-rect-changed(id, x, y, w, h);
     }
 
     /// Report pin position change. Auto-increments geometry-version.
     public function report-pin-position(pin-id: int, node-id: int, pin-type: int, rel-x: length, rel-y: length) {
-        root.geometry-version += 1;
+        GeometryVersion.version += 1;
         root.pin-position-changed(pin-id, node-id, pin-type, rel-x, rel-y);
     }
 
@@ -371,6 +371,7 @@ export component NodeEditor {
             root.select-node(node-id, false);
         }
         root.internal-is-dragging = true;
+        root.internal-dragged-node-id = node-id;
         root.internal-drag-offset-x = 0px;
         root.internal-drag-offset-y = 0px;
         root.internal-drag-origin-x = world-x;
@@ -396,23 +397,41 @@ export component NodeEditor {
 
         // THEN reset visual offset (now report-rect will find model already updated)
         root.internal-is-dragging = false;
+        root.internal-dragged-node-id = 0;
         root.internal-drag-offset-x = 0px;
         root.internal-drag-offset-y = 0px;
     }
 
     // === Trigger updates on viewport changes ===
     changed pan-x => {
+        ViewportState.pan-x = root.pan-x;
         request-grid-update();
-        viewport-changed();
+        NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
     }
     changed pan-y => {
+        ViewportState.pan-y = root.pan-y;
         request-grid-update();
-        viewport-changed();
+        NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
     }
     changed zoom => {
-        root.geometry-version += 1;
+        ViewportState.zoom = root.zoom;
+        GeometryVersion.version += 1;
         request-grid-update();
-        viewport-changed();
+        NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
+    }
+    
+    // Sync drag state to global
+    changed internal-is-dragging => {
+        DragState.is-dragging = root.internal-is-dragging;
+    }
+    changed internal-dragged-node-id => {
+        DragState.dragged-node-id = root.internal-dragged-node-id;
+    }
+    changed internal-drag-offset-x => {
+        DragState.drag-offset-x = root.internal-drag-offset-x;
+    }
+    changed internal-drag-offset-y => {
+        DragState.drag-offset-y = root.internal-drag-offset-y;
     }
     changed width => {
         request-grid-update();
@@ -423,9 +442,9 @@ export component NodeEditor {
 
     /// Call this after initial geometry has been reported to force link path recomputation.
     public function refresh-links() {
-        root.geometry-version += 1;
+        GeometryVersion.version += 1;
         // Also trigger viewport-changed to force a repaint
-        root.viewport-changed();
+        NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
     }
 
     // === Minimap Positioning ===
@@ -578,32 +597,25 @@ export component NodeEditor {
     }
 
     // === Layer 2: World Content (scaled) ===
-    // Container at origin with transform-scale. Nodes position themselves such that
-    // after scaling, they appear at the correct screen position.
-    // Node position = (world * zoom + pan) / zoom, so after scale: position * zoom = world * zoom + pan ✓
-    // WorldContent exposes zoom/pan/viewport so child nodes auto-inherit these values.
-    world-content := WorldContent {
-        x: 0px;
-        y: 0px;
+    // Container positioned at pan offset with transform-scale for zoom.
+    // Nodes use pure world coordinates (x: world-x, y: world-y).
+    // After transform: screen = pan + world * zoom ✓
+    world-content := Rectangle {
+        x: root.pan-x;
+        y: root.pan-y;
         width: 100000px;  // Large enough for any world content
         height: 100000px;
         transform-origin: { x: 0, y: 0 };
         transform-scale: root.zoom;
+        background: transparent;
         clip: false;
-        
-        // Expose transform state to child nodes
-        zoom: root.zoom;
-        pan-x: root.pan-x;
-        pan-y: root.pan-y;
-        viewport-width: root.width;
-        viewport-height: root.height;
 
         // Render links from `links` property
         for link in root.links: Link {
-            path-commands: root.compute-link-path(link.start-pin-id, link.end-pin-id, root.geometry-version, root.zoom, root.pan-x / 1px, root.pan-y / 1px);
+            path-commands: NodeEditorComputations.compute-link-path(link.start-pin-id, link.end-pin-id, GeometryVersion.version, root.zoom, root.pan-x / 1px, root.pan-y / 1px);
             link-color: link.color;
             line-width: link.line-width > 0 ? link.line-width * 1px : 2px;
-            selected: root.is-link-selected(link.id, root.selection-version);
+            selected: NodeEditorComputations.is-link-selected(link.id, root.selection-version);
             hovered: root.hovered-link-id == link.id;
         }
 
