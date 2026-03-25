@@ -82,7 +82,7 @@ component Node inherits BaseNode {
     in property <int> output-pin-id: PinId.make(self.node-id, PinTypes.output);
 
     // Pin dimensions (scaled by zoom)
-    property <length> pin-size: NodeConstants.pin-size ;
+    property <length> pin-size: NodeConstants.pin-size;
     property <length> pin-radius: pin-size / 2;
 
     // Base dimensions (from global constants)
@@ -96,22 +96,22 @@ component Node inherits BaseNode {
     out property <length> output-pin-y: self.screen-y + output-pin.center-y;
 
     // Set dimensions
-    width: base-width ;
-    height: base-height ;
+    width: base-width;
+    height: base-height;
 
     // Title bar
     Rectangle {
-        x: 8px ;
-        y: 8px ;
-        width: parent.width - 16px ;
-        height: 24px ;
+        x: 8px;
+        y: 8px;
+        width: parent.width - 16px;
+        height: 24px;
         background: root.selected ? #4a6a9a : #3d3d3d;
-        border-radius: 4px ;
+        border-radius: 4px;
 
         Text {
             text: root.title;
             color: white;
-            font-size: 14px ;
+            font-size: 14px;
             horizontal-alignment: center;
             vertical-alignment: center;
         }

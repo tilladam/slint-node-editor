@@ -1,4 +1,12 @@
-import { NodeEditor, BaseNode, Pin, PinTypes, LinkData, NodeEditorComputations, GeometryCallbacks } from "@slint-node-editor/node-editor.slint";
+import {
+    NodeEditor,
+    BaseNode,
+    Pin,
+    PinTypes,
+    LinkData,
+    NodeEditorComputations,
+    GeometryCallbacks,
+} from "@slint-node-editor/node-editor.slint";
 import { ComboBox } from "std-widgets.slint";
 
 export struct NodeData {
@@ -7,7 +15,6 @@ export struct NodeData {
     x: float,
     y: float,
 }
-
 export { LinkData, NodeEditorComputations, GeometryCallbacks }
 
 component SimpleNode inherits BaseNode {
@@ -111,7 +118,6 @@ export component MainWindow inherits Window {
         HorizontalLayout {
             padding: 10px;
             spacing: 10px;
-            
             Text {
                 text: "Link Style:";
                 color: white;

@@ -35,8 +35,8 @@ export struct FilterNodeData {
 export component ControlPin inherits Pin {
     in-out property <bool> pulse-state: false;
     border-radius: 4px;
-    width: pulse-state ? 24px : 10px ;  // 20% bigger when pulsed (20 * 1.2 = 24)
-    height: pulse-state ? 24px : 10px ;
+    width: pulse-state ? 24px : 10px;  // 20% bigger when pulsed (20 * 1.2 = 24)
+    height: pulse-state ? 24px : 10px;
     background: #FFC107;
     border-color: #FF9800;
 
@@ -77,7 +77,7 @@ export component FilterNode inherits BaseNode {
 
     // Pin dimensions (scaled by root.zoom)
     property <length> base-pin-size: 12px;
-    property <length> pin-size: base-pin-size ;
+    property <length> pin-size: base-pin-size;
     property <length> pin-radius: pin-size / 2;
     property <length> pin-margin: 4px;
 
@@ -95,28 +95,28 @@ export component FilterNode inherits BaseNode {
 
     // Pin Y positions - centered on each content row
     // Account for: VerticalLayout padding + title + HorizontalLayout padding-top + row offset
-    property <length> row-1-center: (content-padding + title-height + content-padding + row-height / 2) ;
-    property <length> row-2-center: (content-padding + title-height + content-padding + row-height + row-height / 2) ;
+    property <length> row-1-center: (content-padding + title-height + content-padding + row-height / 2);
+    property <length> row-2-center: (content-padding + title-height + content-padding + row-height + row-height / 2);
 
     // Set dimensions
-    width: base-width ;
-    height: base-height ;
+    width: base-width;
+    height: base-height;
 
     // Main layout
     VerticalLayout {
-        padding: root.content-padding ;
+        padding: root.content-padding;
         spacing: 0px;
 
         // Title bar
         Rectangle {
-            height: root.title-height ;
+            height: root.title-height;
             background: root.selected ? #6a4a9a : #4a3d5d;
-            border-radius: 4px ;
+            border-radius: 4px;
 
             Text {
                 text: root.title;
                 color: white;
-                font-size: 14px ;
+                font-size: 14px;
                 horizontal-alignment: center;
                 vertical-alignment: center;
             }
@@ -124,60 +124,60 @@ export component FilterNode inherits BaseNode {
 
         // Content area with left/right margins for pins
         HorizontalLayout {
-            padding-top: root.content-padding ;
+            padding-top: root.content-padding;
 
             // Left pin labels column
             VerticalLayout {
-                width: pin-area-width ;
+                width: pin-area-width;
                 spacing: 0px;
 
                 // Row 1: Data input label
                 Rectangle {
-                    height: row-height ;
+                    height: row-height;
                     Text {
-                        x: 16px ;
+                        x: 16px;
                         text: "In";
                         color: #888;
-                        font-size: 10px ;
+                        font-size: 10px;
                         vertical-alignment: center;
                     }
                 }
 
                 // Row 2: Control input label
                 Rectangle {
-                    height: row-height ;
+                    height: row-height;
                     Text {
-                        x: 16px ;
+                        x: 16px;
                         text: "Ctrl";
                         color: #888;
-                        font-size: 10px ;
+                        font-size: 10px;
                         vertical-alignment: center;
                     }
                 }
 
                 // Row 3: empty
                 Rectangle {
-                    height: row-height ;
+                    height: row-height;
                 }
             }
 
             // Center content
             VerticalLayout {
-                spacing: 4px ;
+                spacing: 4px;
                 horizontal-stretch: 1;
 
                 // Row 1: Filter type selector
                 HorizontalLayout {
-                    height: row-height ;
-                    spacing: 8px ;
+                    height: row-height;
+                    spacing: 8px;
                     alignment: stretch;
-                    padding-top: 4px ;
-                    padding-bottom: 4px ;
+                    padding-top: 4px;
+                    padding-bottom: 4px;
 
                     Text {
                         text: "Type:";
                         color: #aaa;
-                        font-size: 11px ;
+                        font-size: 11px;
                         vertical-alignment: center;
                     }
 
@@ -193,34 +193,34 @@ export component FilterNode inherits BaseNode {
 
                 // Row 2: Status row
                 HorizontalLayout {
-                    height: row-height ;
-                    spacing: 12px ;
+                    height: row-height;
+                    spacing: 12px;
                     alignment: start;
-                    padding-top: 4px ;
-                    padding-bottom: 4px ;
+                    padding-top: 4px;
+                    padding-bottom: 4px;
 
                     Text {
                         text: root.enabled ? "Active" : "Bypassed";
                         color: root.enabled ? #8f8 : #f88;
-                        font-size: 12px ;
+                        font-size: 12px;
                         vertical-alignment: center;
                     }
 
                     Text {
                         text: "Count: " + root.processed-count;
                         color: #888;
-                        font-size: 11px ;
+                        font-size: 11px;
                         vertical-alignment: center;
                     }
                 }
 
                 // Row 3: Button row
                 HorizontalLayout {
-                    height: row-height ;
-                    spacing: 8px ;
+                    height: row-height;
+                    spacing: 8px;
                     alignment: start;
-                    padding-top: 2px ;
-                    padding-bottom: 2px ;
+                    padding-top: 2px;
+                    padding-bottom: 2px;
 
                     Button {
                         text: root.enabled ? "Bypass" : "Enable";
@@ -240,18 +240,18 @@ export component FilterNode inherits BaseNode {
 
             // Right pin labels column
             VerticalLayout {
-                width: pin-area-width ;
+                width: pin-area-width;
                 spacing: 0px;
 
                 // Row 1: Data output label
                 Rectangle {
-                    height: row-height ;
+                    height: row-height;
                     Text {
                         x: 0px;
-                        width: parent.width - 16px ;
+                        width: parent.width - 16px;
                         text: "Out";
                         color: #888;
-                        font-size: 10px ;
+                        font-size: 10px;
                         vertical-alignment: center;
                         horizontal-alignment: right;
                     }
@@ -259,7 +259,7 @@ export component FilterNode inherits BaseNode {
 
                 // Rows 2-3: empty
                 Rectangle {
-                    height: row-height  * 2;
+                    height: row-height * 2;
                 }
             }
         }

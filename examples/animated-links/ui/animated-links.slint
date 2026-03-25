@@ -1,4 +1,14 @@
-import { NodeEditor, BaseNode, Pin, PinTypes, LinkData, NodeEditorComputations, GeometryCallbacks, ViewportState, GeometryVersion } from "@slint-node-editor/node-editor.slint";
+import {
+    NodeEditor,
+    BaseNode,
+    Pin,
+    PinTypes,
+    LinkData,
+    NodeEditorComputations,
+    GeometryCallbacks,
+    ViewportState,
+    GeometryVersion,
+} from "@slint-node-editor/node-editor.slint";
 
 export struct NodeData {
     id: int,
@@ -50,11 +60,8 @@ component AnimatedLink inherits Rectangle {
         height: 100%;
         // Apply dash pattern based on progress (creates grow effect)
         // Estimate path length as ~500px for bezier, adjust dash accordingly
-        stroke: selected ? link-color.brighter(50%) :
-                (hovered ? link-color.brighter(25%) : link-color);
-        stroke-width: selected ? line-width * 1.5 :
-                      (hovered ? line-width * 1.25 :
-                       (glow-intensity > 0.1 ? line-width * (1.0 + glow-intensity * 0.5) : line-width));
+        stroke: selected ? link-color.brighter(50%) : (hovered ? link-color.brighter(25%) : link-color);
+        stroke-width: selected ? line-width * 1.5 : (hovered ? line-width * 1.25 : (glow-intensity > 0.1 ? line-width * (1.0 + glow-intensity * 0.5) : line-width));
         fill: transparent;
 
         viewbox-x: 0;
@@ -85,13 +92,13 @@ component AnimatedLink inherits Rectangle {
 component SimpleNode inherits BaseNode {
     in property <string> title: "Node";
     in property <color> accent-color: #4a9eff;
-    width: 150px ;
-    height: 100px ;
+    width: 150px;
+    height: 100px;
 
     Rectangle {
         background: root.selected ? accent-color.darker(60%) : #333;
-        border-radius: 6px ;
-        border-width: root.selected ? 2px  : 1px ;
+        border-radius: 6px;
+        border-width: root.selected ? 2px : 1px;
         border-color: root.selected ? accent-color : #666;
 
         // Animated gradient overlay
@@ -99,16 +106,16 @@ component SimpleNode inherits BaseNode {
             x: 0;
             y: 0;
             width: parent.width;
-            height: 30px ;
-            border-radius: 6px ;
+            height: 30px;
+            border-radius: 6px;
             background: @linear-gradient(180deg, accent-color.with-alpha(0.3) 0%, transparent 100%);
             clip: true;
 
             // Only round top corners
             Rectangle {
-                y: parent.height - 6px ;
+                y: parent.height - 6px;
                 width: parent.width;
-                height: 6px ;
+                height: 6px;
                 background: root.selected ? accent-color.darker(60%) : #333;
             }
         }
@@ -116,7 +123,7 @@ component SimpleNode inherits BaseNode {
         Text {
             text: root.title;
             color: white;
-            font-size: 14px ;
+            font-size: 14px;
             font-weight: 600;
         }
     }
@@ -132,9 +139,15 @@ component SimpleNode inherits BaseNode {
         hover-color: accent-color;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
-        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
-        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
-        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+        drag-started(id, x, y) => {
+            root.pin-drag-started(id, x, y);
+        }
+        drag-moved(id, x, y) => {
+            root.pin-drag-moved(id, x, y);
+        }
+        drag-ended(id, x, y) => {
+            root.pin-drag-ended(id, x, y);
+        }
     }
 
     // Output pin (right side)
@@ -148,9 +161,15 @@ component SimpleNode inherits BaseNode {
         hover-color: accent-color;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
-        drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
-        drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
-        drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
+        drag-started(id, x, y) => {
+            root.pin-drag-started(id, x, y);
+        }
+        drag-moved(id, x, y) => {
+            root.pin-drag-moved(id, x, y);
+        }
+        drag-ended(id, x, y) => {
+            root.pin-drag-ended(id, x, y);
+        }
     }
 }
 
@@ -215,10 +234,7 @@ export component MainWindow inherits Window {
         for data in root.nodes: SimpleNode {
             node-id: data.id;
             title: data.title;
-            accent-color: data.id == 1 ? #ff6b6b :
-                          data.id == 2 ? #4ecdc4 :
-                          data.id == 3 ? #ffe66d :
-                          data.id == 4 ? #a855f7 : #4a9eff;
+            accent-color: data.id == 1 ? #ff6b6b : data.id == 2 ? #4ecdc4 : data.id == 3 ? #ffe66d : data.id == 4 ? #a855f7 : #4a9eff;
             world-x: data.x * 1px;
             world-y: data.y * 1px;
             viewport-width: root.width;
@@ -280,10 +296,30 @@ export component MainWindow inherits Window {
                     padding: 8px;
                     spacing: 3px;
 
-                    Text { text: "Features"; color: #88aaff; font-size: 10px; font-weight: 600; }
-                    Text { text: "- Links snake/grow from source to target"; color: #cccccc; font-size: 9px; }
-                    Text { text: "- Glow effect on new connections"; color: #cccccc; font-size: 9px; }
-                    Text { text: "- Color cycling for each new link"; color: #cccccc; font-size: 9px; }
+                    Text {
+                        text: "Features";
+                        color: #88aaff;
+                        font-size: 10px;
+                        font-weight: 600;
+                    }
+
+                    Text {
+                        text: "- Links snake/grow from source to target";
+                        color: #cccccc;
+                        font-size: 9px;
+                    }
+
+                    Text {
+                        text: "- Glow effect on new connections";
+                        color: #cccccc;
+                        font-size: 9px;
+                    }
+
+                    Text {
+                        text: "- Color cycling for each new link";
+                        color: #cccccc;
+                        font-size: 9px;
+                    }
                 }
             }
 
@@ -297,11 +333,36 @@ export component MainWindow inherits Window {
                     padding: 8px;
                     spacing: 3px;
 
-                    Text { text: "Controls"; color: #88aaff; font-size: 10px; font-weight: 600; }
-                    Text { text: "Create link: Drag output pin to input pin"; color: #cccccc; font-size: 9px; }
-                    Text { text: "Pan view: Middle mouse button drag"; color: #cccccc; font-size: 9px; }
-                    Text { text: "Zoom: Mouse scroll wheel"; color: #cccccc; font-size: 9px; }
-                    Text { text: "Move node: Left mouse drag on node"; color: #cccccc; font-size: 9px; }
+                    Text {
+                        text: "Controls";
+                        color: #88aaff;
+                        font-size: 10px;
+                        font-weight: 600;
+                    }
+
+                    Text {
+                        text: "Create link: Drag output pin to input pin";
+                        color: #cccccc;
+                        font-size: 9px;
+                    }
+
+                    Text {
+                        text: "Pan view: Middle mouse button drag";
+                        color: #cccccc;
+                        font-size: 9px;
+                    }
+
+                    Text {
+                        text: "Zoom: Mouse scroll wheel";
+                        color: #cccccc;
+                        font-size: 9px;
+                    }
+
+                    Text {
+                        text: "Move node: Left mouse drag on node";
+                        color: #cccccc;
+                        font-size: 9px;
+                    }
                 }
             }
         }

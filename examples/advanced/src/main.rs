@@ -5,8 +5,9 @@
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    GraphLogic, LinkModel, MovableNode, NodeEditorController, SelectionManager,
+    GraphLogic, LinkModel, MovableNode, NodeEditorSetup, SelectionManager,
     BasicLinkValidator, NoDuplicatesValidator, CompositeValidator, LinkValidator, ValidationResult,
+    wire_node_editor,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -168,7 +169,6 @@ fn build_minimap_nodes(
 
 fn main() {
     let window = MainWindow::new().unwrap();
-    let ctrl = NodeEditorController::new();
 
     let selection_manager = Rc::new(RefCell::new(SelectionManager::new()));
     let link_selection_manager = Rc::new(RefCell::new(SelectionManager::new()));
@@ -247,8 +247,20 @@ fn main() {
     let filter_width = filter_node_constants.get_base_width();
     let filter_height = filter_node_constants.get_base_height();
 
+    // Create setup with model update logic for both node types
+    let setup = NodeEditorSetup::new({
+        let nodes = nodes.clone();
+        let filter_nodes = filter_nodes.clone();
+        let sm = selection_manager.clone();
+        move |_node_id, delta_x, delta_y| {
+            let sm = sm.borrow();
+            GraphLogic::commit_drag(&nodes, &sm, delta_x, delta_y);
+            GraphLogic::commit_drag(&filter_nodes, &sm, delta_x, delta_y);
+        }
+    });
+
     // Configure controller
-    ctrl.set_grid_spacing(node_constants.get_grid_spacing());
+    setup.controller().set_grid_spacing(node_constants.get_grid_spacing());
 
     // Create selection models
     let selected_node_ids: Rc<VecModel<i32>> = Rc::new(VecModel::default());
@@ -268,8 +280,11 @@ fn main() {
 
     // === Computation Callbacks ===
 
+    // Wire standard callbacks with one macro call
+    wire_node_editor!(window, setup);
+
     window.on_request_grid_update({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let w = window.as_weak();
         move || {
             if let Some(w) = w.upgrade() {
@@ -278,22 +293,8 @@ fn main() {
         }
     });
 
-    window.global::<GeometryCallbacks>().on_report_pin_position({
-        let ctrl = ctrl.clone();
-        move |pin_id, node_id, pin_type, rel_x, rel_y| {
-            ctrl.handle_pin_position(pin_id, node_id, pin_type, rel_x, rel_y);
-        }
-    });
-
-    window.global::<GeometryCallbacks>().on_report_node_rect({
-        let ctrl = ctrl.clone();
-        move |id, x, y, width, height| {
-            ctrl.handle_node_rect(id, x, y, width, height);
-        }
-    });
-
     window.on_compute_pin_at({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let w = window.as_weak();
         move |x, y| {
             let w = match w.upgrade() { Some(w) => w, None => return 0 };
@@ -302,7 +303,7 @@ fn main() {
     });
 
     window.on_compute_link_at({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let links = links.clone();
         let w = window.as_weak();
         move |x, y| {
@@ -315,32 +316,20 @@ fn main() {
     });
 
     window.on_compute_box_selection({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         move |x, y, w, h| {
             ModelRc::from(Rc::new(VecModel::from(ctrl.cache().borrow().nodes_in_selection_box(x as f32, y as f32, w as f32, h as f32))))
         }
     });
 
     window.on_compute_link_box_selection({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let links = links.clone();
         move |x, y, w, h| {
             let cache = ctrl.cache();
             let cache = cache.borrow();
             let link_iter = (0..links.row_count()).filter_map(|i| links.row_data(i)).map(|l| (l.id, l.start_pin_id, l.end_pin_id));
             ModelRc::from(Rc::new(VecModel::from(cache.links_in_selection_box(x as f32, y as f32, w as f32, h as f32, link_iter))))
-        }
-    });
-
-    window.global::<NodeEditorComputations>().on_compute_link_path({
-        let ctrl = ctrl.clone();
-        let w = window.as_weak();
-        move |start_pin, end_pin, _version, _zoom: f32, _pan_x: f32, _pan_y: f32| {
-            let w = match w.upgrade() { Some(w) => w, None => return SharedString::default() };
-            ctrl.cache().borrow()
-                .compute_link_path(start_pin, end_pin, w.get_zoom(), w.get_bezier_min_offset())
-                .unwrap_or_default()
-                .into()
         }
     });
 
@@ -436,7 +425,7 @@ fn main() {
     // === Event Callbacks ===
 
     window.on_create_link({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let links = links.clone();
         let next_link_id = next_link_id.clone();
         let color_index = color_index.clone();
@@ -481,7 +470,7 @@ fn main() {
 
     // Viewport change handling (grid updates) - now via NodeEditorComputations global
     window.global::<NodeEditorComputations>().on_viewport_changed({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let w = window.as_weak();
         move |zoom, pan_x, pan_y| {
             let w = match w.upgrade() { Some(w) => w, None => return };
@@ -492,17 +481,8 @@ fn main() {
         }
     });
 
-    let nodes_for_drag = nodes.clone();
-    let filter_nodes_for_drag = filter_nodes.clone();
-    let sm_drag = selection_manager.clone();
-    window.on_commit_drag(move |dx, dy| {
-        let sm = sm_drag.borrow();
-        GraphLogic::commit_drag(&nodes_for_drag, &sm, dx, dy);
-        GraphLogic::commit_drag(&filter_nodes_for_drag, &sm, dx, dy);
-    });
-
     window.on_delete_selected_nodes({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let nodes = nodes.clone();
         let filter_nodes = filter_nodes.clone();
         let links = links.clone();
