@@ -83,12 +83,6 @@ fn main() {
     // Wire all standard callbacks with one macro call
     wire_node_editor!(window, setup);
 
-    // Pin hit testing
-    window.on_compute_pin_at({
-        let ctrl = setup.controller().clone();
-        move |x, y| ctrl.cache().borrow().find_pin_at(x as f32, y as f32, 10.0)
-    });
-
     // Link preview path generation
     window.on_compute_link_preview_path({
         let ctrl = setup.controller().clone();

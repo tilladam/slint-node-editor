@@ -119,6 +119,12 @@ export global NodeEditorComputations {
     pure callback is-link-selected(
         /* link-id */ int,
         /* selection-version */ int) -> bool;
+    
+    /// Compute pin ID at screen coordinates (for hit testing)
+    pure callback compute-pin-at(
+        /* x */ float,
+        /* y */ float,
+        /* pin-hit-radius */ float) -> int;
 }
 
 /// Optional layout helpers for common node structures.

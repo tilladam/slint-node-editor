@@ -283,15 +283,6 @@ fn main() {
     // Wire standard callbacks with one macro call
     wire_node_editor!(window, setup);
 
-    window.on_compute_pin_at({
-        let ctrl = setup.controller().clone();
-        let w = window.as_weak();
-        move |x, y| {
-            let w = match w.upgrade() { Some(w) => w, None => return 0 };
-            ctrl.cache().borrow().find_pin_at(x as f32, y as f32, w.get_pin_hit_radius() as f32)
-        }
-    });
-
     window.on_compute_link_at({
         let ctrl = setup.controller().clone();
         let links = links.clone();

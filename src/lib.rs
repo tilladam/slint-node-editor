@@ -106,7 +106,15 @@ macro_rules! wire_node_editor {
         gc.on_report_pin_position($setup.report_pin_position());
         gc.on_start_node_drag($setup.start_node_drag());
         gc.on_end_node_drag($setup.end_node_drag());
-        $window.global::<NodeEditorComputations>().on_compute_link_path($setup.compute_link_path());
+        
+        let computations = $window.global::<NodeEditorComputations>();
+        computations.on_compute_link_path($setup.compute_link_path());
+        
+        // Wire compute-pin-at for automatic pin hit testing
+        let ctrl = $setup.controller().clone();
+        computations.on_compute_pin_at(move |x, y, radius| {
+            ctrl.cache().borrow().find_pin_at(x, y, radius)
+        });
         
         // Wire viewport_changed for automatic grid updates
         let ctrl = $setup.controller().clone();

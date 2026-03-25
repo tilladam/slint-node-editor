@@ -309,9 +309,12 @@ export component NodeEditor {
     public function complete-link-creation() {
         if root.internal-is-creating-link {
             // Call compute-pin-at and request link if valid
-            // Note: We call link-requested with the result directly since Slint
-            // doesn't support local variables. The callback checks for pin ID != 0.
-            root.try-complete-link(root.compute-pin-at(root.internal-link-end-x, root.internal-link-end-y));
+            // Note: Convert screen coords to world coords since pin positions are stored in world space
+            // world = (screen - pan) / zoom
+            root.try-complete-link(NodeEditorComputations.compute-pin-at(
+                (root.internal-link-end-x - root.pan-x) / root.zoom / 1px,
+                (root.internal-link-end-y - root.pan-y) / root.zoom / 1px,
+                root.pin-hit-radius / root.zoom / 1px));
             root.internal-is-creating-link = false;
         }
     }

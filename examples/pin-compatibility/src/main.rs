@@ -208,16 +208,6 @@ fn main() {
     // Wire all standard callbacks with one macro call
     wire_node_editor!(window, setup);
 
-    // Pin hit detection for link completion
-    window.on_compute_pin_at({
-        let ctrl = setup.controller().clone();
-        move |x, y| {
-            let result = ctrl.cache().borrow().find_pin_at(x as f32, y as f32, 20.0);
-            println!("compute_pin_at({}, {}) = {}", x, y, result);
-            result
-        }
-    });
-
     // Link validation callback for hover feedback
     window.on_validate_link({
         let ctrl = setup.controller().clone();
