@@ -632,6 +632,10 @@ export component NodeEditor {
             }
 
             moved => {
+                // Update screen mouse coordinates (unaffected by transform-scale)
+                ViewportState.screen-mouse-x = self.mouse-x;
+                ViewportState.screen-mouse-y = self.mouse-y;
+                
                 if root.internal-is-panning {
                     root.pan-x = root.pan-start-offset-x + (self.mouse-x - root.pan-start-mouse-x);
                     root.pan-y = root.pan-start-offset-y + (self.mouse-y - root.pan-start-mouse-y);

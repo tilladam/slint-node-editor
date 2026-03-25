@@ -27,6 +27,9 @@ export global ViewportState {
     in-out property <length> pan-x: 0px;
     /// Current pan Y offset (updated by NodeEditor)
     in-out property <length> pan-y: 0px;
+    /// True screen mouse coordinates (unaffected by transform-scale)
+    in-out property <length> screen-mouse-x: 0px;
+    in-out property <length> screen-mouse-y: 0px;
 }
 
 /// Drag state shared from NodeEditor to all child nodes.
@@ -600,9 +603,13 @@ export component BaseNode inherits Rectangle {
             if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                 shift-held = event.modifiers.shift;
                 is-dragging = false;
-                // Store ABSOLUTE mouse position to avoid coordinate system issues
-                start-abs-x = self.absolute-position.x + self.mouse-x;
-                start-abs-y = self.absolute-position.y + self.mouse-y;
+                
+                // Calculate and store true screen mouse position immediately
+                // absolute-position is in screen space, but self.mouse-x/y is in world space (inside scaled container)
+                ViewportState.screen-mouse-x = self.absolute-position.x + self.mouse-x * ViewportState.zoom;
+                ViewportState.screen-mouse-y = self.absolute-position.y + self.mouse-y * ViewportState.zoom;
+                start-abs-x = ViewportState.screen-mouse-x;
+                start-abs-y = ViewportState.screen-mouse-y;
                 current-drag-offset-x = 0px;
                 current-drag-offset-y = 0px;
                 was-selected-on-press = selected;
@@ -653,9 +660,15 @@ export component BaseNode inherits Rectangle {
 
         moved => {
             if self.pressed {
-                // Calculate offset from start position using absolute coordinates
+                // Update screen mouse coordinates
+                // absolute-position is in screen space, but self.mouse-x/y is in world space (inside scaled container)
+                // So: screen_mouse = absolute_position + mouse_in_world * zoom
+                ViewportState.screen-mouse-x = self.absolute-position.x + self.mouse-x * ViewportState.zoom;
+                ViewportState.screen-mouse-y = self.absolute-position.y + self.mouse-y * ViewportState.zoom;
+                
+                // Calculate offset from start position using true screen coordinates
                 if !is-dragging {
-                    if abs((self.absolute-position.x + self.mouse-x) - start-abs-x) > drag-threshold || abs((self.absolute-position.y + self.mouse-y) - start-abs-y) > drag-threshold {
+                    if abs(ViewportState.screen-mouse-x - start-abs-x) > drag-threshold || abs(ViewportState.screen-mouse-y - start-abs-y) > drag-threshold {
                         is-dragging = true;
                         GeometryCallbacks.start-node-drag(node-id, selected, world-x, world-y);
                         // Set global drag state for multi-node drag
@@ -664,8 +677,10 @@ export component BaseNode inherits Rectangle {
                     }
                 }
                 if is-dragging {
-                    current-drag-offset-x = ((self.absolute-position.x + self.mouse-x) - start-abs-x) / ViewportState.zoom;
-                    current-drag-offset-y = ((self.absolute-position.y + self.mouse-y) - start-abs-y) / ViewportState.zoom;
+                    // Calculate drag offset using true screen coordinates
+                    current-drag-offset-x = (ViewportState.screen-mouse-x - start-abs-x) / ViewportState.zoom;
+                    current-drag-offset-y = (ViewportState.screen-mouse-y - start-abs-y) / ViewportState.zoom;
+                    
                     GeometryCallbacks.update-node-drag(current-drag-offset-x, current-drag-offset-y);
                     // Update global drag offset for other selected nodes
                     DragState.drag-offset-x = current-drag-offset-x;
