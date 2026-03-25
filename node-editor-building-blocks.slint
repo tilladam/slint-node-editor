@@ -66,6 +66,17 @@ export global LinkCreation {
     in-out property <length> current-y: 0px;
 }
 
+/// Selection request state - updated by BaseNode, consumed by NodeEditor.
+/// This allows BaseNode to trigger selection without manual callback forwarding.
+export global SelectionRequest {
+    /// Version counter - incremented on every selection request
+    in-out property <int> version: 0;
+    /// The node ID to select
+    in-out property <int> node-id: 0;
+    /// Whether shift key was held
+    in-out property <bool> shift-held: false;
+}
+
 /// Internal geometry callback registry.
 /// NodeEditor's Rust code wires these up automatically - examples don't touch this!
 /// BaseNode/Pin components call these to report geometry and interactions.
@@ -542,6 +553,16 @@ export component BaseNode inherits Rectangle {
             GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
+    changed world-pos-x => {
+        if (node-id > 0) {
+            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+        }
+    }
+    changed world-pos-y => {
+        if (node-id > 0) {
+            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+        }
+    }
 
     // === Double-click detection ===
     property <bool> dbl-click-armed: false;
@@ -587,7 +608,9 @@ export component BaseNode inherits Rectangle {
                 // Only select immediately if shift is held (multi-select toggle)
                 // or if node is not already selected
                 if shift-held || !selected {
-                    GeometryCallbacks.click-node(node-id, shift-held);
+                    SelectionRequest.node-id = node-id;
+                    SelectionRequest.shift-held = shift-held;
+                    SelectionRequest.version += 1;
                 }
                 // If node is already selected and shift not held, defer selection
                 // until we know if it's a drag or a click
@@ -610,7 +633,9 @@ export component BaseNode inherits Rectangle {
                 } else {
                     // Click without drag - if we deferred selection, do it now
                     if was-selected-on-press && !shift-held {
-                        GeometryCallbacks.click-node(node-id, shift-held);
+                        SelectionRequest.node-id = node-id;
+                        SelectionRequest.shift-held = shift-held;
+                        SelectionRequest.version += 1;
                     }
                     // Double-click detection
                     if root.dbl-click-armed {

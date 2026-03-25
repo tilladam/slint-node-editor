@@ -277,6 +277,9 @@ export component MainWindow inherits Window {
         grid-commands <=> root.grid-commands;
         links <=> root.links;
 
+        // Enable link selection
+        has-link-selection: true;
+
         // Set pin hit radius from globals
         pin-hit-radius: NodeConstants.pin-size * zoom * 0.66;
         link-hover-distance: 8px;
