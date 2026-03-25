@@ -169,6 +169,8 @@ export component NodeEditor {
     // === Box selection modifier configuration ===
     /// Allow box selection on click on empty area (no modifier needed)
     in property <bool> box-selection-on-empty: true;
+    /// Whether link hit-testing is enabled (set to true if compute-link-at is wired)
+    in property <bool> has-link-selection: false;
     /// Modifier key that enables box selection even over links/nodes
     in property <BoxSelectionModifier> box-selection-modifier: BoxSelectionModifier.ctrl;
 
@@ -215,17 +217,17 @@ export component NodeEditor {
     /// Compute links in selection box, returns array of IDs
     callback compute-link-box-selection(/* x */ length, /* y */ length, /* w */ length, /* h */ length) -> [int];
 
-    /// Select a node (called on click). Rust handles the selection logic.
-    callback select-node(/* node-id */ int, /* shift-held */ bool);
-
     /// Select a link (called on click). Rust handles the selection logic.
     callback select-link(/* link-id */ int, /* shift-held */ bool);
 
-    /// Clear all selection
-    callback clear-selection();
-
     /// Sync selection IDs to node data (called after box selection)
     callback sync-selection-to-nodes([int]);
+
+    /// Notification callback when node selection changes (for application tracking)
+    callback node-selected(/* node-id */ int, /* shift-held */ bool);
+
+    /// Notification callback when selection is cleared (for application tracking)
+    callback selection-cleared();
 
     /// Sync selection IDs to link data (called after box selection)
     callback sync-selection-to-links([int]);
@@ -362,7 +364,34 @@ export component NodeEditor {
         root.select-link(link-id, shift-held);
     }
 
-    /// Handle node click selection - delegates to Rust via callback
+    /// Select a node by ID. If shift-held is false, clears existing selection first.
+    /// For shift-select (adding to selection), the application must handle via node-selected callback.
+    public function select-node(node-id: int, shift-held: bool) {
+        if !shift-held {
+            // Simple single-node selection: clear and set to this node
+            root.selected-node-ids = [node-id];
+            root.selected-link-ids = [];
+            NodeEditorComputations.sync-selection-to-nodes(root.selected-node-ids);
+            root.sync-selection-to-links([]);
+            root.selection-version += 1;
+            root.selection-changed();
+        }
+        // Notify application (for shift-select, app handles adding to selection)
+        root.node-selected(node-id, shift-held);
+    }
+
+    /// Clear all selection
+    public function clear-selection() {
+        root.selected-node-ids = [];
+        root.selected-link-ids = [];
+        NodeEditorComputations.sync-selection-to-nodes([]);
+        root.sync-selection-to-links([]);
+        root.selection-version += 1;
+        root.selection-changed();
+        root.selection-cleared();
+    }
+
+    /// Handle node click selection - calls select-node
     public function handle-node-click(node-id: int, shift-held: bool) {
         root.select-node(node-id, shift-held);
     }
@@ -537,7 +566,8 @@ export component NodeEditor {
                         // Check if box selection should start based on configuration
                         // Modifier key can force box selection even over links
                         // Empty area allows box selection if box-selection-on-empty is true
-                        if (root.box-selection-modifier == BoxSelectionModifier.ctrl && event.modifiers.control) || (root.box-selection-modifier == BoxSelectionModifier.alt && event.modifiers.alt) || (root.box-selection-modifier == BoxSelectionModifier.shift && event.modifiers.shift) || (root.box-selection-on-empty && root.compute-link-at(self.mouse-x, self.mouse-y) < 0) {
+                        // If has-link-selection is false, skip link hit testing entirely
+                        if (root.box-selection-modifier == BoxSelectionModifier.ctrl && event.modifiers.control) || (root.box-selection-modifier == BoxSelectionModifier.alt && event.modifiers.alt) || (root.box-selection-modifier == BoxSelectionModifier.shift && event.modifiers.shift) || (root.box-selection-on-empty && (!root.has-link-selection || root.compute-link-at(self.mouse-x, self.mouse-y) < 0)) {
                             // Start box selection
                             root.internal-is-box-selecting = true;
                             root.box-start-x = self.mouse-x;
@@ -549,7 +579,7 @@ export component NodeEditor {
                                 root.selected-link-ids = [];
                                 root.clear-selection();
                             }
-                        } else if root.compute-link-at(self.mouse-x, self.mouse-y) >= 0 {
+                        } else if root.has-link-selection && root.compute-link-at(self.mouse-x, self.mouse-y) >= 0 {
                             // Clicked on a link - select it
                             root.select-link(root.compute-link-at(self.mouse-x, self.mouse-y), event.modifiers.shift);
                         }
@@ -565,15 +595,19 @@ export component NodeEditor {
                     }
                     if root.internal-is-box-selecting && event.button == PointerEventButton.left {
                         root.internal-is-box-selecting = false;
-                        // Compute selected nodes and links
-                        root.selected-node-ids = root.compute-box-selection(
-                            root.selection-x, root.selection-y,
-                            root.selection-width, root.selection-height);
+                        // Convert selection box from screen to world coordinates for node hit testing
+                        // For nodes: world = (screen - pan) / zoom
+                        root.selected-node-ids = NodeEditorComputations.compute-box-selection(
+                            (root.selection-x - root.pan-x) / root.zoom / 1px,
+                            (root.selection-y - root.pan-y) / root.zoom / 1px,
+                            root.selection-width / root.zoom / 1px,
+                            root.selection-height / root.zoom / 1px);
                         root.selected-link-ids = root.compute-link-box-selection(
                             root.selection-x, root.selection-y,
                             root.selection-width, root.selection-height);
-                        root.sync-selection-to-nodes(root.selected-node-ids);
+                        NodeEditorComputations.sync-selection-to-nodes(root.selected-node-ids);
                         root.sync-selection-to-links(root.selected-link-ids);
+                        root.selection-version += 1;
                         root.selection-changed();
                     }
                     if root.internal-is-creating-link && event.button == PointerEventButton.left {
@@ -582,7 +616,7 @@ export component NodeEditor {
                 }
                 if event.kind == PointerEventKind.move {
                     // Link hover detection when not doing other interactions
-                    if !root.internal-is-panning && !root.internal-is-box-selecting && !root.internal-is-creating-link {
+                    if root.has-link-selection && !root.internal-is-panning && !root.internal-is-box-selecting && !root.internal-is-creating-link {
                         root.update-link-hover(root.compute-link-at(self.mouse-x, self.mouse-y));
                     }
                 }

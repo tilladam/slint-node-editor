@@ -59,7 +59,7 @@ component ValidatedPin inherits Rectangle {
     in property <int> valid-target-pin-id: 0;  // Pin ID that's a valid drop target
 
     property <bool> is-valid-target: root.valid-target-pin-id == root.pin-id && root.pin-id > 0;
-    property <length> pin-size: 12px * ViewportState.zoom;
+    property <length> pin-size: 12px;
 
     width: pin-size;
     height: pin-size;
@@ -69,8 +69,8 @@ component ValidatedPin inherits Rectangle {
         node-id: root.node-id;
         pin-type: root.pin-type;
         base-color: root.base-color;
-        node-screen-x: root.node-screen-x + root.x * ViewportState.zoom;
-        node-screen-y: root.node-screen-y + root.y * ViewportState.zoom;
+        node-screen-x: root.node-screen-x;  // Just pass through - library handles offset via parent-offset
+        node-screen-y: root.node-screen-y;
         parent-offset-x: root.x;
         parent-offset-y: root.y;
         refresh-trigger: root.refresh-trigger;

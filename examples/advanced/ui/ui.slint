@@ -184,7 +184,6 @@ export component MainWindow inherits Window {
     callback request-grid-update <=> editor.request-grid-update;
     callback compute-pin-at <=> editor.compute-pin-at;
     callback compute-link-at <=> editor.compute-link-at;
-    callback compute-box-selection <=> editor.compute-box-selection;
     callback compute-link-box-selection <=> editor.compute-link-box-selection;
     // Note: compute-link-path, compute-link-preview-path, node-rect, and pin-position are now handled via globals
 
@@ -213,11 +212,10 @@ export component MainWindow inherits Window {
     in-out property <[int]> selected-node-ids <=> editor.selected-node-ids;
     in-out property <[int]> selected-link-ids <=> editor.selected-link-ids;
 
-    // Selection manipulation callbacks (implemented by Rust)
-    callback select-node <=> editor.select-node;
+    // Selection notification callbacks (NodeEditor handles selection logic internally)
+    callback node-selected <=> editor.node-selected;
     callback select-link <=> editor.select-link;
-    callback clear-selection <=> editor.clear-selection;
-    callback sync-selection-to-nodes <=> editor.sync-selection-to-nodes;
+    callback selection-cleared <=> editor.selection-cleared;
     callback sync-selection-to-links <=> editor.sync-selection-to-links;
 
     // Selection checking is now via NodeEditorComputations global

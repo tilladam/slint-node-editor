@@ -105,6 +105,7 @@ export component MainWindow inherits Window {
                 title: data.title;
                 world-x: data.x * 1px;
                 world-y: data.y * 1px;
+                selected: NodeEditorComputations.is-node-selected(data.id, editor.selection-version);
             }
         }
     }

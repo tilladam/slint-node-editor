@@ -296,13 +296,6 @@ fn main() {
         }
     });
 
-    window.on_compute_box_selection({
-        let ctrl = setup.controller().clone();
-        move |x, y, w, h| {
-            ModelRc::from(Rc::new(VecModel::from(ctrl.cache().borrow().nodes_in_selection_box(x as f32, y as f32, w as f32, h as f32))))
-        }
-    });
-
     window.on_compute_link_box_selection({
         let ctrl = setup.controller().clone();
         let links = links.clone();
@@ -322,25 +315,30 @@ fn main() {
     let lsm_check = link_selection_manager.clone();
     window.global::<NodeEditorComputations>().on_is_link_selected(move |id, _version| lsm_check.borrow().contains(id));
 
-    // === Selection Manipulation Callbacks ===
+    // === Selection Notification Callbacks ===
+    // NodeEditor handles basic selection logic internally. These callbacks allow the app
+    // to perform additional actions (like clearing link selection when a node is selected).
 
-    let sn_ids = selected_node_ids.clone();
     let sl_ids = selected_link_ids.clone();
-    let sm_select = selection_manager.clone();
     let lsm_select = link_selection_manager.clone();
-    let window_for_select_node = window.as_weak();
-    window.on_select_node(move |node_id, shift| {
+    let sm_for_shift = selection_manager.clone();
+    let sn_ids_shift = selected_node_ids.clone();
+    let window_for_node_selected = window.as_weak();
+    window.on_node_selected(move |node_id, shift| {
+        // Clear link selection when a node is selected
         lsm_select.borrow_mut().clear();
         lsm_select.borrow().sync_to_model(&*sl_ids);
 
-        let mut sm = sm_select.borrow_mut();
-        sm.handle_interaction(node_id, shift);
-        sm.sync_to_model(&*sn_ids);
-
-        if let Some(w) = window_for_select_node.upgrade() {
-            w.set_selection_version(w.get_selection_version() + 1);
-            w.invoke_selection_changed();
+        if shift {
+            // For shift-select, NodeEditor doesn't modify selection, app must handle it
+            let mut sm = sm_for_shift.borrow_mut();
+            sm.handle_interaction(node_id, true);
+            sm.sync_to_model(&*sn_ids_shift);
+            if let Some(w) = window_for_node_selected.upgrade() {
+                w.set_selection_version(w.get_selection_version() + 1);
+            }
         }
+        // For non-shift, NodeEditor already updated selection and version
     });
 
     let sn_ids_l = selected_node_ids.clone();
@@ -366,35 +364,23 @@ fn main() {
         }
     });
 
-    let sn_ids_c = selected_node_ids.clone();
     let sl_ids_c = selected_link_ids.clone();
-    let sm_clear = selection_manager.clone();
     let lsm_clear = link_selection_manager.clone();
-    let window_for_clear = window.as_weak();
-    window.on_clear_selection(move || {
-        sm_clear.borrow_mut().clear();
-        sm_clear.borrow().sync_to_model(&*sn_ids_c);
+    window.on_selection_cleared(move || {
+        // NodeEditor already cleared node selection, just clear link selection
         lsm_clear.borrow_mut().clear();
         lsm_clear.borrow().sync_to_model(&*sl_ids_c);
-
-        if let Some(w) = window_for_clear.upgrade() {
-            w.set_selection_version(w.get_selection_version() + 1);
-            w.invoke_selection_changed();
-        }
     });
 
+    // Override global selection sync to use our SelectionManager (NodeEditor increments selection-version)
     let sm_sync = selection_manager.clone();
-    let window_for_sync = window.as_weak();
-    window.on_sync_selection_to_nodes(move |ids_model| {
+    window.global::<NodeEditorComputations>().on_sync_selection_to_nodes(move |ids_model| {
         sm_sync.borrow_mut().sync_from_model(&ids_model);
-        if let Some(w) = window_for_sync.upgrade() { w.set_selection_version(w.get_selection_version() + 1); }
     });
 
     let lsm_sync = link_selection_manager.clone();
-    let window_for_sync_links = window.as_weak();
     window.on_sync_selection_to_links(move |ids_model| {
         lsm_sync.borrow_mut().sync_from_model(&ids_model);
-        if let Some(w) = window_for_sync_links.upgrade() { w.set_selection_version(w.get_selection_version() + 1); }
     });
 
     // === Event Callbacks ===

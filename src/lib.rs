@@ -84,8 +84,8 @@ pub use layout::{sugiyama_layout, sugiyama_layout_from_cache, Direction, NodePos
 
 /// Wire up all NodeEditor callbacks with a single macro call.
 ///
-/// This macro eliminates the boilerplate of wiring geometry and computation callbacks.
-/// It expands in your crate where the generated Slint types are available.
+/// This macro sets up default behavior for geometry tracking, computations, and grid updates.
+/// You can override any callback after calling this macro - the last `.on_*()` call wins.
 ///
 /// # Example
 ///
@@ -97,31 +97,58 @@ pub use layout::{sugiyama_layout, sugiyama_layout_from_cache, Direction, NodePos
 /// });
 ///
 /// wire_node_editor!(window, setup);
+///
+/// // Override specific callbacks if needed:
+/// // window.global::<NodeEditorComputations>().on_compute_pin_at(|x, y, radius| { ... });
 /// ```
 #[macro_export]
 macro_rules! wire_node_editor {
     ($window:expr, $setup:expr) => {{
+        // Geometry tracking
         let gc = $window.global::<GeometryCallbacks>();
         gc.on_report_node_rect($setup.report_node_rect());
         gc.on_report_pin_position($setup.report_pin_position());
         gc.on_start_node_drag($setup.start_node_drag());
         gc.on_end_node_drag($setup.end_node_drag());
         
+        // Computations
         let computations = $window.global::<NodeEditorComputations>();
         computations.on_compute_link_path($setup.compute_link_path());
         
-        // Wire compute-pin-at for automatic pin hit testing
         let ctrl = $setup.controller().clone();
         computations.on_compute_pin_at(move |x, y, radius| {
             ctrl.cache().borrow().find_pin_at(x, y, radius)
         });
         
-        // Wire compute-link-preview-path for link creation preview
         computations.on_compute_link_preview_path(|start_x, start_y, end_x, end_y, zoom, bezier_offset| {
             slint_node_editor::generate_bezier_path(start_x, start_y, end_x, end_y, zoom, bezier_offset).into()
         });
         
-        // Wire viewport_changed for automatic grid updates
+        let ctrl = $setup.controller().clone();
+        computations.on_compute_box_selection(move |x, y, w, h| {
+            let ids = ctrl.cache().borrow().nodes_in_selection_box(x, y, w, h);
+            ids.as_slice().into()
+        });
+        
+        // Selection state tracking - uses setup's internal selection set
+        let selection_set = $setup.selection();
+        
+        let sm_check = selection_set.clone();
+        computations.on_is_node_selected(move |id, _version| sm_check.borrow().contains(&id));
+        
+        let sm_update = selection_set.clone();
+        computations.on_sync_selection_to_nodes(move |ids_model| {
+            use slint::Model;
+            let mut set = sm_update.borrow_mut();
+            set.clear();
+            for i in 0..ids_model.row_count() {
+                if let Some(id) = ids_model.row_data(i) {
+                    set.insert(id);
+                }
+            }
+        });
+        
+        // Auto grid updates
         let ctrl = $setup.controller().clone();
         let w = $window.as_weak();
         $window.global::<NodeEditorComputations>().on_viewport_changed(move |zoom, pan_x, pan_y| {
@@ -131,7 +158,7 @@ macro_rules! wire_node_editor {
             }
         });
         
-        // Generate initial grid
+        // Initial grid
         let ctrl = $setup.controller().clone();
         let w = $window.as_weak();
         if let Some(w) = w.upgrade() {

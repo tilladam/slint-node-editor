@@ -96,17 +96,15 @@ export component MainWindow inherits Window {
     callback context-menu-requested <=> editor.context-menu-requested;
     callback add-node-requested <=> editor.add-node-requested;
 
-    // Selection callbacks
-    callback select-node <=> editor.select-node;
+    // Selection callbacks (node-selected and selection-cleared are notifications)
+    callback node-selected <=> editor.node-selected;
     callback select-link <=> editor.select-link;
-    callback clear-selection <=> editor.clear-selection;
-    callback sync-selection-to-nodes <=> editor.sync-selection-to-nodes;
+    callback selection-cleared <=> editor.selection-cleared;
     callback sync-selection-to-links <=> editor.sync-selection-to-links;
 
     // Compute callbacks (tests use globals instead of these)
     callback compute-pin-at <=> editor.compute-pin-at;
     callback compute-link-at <=> editor.compute-link-at;
-    callback compute-box-selection <=> editor.compute-box-selection;
     callback compute-link-box-selection <=> editor.compute-link-box-selection;
 
     // Function to refresh links after geometry is reported

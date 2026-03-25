@@ -47,6 +47,7 @@
 
 use crate::controller::NodeEditorController;
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 /// Setup helper that bundles NodeEditorController and automatic model updates.
@@ -54,6 +55,7 @@ use std::rc::Rc;
 /// This helper eliminates boilerplate by:
 /// - Managing the controller lifecycle
 /// - Tracking dragged node ID internally  
+/// - Tracking selection for multi-node drag
 /// - Calling your model-update closure automatically on drag end
 pub struct NodeEditorSetup<F>
 where
@@ -61,6 +63,7 @@ where
 {
     controller: Rc<NodeEditorController>,
     dragged_node_id: Rc<RefCell<i32>>,
+    selection: Rc<RefCell<HashSet<i32>>>,
     on_node_moved: Rc<F>,
 }
 
@@ -76,6 +79,7 @@ where
         Self {
             controller: Rc::new(NodeEditorController::new()),
             dragged_node_id: Rc::new(RefCell::new(0i32)),
+            selection: Rc::new(RefCell::new(HashSet::new())),
             on_node_moved: Rc::new(on_node_moved),
         }
     }
@@ -83,6 +87,11 @@ where
     /// Get access to the underlying controller for advanced operations.
     pub fn controller(&self) -> &NodeEditorController {
         &self.controller
+    }
+    
+    /// Get access to the selection set for the macro to wire up.
+    pub fn selection(&self) -> Rc<RefCell<HashSet<i32>>> {
+        self.selection.clone()
     }
 
     /// Callback for `GeometryCallbacks.on_report_node_rect`.
@@ -112,12 +121,24 @@ where
     /// Callback for `GeometryCallbacks.on_end_node_drag`.
     /// 
     /// This automatically calls your model-update closure with the dragged node ID.
+    /// If the dragged node is part of a multi-node selection, all selected nodes are moved.
     pub fn end_node_drag(&self) -> impl Fn(f32, f32) + 'static {
         let dragged = self.dragged_node_id.clone();
+        let selection = self.selection.clone();
         let on_moved = self.on_node_moved.clone();
         move |delta_x, delta_y| {
             let node_id = *dragged.borrow();
-            on_moved(node_id, delta_x, delta_y);
+            let sel = selection.borrow();
+            
+            // If dragged node is in a multi-node selection, move all selected nodes
+            if sel.contains(&node_id) && sel.len() > 1 {
+                for &id in sel.iter() {
+                    on_moved(id, delta_x, delta_y);
+                }
+            } else {
+                // Single node drag
+                on_moved(node_id, delta_x, delta_y);
+            }
         }
     }
 
