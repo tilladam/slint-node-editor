@@ -1,5 +1,5 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::{NodeEditorController, NodeGeometry};
+use slint_node_editor::{NodeEditorSetup, NodeGeometry, wire_node_editor};
 use std::rc::Rc;
 
 slint::include_modules!();
@@ -31,7 +31,6 @@ fn generate_manhattan_path(
 
 fn main() {
     let window = MainWindow::new().unwrap();
-    let ctrl = NodeEditorController::new();
     let w = window.as_weak();
 
     // Set up nodes
@@ -60,9 +59,31 @@ fn main() {
         },
     ]))));
 
+    // Create setup with model update logic
+    let setup = NodeEditorSetup::new({
+        let nodes = nodes.clone();
+        move |node_id, delta_x, delta_y| {
+            for i in 0..nodes.row_count() {
+                if let Some(mut node) = nodes.row_data(i) {
+                    if node.id == node_id {
+                        node.x += delta_x;
+                        node.y += delta_y;
+                        nodes.set_row_data(i, node);
+                        break;
+                    }
+                }
+            }
+        }
+    });
+
+    // Wire all standard callbacks with one macro call
+    wire_node_editor!(window, setup);
+    // Wire all standard callbacks with one macro call
+    wire_node_editor!(window, setup);
+
     // Custom link path computation via global callback
     window.global::<NodeEditorComputations>().on_compute_link_path({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let w = w.clone();
         move |start_pin, end_pin, _version, _zoom: f32, _pan_x: f32, _pan_y: f32| {
             let w = match w.upgrade() { Some(w) => w, None => return SharedString::default() };
@@ -100,24 +121,9 @@ fn main() {
         }
     });
 
-    // Geometry callbacks via globals
-    window.global::<GeometryCallbacks>().on_report_node_rect({
-        let ctrl = ctrl.clone();
-        move |id, x, y, width, h| {
-            ctrl.handle_node_rect(id, x, y, width, h);
-        }
-    });
-
-    window.global::<GeometryCallbacks>().on_report_pin_position({
-        let ctrl = ctrl.clone();
-        move |pid, nid, ptype, x, y| {
-            ctrl.handle_pin_position(pid, nid, ptype, x, y);
-        }
-    });
-
     // Viewport changes via global
     window.global::<NodeEditorComputations>().on_viewport_changed({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let w = w.clone();
         move |z, pan_x, pan_y| {
             if let Some(w) = w.upgrade() {
@@ -127,33 +133,13 @@ fn main() {
         }
     });
 
-    // Standard callbacks
-    window.on_node_drag_started(ctrl.node_drag_started_callback());
-
+    // Grid initialization
     window.on_request_grid_update({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let w = w.clone();
         move || {
             if let Some(w) = w.upgrade() {
                 w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
-            }
-        }
-    });
-
-    // Node drag
-    window.on_node_drag_ended({
-        let ctrl = ctrl.clone();
-        move |delta_x, delta_y| {
-            let node_id = ctrl.dragged_node_id();
-            for i in 0..nodes.row_count() {
-                if let Some(mut node) = nodes.row_data(i) {
-                    if node.id == node_id {
-                        node.x += delta_x;
-                        node.y += delta_y;
-                        nodes.set_row_data(i, node);
-                        break;
-                    }
-                }
             }
         }
     });

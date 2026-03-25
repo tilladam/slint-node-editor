@@ -625,6 +625,8 @@ export component Pin inherits Rectangle {
     in property <length> base-size: 12px;
     in property <length> node-screen-x: 0px;  // Needed for drag preview coordinates
     in property <length> node-screen-y: 0px;
+    in property <length> parent-offset-x: 0px;  // For wrapped pins (offset from node)
+    in property <length> parent-offset-y: 0px;  // For wrapped pins (offset from node)
     /// Increment this to force pin position re-reporting (workaround for init timing)
     in property <int> refresh-trigger: 0;
 
@@ -633,9 +635,9 @@ export component Pin inherits Rectangle {
     property <length> pin-radius: pin-size / 2;
 
     /// Pin center X relative to node top-left
-    out property <length> center-x: self.x + self.width / 2;
+    out property <length> center-x: parent-offset-x + self.x + self.width / 2;
     /// Pin center Y relative to node top-left
-    out property <length> center-y: self.y + self.height / 2;
+    out property <length> center-y: parent-offset-y + self.y + self.height / 2;
 
     callback drag-started(int, length, length);
     callback drag-moved(int, length, length);
@@ -675,11 +677,16 @@ export component Pin inherits Rectangle {
     }
 
     touch := TouchArea {
-        property <bool> drag-active: false;
-
+        moved => {
+            if LinkCreation.state > 0 {
+                LinkCreation.current-x = node-screen-x + (root.x + self.mouse-x) * ViewportState.zoom;
+                LinkCreation.current-y = node-screen-y + (root.y + self.mouse-y) * ViewportState.zoom;
+                LinkCreation.state = 2; // updating
+                LinkCreation.version += 1;
+            }
+        }
         pointer-event(event) => {
             if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
-                drag-active = true;
                 // Set LinkCreation state to start link creation (NodeEditor watches this)
                 // Pin position within node must be scaled by zoom since we're inside a scaled container
                 LinkCreation.start-pin-id = pin-id;
@@ -687,19 +694,14 @@ export component Pin inherits Rectangle {
                 LinkCreation.current-y = node-screen-y + (root.y + self.y + self.height / 2) * ViewportState.zoom;
                 LinkCreation.state = 1; // started
                 LinkCreation.version += 1;
-            }
-            if event.kind == PointerEventKind.up && drag-active {
-                drag-active = false;
-                LinkCreation.state = 3; // complete
-                LinkCreation.version += 1;
-            }
-        }
-        moved => {
-            if drag-active {
-                LinkCreation.current-x = node-screen-x + (root.x + self.mouse-x) * ViewportState.zoom;
-                LinkCreation.current-y = node-screen-y + (root.y + self.mouse-y) * ViewportState.zoom;
-                LinkCreation.state = 2; // updating
-                LinkCreation.version += 1;
+            } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                // If we're currently creating a link (started from another pin), complete it
+                if LinkCreation.state > 0 {
+                    LinkCreation.current-x = node-screen-x + (root.x + self.mouse-x) * ViewportState.zoom;
+                    LinkCreation.current-y = node-screen-y + (root.y + self.mouse-y) * ViewportState.zoom;
+                    LinkCreation.state = 3; // complete
+                    LinkCreation.version += 1;
+                }
             }
         }
     }

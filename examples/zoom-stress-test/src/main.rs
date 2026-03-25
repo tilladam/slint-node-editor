@@ -3,14 +3,13 @@
 // Tests widget scaling behavior at various zoom levels with three complex nodes.
 
 use slint::{Color, ModelRc, SharedString, VecModel};
-use slint_node_editor::NodeEditorController;
+use slint_node_editor::{NodeEditorSetup, wire_node_editor};
 use std::rc::Rc;
 
 slint::include_modules!();
 
 fn main() {
     let window = MainWindow::new().unwrap();
-    let ctrl = NodeEditorController::new();
     let w = window.as_weak();
 
     // Create input nodes model
@@ -81,27 +80,17 @@ fn main() {
     window.set_display_nodes(ModelRc::from(display_nodes.clone()));
     window.set_links(ModelRc::from(links.clone()));
 
-    // Core callbacks - controller handles link path computation via global
-    window.global::<NodeEditorComputations>().on_compute_link_path(ctrl.compute_link_path_callback());
-
-    // Geometry tracking via globals
-    window.global::<GeometryCallbacks>().on_report_node_rect({
-        let ctrl = ctrl.clone();
-        move |id, x, y, width, h| {
-            ctrl.handle_node_rect(id, x, y, width, h);
-        }
+    // Create setup with model update logic (no-op since nodes don't move in this example)
+    let setup = NodeEditorSetup::new(|_node_id, _delta_x, _delta_y| {
+        // Nodes are not draggable in this stress test
     });
 
-    window.global::<GeometryCallbacks>().on_report_pin_position({
-        let ctrl = ctrl.clone();
-        move |pid, nid, ptype, x, y| {
-            ctrl.handle_pin_position(pid, nid, ptype, x, y);
-        }
-    });
+    // Wire all standard callbacks with one macro call
+    wire_node_editor!(window, setup);
 
     // Grid updates
     window.on_request_grid_update({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let w = w.clone();
         move || {
             if let Some(w) = w.upgrade() {
@@ -112,7 +101,7 @@ fn main() {
 
     // Viewport change handling via global
     window.global::<NodeEditorComputations>().on_viewport_changed({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let w = w.clone();
         move |z, pan_x, pan_y| {
             if let Some(w) = w.upgrade() {
