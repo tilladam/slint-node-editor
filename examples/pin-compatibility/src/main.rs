@@ -230,27 +230,6 @@ fn main() {
         }
     });
 
-    // Link preview path generation
-    window.on_compute_link_preview_path({
-        let w = window.as_weak();
-        move |start_x, start_y, end_x, end_y| {
-            println!("compute_link_preview_path({}, {}, {}, {})", start_x, start_y, end_x, end_y);
-            let w = match w.upgrade() {
-                Some(w) => w,
-                None => return SharedString::default(),
-            };
-            slint_node_editor::generate_bezier_path(
-                start_x as f32,
-                start_y as f32,
-                end_x as f32,
-                end_y as f32,
-                w.get_zoom(),
-                50.0,
-            )
-            .into()
-        }
-    });
-
     // Link requested - validate and create
     window.on_link_requested({
         let ctrl = setup.controller().clone();

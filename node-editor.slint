@@ -230,9 +230,6 @@ export component NodeEditor {
     /// Sync selection IDs to link data (called after box selection)
     callback sync-selection-to-links([int]);
 
-    /// Compute link preview path
-    callback compute-link-preview-path(/* start-x */ length, /* start-y */ length, /* end-x */ length, /* end-y */ length) -> string;
-
     // === Callbacks TO Application (events) ===
     callback link-requested(/* start-pin */ int, /* end-pin */ int);
     callback link-cancelled();
@@ -294,15 +291,17 @@ export component NodeEditor {
         root.internal-link-start-y = y;
         root.internal-link-end-x = x;
         root.internal-link-end-y = y;
-        root.link-preview-path-commands = root.compute-link-preview-path(x, y, x, y);
+        root.link-preview-path-commands = NodeEditorComputations.compute-link-preview-path(
+            x / 1px, y / 1px, x / 1px, y / 1px, root.zoom, root.bezier-min-offset);
     }
 
     /// Update link end position during creation
     public function update-link-end(x: length, y: length) {
         root.internal-link-end-x = x;
         root.internal-link-end-y = y;
-        root.link-preview-path-commands = root.compute-link-preview-path(
-            root.internal-link-start-x, root.internal-link-start-y, x, y);
+        root.link-preview-path-commands = NodeEditorComputations.compute-link-preview-path(
+            root.internal-link-start-x / 1px, root.internal-link-start-y / 1px,
+            x / 1px, y / 1px, root.zoom, root.bezier-min-offset);
     }
 
     /// Complete link creation

@@ -314,12 +314,6 @@ fn main() {
         }
     });
 
-    let window_for_preview = window.as_weak();
-    window.on_compute_link_preview_path(move |start_x, start_y, end_x, end_y| {
-        let w = match window_for_preview.upgrade() { Some(w) => w, None => return "".into() };
-        slint_node_editor::generate_bezier_path(start_x as f32, start_y as f32, end_x as f32, end_y as f32, w.get_zoom(), w.get_bezier_min_offset()).into()
-    });
-
     // === Selection Checking Callbacks (now on NodeEditorComputations global) ===
 
     let sm_check = selection_manager.clone();

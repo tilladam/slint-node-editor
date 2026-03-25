@@ -186,8 +186,7 @@ export component MainWindow inherits Window {
     callback compute-link-at <=> editor.compute-link-at;
     callback compute-box-selection <=> editor.compute-box-selection;
     callback compute-link-box-selection <=> editor.compute-link-box-selection;
-    callback compute-link-preview-path <=> editor.compute-link-preview-path;
-    // Note: compute-link-path, node-rect, and pin-position are now handled via globals
+    // Note: compute-link-path, compute-link-preview-path, node-rect, and pin-position are now handled via globals
 
     // Pure function to snap a value to the grid
     pure public function snap-to-grid(value: float) -> float {

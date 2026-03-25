@@ -289,10 +289,6 @@ impl MinimalTestHarness {
             }
         });
 
-        window.on_compute_link_preview_path(|start_x, start_y, end_x, end_y| {
-            slint_node_editor::generate_bezier_path(start_x, start_y, end_x, end_y, 1.0, 50.0).into()
-        });
-
         // Initialize grid
         window.invoke_request_grid_update();
 

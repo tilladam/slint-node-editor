@@ -83,22 +83,6 @@ fn main() {
     // Wire all standard callbacks with one macro call
     wire_node_editor!(window, setup);
 
-    // Link preview path generation
-    window.on_compute_link_preview_path({
-        let ctrl = setup.controller().clone();
-        move |start_x, start_y, end_x, end_y| {
-            slint_node_editor::generate_bezier_path(
-                start_x as f32,
-                start_y as f32,
-                end_x as f32,
-                end_y as f32,
-                ctrl.zoom(),
-                50.0,
-            )
-            .into()
-        }
-    });
-
     // Animated link path generation (partial bezier based on progress)
     window.on_compute_animated_link_path({
         let ctrl = setup.controller().clone();

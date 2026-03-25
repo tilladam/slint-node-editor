@@ -205,7 +205,6 @@ export component MainWindow inherits Window {
     callback node-drag-started <=> editor.node-drag-started;
     callback node-drag-ended <=> editor.node-drag-ended;
     callback compute-pin-at <=> editor.compute-pin-at;
-    callback compute-link-preview-path <=> editor.compute-link-preview-path;
     callback add-animated-link(/* from-pin */ int, /* to-pin */ int);
     // Animated link path with progress (0.0-1.0)
     pure callback compute-animated-link-path(/* start-pin */ int, /* end-pin */ int, /* progress */ float, /* version */ int) -> string;

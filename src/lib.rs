@@ -116,6 +116,11 @@ macro_rules! wire_node_editor {
             ctrl.cache().borrow().find_pin_at(x, y, radius)
         });
         
+        // Wire compute-link-preview-path for link creation preview
+        computations.on_compute_link_preview_path(|start_x, start_y, end_x, end_y, zoom, bezier_offset| {
+            slint_node_editor::generate_bezier_path(start_x, start_y, end_x, end_y, zoom, bezier_offset).into()
+        });
+        
         // Wire viewport_changed for automatic grid updates
         let ctrl = $setup.controller().clone();
         let w = $window.as_weak();

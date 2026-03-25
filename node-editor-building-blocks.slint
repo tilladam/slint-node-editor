@@ -125,6 +125,15 @@ export global NodeEditorComputations {
         /* x */ float,
         /* y */ float,
         /* pin-hit-radius */ float) -> int;
+    
+    /// Compute link preview path (for link creation drag)
+    pure callback compute-link-preview-path(
+        /* start-x */ float,
+        /* start-y */ float,
+        /* end-x */ float,
+        /* end-y */ float,
+        /* zoom */ float,
+        /* bezier-offset */ float) -> string;
 }
 
 /// Optional layout helpers for common node structures.
