@@ -190,8 +190,8 @@ fn main() {
     // Link ID counter
     let next_link_id = Rc::new(std::cell::Cell::new(1));
 
-    // Core callbacks
-    window.on_compute_link_path({
+    // Core callbacks via globals
+    window.global::<NodeEditorComputations>().on_compute_link_path({
         let ctrl = ctrl.clone();
         let w = window.as_weak();
         move |start_pin, end_pin, _version, _zoom: f32, _pan_x: f32, _pan_y: f32| {
@@ -258,15 +258,15 @@ fn main() {
         }
     });
 
-    // Geometry tracking
-    window.on_node_rect_changed({
+    // Geometry tracking - using GeometryCallbacks global
+    window.global::<GeometryCallbacks>().on_report_node_rect({
         let ctrl = ctrl.clone();
         move |id, x, y, width, h| {
             ctrl.handle_node_rect(id, x, y, width, h);
         }
     });
 
-    window.on_pin_position_changed({
+    window.global::<GeometryCallbacks>().on_report_pin_position({
         let ctrl = ctrl.clone();
         move |pid, nid, ptype, x, y| {
             ctrl.handle_pin_position(pid, nid, ptype, x, y);
@@ -353,12 +353,12 @@ fn main() {
         }
     });
 
-    window.on_update_viewport({
+    window.global::<NodeEditorComputations>().on_viewport_changed({
         let ctrl = ctrl.clone();
         let w = w.clone();
         move |z, pan_x, pan_y| {
             if let Some(w) = w.upgrade() {
-                ctrl.set_zoom(z);
+                ctrl.set_viewport(z, pan_x, pan_y);
                 w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
             }
         }

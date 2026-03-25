@@ -278,14 +278,14 @@ fn main() {
         }
     });
 
-    window.on_pin_position_changed({
+    window.global::<GeometryCallbacks>().on_report_pin_position({
         let ctrl = ctrl.clone();
         move |pin_id, node_id, pin_type, rel_x, rel_y| {
             ctrl.handle_pin_position(pin_id, node_id, pin_type, rel_x, rel_y);
         }
     });
 
-    window.on_node_rect_changed({
+    window.global::<GeometryCallbacks>().on_report_node_rect({
         let ctrl = ctrl.clone();
         move |id, x, y, width, height| {
             ctrl.handle_node_rect(id, x, y, width, height);
@@ -332,7 +332,7 @@ fn main() {
         }
     });
 
-    window.on_compute_link_path({
+    window.global::<NodeEditorComputations>().on_compute_link_path({
         let ctrl = ctrl.clone();
         let w = window.as_weak();
         move |start_pin, end_pin, _version, _zoom: f32, _pan_x: f32, _pan_y: f32| {
@@ -350,13 +350,13 @@ fn main() {
         slint_node_editor::generate_bezier_path(start_x as f32, start_y as f32, end_x as f32, end_y as f32, w.get_zoom(), w.get_bezier_min_offset()).into()
     });
 
-    // === Selection Checking Callbacks ===
+    // === Selection Checking Callbacks (now on NodeEditorComputations global) ===
 
     let sm_check = selection_manager.clone();
-    window.on_is_node_selected(move |id| sm_check.borrow().contains(id));
+    window.global::<NodeEditorComputations>().on_is_node_selected(move |id, _version| sm_check.borrow().contains(id));
 
     let lsm_check = link_selection_manager.clone();
-    window.on_is_link_selected(move |id| lsm_check.borrow().contains(id));
+    window.global::<NodeEditorComputations>().on_is_link_selected(move |id, _version| lsm_check.borrow().contains(id));
 
     // === Selection Manipulation Callbacks ===
 
@@ -479,12 +479,13 @@ fn main() {
         }
     });
 
-    window.on_update_viewport({
+    // Viewport change handling (grid updates) - now via NodeEditorComputations global
+    window.global::<NodeEditorComputations>().on_viewport_changed({
         let ctrl = ctrl.clone();
         let w = window.as_weak();
         move |zoom, pan_x, pan_y| {
             let w = match w.upgrade() { Some(w) => w, None => return };
-            ctrl.set_zoom(zoom);
+            ctrl.set_viewport(zoom, pan_x, pan_y);
 
             // Update grid
             w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));

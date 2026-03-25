@@ -73,13 +73,14 @@ export component MainWindow inherits Window {
     in-out property <int> geometry-version <=> editor.geometry-version;
 
     // Callbacks to Rust
+    callback node-rect-changed <=> editor.node-rect-changed;
     callback request-grid-update <=> editor.request-grid-update;
-    // Note: geometry tracking and viewport changes are now handled via globals
 
     // Function to refresh links after geometry is reported
     public function refresh-links() {
         editor.refresh-links();
     }
+    // Note: viewport-changed and compute-link-path are now in NodeEditorComputations global
     callback node-drag-started <=> editor.node-drag-started;
     callback node-drag-ended <=> editor.node-drag-ended;
 

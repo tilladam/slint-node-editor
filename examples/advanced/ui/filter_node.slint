@@ -265,96 +265,47 @@ export component FilterNode inherits BaseNode {
         }
     }
 
-    // Report pin positions after initialization (for newly added nodes)
-    init => {
-        // Pins report themselves via their own init handlers, but we also
-        // report here to ensure it happens even if pin init runs before node-id is set
-        if (self.node-id > 0) {
-            // Compute pin IDs inline to ensure correct evaluation
-            root.pin-position-changed(root.data-input-pin-id, self.node-id, FilterPinTypes.data-input, data-input-pin.center-x, data-input-pin.center-y);
-            root.pin-position-changed(root.control-input-pin-id, self.node-id, FilterPinTypes.control-input, control-input-pin.center-x, control-input-pin.center-y);
-            root.pin-position-changed(root.data-output-pin-id, self.node-id, FilterPinTypes.data-output, data-output-pin.center-x, data-output-pin.center-y);
-        }
-    }
+    // Pins auto-report their positions via GeometryCallbacks global
 
     // Data Input pin (green, left side, row 1)
     data-input-pin := Pin {
-        x: root.pin-margin ;
+        x: root.pin-margin;
         y: root.row-1-center - root.pin-radius;
         pin-id: root.data-input-pin-id;
         node-id: root.node-id;
         pin-type: FilterPinTypes.data-input;
-        zoom: root.zoom;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
         base-color: #4CAF50;
         hover-color: #66BB6A;
         base-size: root.base-pin-size;
-        drag-started(id, x, y) => {
-            root.pin-drag-started(id, x, y);
-        }
-        drag-moved(id, x, y) => {
-            root.pin-drag-moved(id, x, y);
-        }
-        drag-ended(id, x, y) => {
-            root.pin-drag-ended(id, x, y);
-        }
-        report-position(pin-id, node-id, pin-type, x, y) => {
-            root.pin-position-changed(pin-id, node-id, pin-type, x, y);
-        }
     }
 
     // Control Input pin (yellow, left side, row 2)
     control-input-pin := ControlPin {
-        x: root.pin-margin ;
+        x: root.pin-margin;
         y: root.row-2-center - root.pin-radius;
         pin-id: root.control-input-pin-id;
         node-id: root.node-id;
         pin-type: FilterPinTypes.control-input;
-        zoom: root.zoom;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
         base-color: #FFC107;
         hover-color: #FFD54F;
         base-size: root.base-pin-size;
-        drag-started(id, x, y) => {
-            root.pin-drag-started(id, x, y);
-        }
-        drag-moved(id, x, y) => {
-            root.pin-drag-moved(id, x, y);
-        }
-        drag-ended(id, x, y) => {
-            root.pin-drag-ended(id, x, y);
-        }
-        report-position(pin-id, node-id, pin-type, x, y) => {
-            root.pin-position-changed(pin-id, node-id, pin-type, x, y);
-        }
     }
 
     // Data Output pin (blue, right side, row 1)
     data-output-pin := Pin {
-        x: parent.width - root.pin-margin  - root.pin-size;
+        x: parent.width - root.pin-margin - root.pin-size;
         y: root.row-1-center - root.pin-radius;
         pin-id: root.data-output-pin-id;
         node-id: root.node-id;
         pin-type: FilterPinTypes.data-output;
-        zoom: root.zoom;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
         base-color: #2196F3;
         hover-color: #42A5F5;
         base-size: root.base-pin-size;
-        drag-started(id, x, y) => {
-            root.pin-drag-started(id, x, y);
-        }
-        drag-moved(id, x, y) => {
-            root.pin-drag-moved(id, x, y);
-        }
-        drag-ended(id, x, y) => {
-            root.pin-drag-ended(id, x, y);
-        }
-        report-position(pin-id, node-id, pin-type, x, y) => {
-            root.pin-position-changed(pin-id, node-id, pin-type, x, y);
-        }
     }
 }

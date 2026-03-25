@@ -105,8 +105,8 @@ impl MinimalTestHarness {
             }
         });
 
-        // Geometry tracking - update cache
-        window.on_node_rect_changed({
+        // Geometry tracking via globals
+        window.global::<GeometryCallbacks>().on_report_node_rect({
             let ctrl = ctrl.clone();
             let tracker = tracker.clone();
             move |id, x, y, width, h| {
@@ -115,7 +115,7 @@ impl MinimalTestHarness {
             }
         });
 
-        window.on_pin_position_changed({
+        window.global::<GeometryCallbacks>().on_report_pin_position({
             let ctrl = ctrl.clone();
             let tracker = tracker.clone();
             move |pid, nid, ptype, x, y| {
@@ -244,7 +244,8 @@ impl MinimalTestHarness {
             }
         });
 
-        window.on_is_selected({
+        // is-node-selected now uses the global
+        computations.on_is_node_selected({
             let selection = selection.clone();
             move |node_id, _version| selection.borrow().contains(node_id)
         });

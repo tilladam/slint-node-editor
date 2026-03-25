@@ -60,8 +60,8 @@ fn main() {
         },
     ]))));
 
-    // Custom link path computation callback
-    window.on_compute_link_path({
+    // Custom link path computation via global callback
+    window.global::<NodeEditorComputations>().on_compute_link_path({
         let ctrl = ctrl.clone();
         let w = w.clone();
         move |start_pin, end_pin, _version, _zoom: f32, _pan_x: f32, _pan_y: f32| {
@@ -70,10 +70,6 @@ fn main() {
             let zoom = w.get_zoom();
             let bezier_offset = w.get_bezier_min_offset();
 
-            // Use the controller's cache to get pin positions
-            // Note: We need to use the lower-level cache API because we're doing custom logic
-            // that isn't wrapped by the simple `compute_link_path` helper in the controller
-            // when we want orthogonal routing.
             let cache = ctrl.cache();
             let cache = cache.borrow();
 
@@ -81,7 +77,6 @@ fn main() {
             let end_pos = cache.pin_positions.get(&end_pin);
 
             if let (Some(start), Some(end)) = (start_pos, end_pos) {
-                // Resolve absolute positions
                 if let (Some(start_rect), Some(end_rect)) = (
                     cache.node_rects.get(&start.node_id).map(|n| n.rect()),
                     cache.node_rects.get(&end.node_id).map(|n| n.rect()),
@@ -94,7 +89,6 @@ fn main() {
                     if style == "orthogonal" {
                         generate_manhattan_path(sx, sy, ex, ey, zoom).into()
                     } else {
-                        // Fallback to standard Bezier (using library helper)
                         slint_node_editor::generate_bezier_path(sx, sy, ex, ey, zoom, bezier_offset).into()
                     }
                 } else {
@@ -106,22 +100,35 @@ fn main() {
         }
     });
 
-    // Standard callbacks via controller
-    window.on_node_drag_started(ctrl.node_drag_started_callback());
-
-    window.on_node_rect_changed({
+    // Geometry callbacks via globals
+    window.global::<GeometryCallbacks>().on_report_node_rect({
         let ctrl = ctrl.clone();
         move |id, x, y, width, h| {
             ctrl.handle_node_rect(id, x, y, width, h);
         }
     });
 
-    window.on_pin_position_changed({
+    window.global::<GeometryCallbacks>().on_report_pin_position({
         let ctrl = ctrl.clone();
         move |pid, nid, ptype, x, y| {
             ctrl.handle_pin_position(pid, nid, ptype, x, y);
         }
     });
+
+    // Viewport changes via global
+    window.global::<NodeEditorComputations>().on_viewport_changed({
+        let ctrl = ctrl.clone();
+        let w = w.clone();
+        move |z, pan_x, pan_y| {
+            if let Some(w) = w.upgrade() {
+                ctrl.set_viewport(z, pan_x, pan_y);
+                w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
+            }
+        }
+    });
+
+    // Standard callbacks
+    window.on_node_drag_started(ctrl.node_drag_started_callback());
 
     window.on_request_grid_update({
         let ctrl = ctrl.clone();
@@ -129,17 +136,6 @@ fn main() {
         move || {
             if let Some(w) = w.upgrade() {
                 w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
-            }
-        }
-    });
-
-    window.on_update_viewport({
-        let ctrl = ctrl.clone();
-        let w = w.clone();
-        move |z, pan_x, pan_y| {
-            if let Some(w) = w.upgrade() {
-                ctrl.set_zoom(z);
-                w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
             }
         }
     });

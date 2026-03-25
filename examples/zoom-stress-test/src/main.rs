@@ -81,18 +81,18 @@ fn main() {
     window.set_display_nodes(ModelRc::from(display_nodes.clone()));
     window.set_links(ModelRc::from(links.clone()));
 
-    // Core callbacks - controller handles link path computation
-    window.on_compute_link_path(ctrl.compute_link_path_callback());
+    // Core callbacks - controller handles link path computation via global
+    window.global::<NodeEditorComputations>().on_compute_link_path(ctrl.compute_link_path_callback());
 
-    // Geometry tracking
-    window.on_node_rect_changed({
+    // Geometry tracking via globals
+    window.global::<GeometryCallbacks>().on_report_node_rect({
         let ctrl = ctrl.clone();
         move |id, x, y, width, h| {
             ctrl.handle_node_rect(id, x, y, width, h);
         }
     });
 
-    window.on_pin_position_changed({
+    window.global::<GeometryCallbacks>().on_report_pin_position({
         let ctrl = ctrl.clone();
         move |pid, nid, ptype, x, y| {
             ctrl.handle_pin_position(pid, nid, ptype, x, y);
@@ -110,12 +110,13 @@ fn main() {
         }
     });
 
-    window.on_update_viewport({
+    // Viewport change handling via global
+    window.global::<NodeEditorComputations>().on_viewport_changed({
         let ctrl = ctrl.clone();
         let w = w.clone();
         move |z, pan_x, pan_y| {
             if let Some(w) = w.upgrade() {
-                ctrl.set_zoom(z);
+                ctrl.set_viewport(z, pan_x, pan_y);
                 w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
             }
         }

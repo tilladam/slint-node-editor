@@ -51,9 +51,6 @@ component SimpleNode inherits BaseNode {
         pin-type: PinTypes.input;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
-        report-position(id, nid, type, x, y) => {
-            root.report-position(id, nid, type, x, y);
-        }
     }
 
     // Single output pin
@@ -65,12 +62,7 @@ component SimpleNode inherits BaseNode {
         pin-type: PinTypes.output;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
-        report-position(id, nid, type, x, y) => {
-            root.report-position(id, nid, type, x, y);
-        }
     }
-
-    callback report-position(int, int, int, length, length);
 }
 
 export component MainWindow inherits Window {
@@ -81,7 +73,6 @@ export component MainWindow inherits Window {
     in property <[NodeData]> nodes;
     in property <[LinkData]> links <=> editor.links;
     in-out property <string> grid_commands <=> editor.grid-commands;
-    in-out property <int> dragged-node-id: 0;
 
     // Size for grid generation
     out property <float> width_: self.width / 1px;
@@ -93,8 +84,6 @@ export component MainWindow inherits Window {
     in-out property <int> selection-version <=> editor.selection-version;
 
     // Core callbacks to Rust
-    callback node-rect-changed <=> editor.node-rect-changed;
-    callback pin-position-changed <=> editor.pin-position-changed;
     callback request-grid-update <=> editor.request-grid-update;
     callback node-drag-started <=> editor.node-drag-started;
     callback node-drag-ended <=> editor.node-drag-ended;
@@ -114,7 +103,7 @@ export component MainWindow inherits Window {
     callback sync-selection-to-nodes <=> editor.sync-selection-to-nodes;
     callback sync-selection-to-links <=> editor.sync-selection-to-links;
 
-    // Compute callbacks
+    // Compute callbacks (tests use globals instead of these)
     callback compute-pin-at <=> editor.compute-pin-at;
     callback compute-link-at <=> editor.compute-link-at;
     callback compute-box-selection <=> editor.compute-box-selection;
@@ -135,25 +124,8 @@ export component MainWindow inherits Window {
             title: data.title;
             world-x: data.x * 1px;
             world-y: data.y * 1px;
-            // drag-offset-x and drag-offset-y computed automatically in BaseNode
-
-            report-rect(id, x, y, w, h) => {
-                editor.report-node-rect(id, x, y, w, h);
-            }
-            report-position(pid, nid, pt, x, y) => {
-                editor.report-pin-position(pid, nid, pt, x, y);
-            }
-            drag-started(id, already-selected, wx, wy) => {
-                root.dragged-node-id = id;
-                editor.start-node-drag(id, already-selected, wx, wy);
-            }
-            drag-moved(id, dx, dy) => {
-                editor.update-node-drag(dx, dy);
-            }
-            drag-ended(id, dx, dy) => {
-                root.dragged-node-id = 0;
-                editor.end-node-drag(dx, dy);
-            }
+            viewport-width: editor.width;
+            viewport-height: editor.height;
         }
     }
 }

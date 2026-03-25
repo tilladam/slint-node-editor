@@ -1,4 +1,4 @@
-import { NodeEditor, BaseNode, Pin, PinTypes, LinkData } from "@slint-node-editor/node-editor.slint";
+import { NodeEditor, BaseNode, Pin, PinTypes, LinkData, NodeEditorComputations, GeometryCallbacks, ViewportState, GeometryVersion } from "@slint-node-editor/node-editor.slint";
 
 export struct NodeData {
     id: int,
@@ -21,7 +21,7 @@ export struct AnimatedLinkData {
 }
 
 // Re-export for Rust
-export { LinkData }
+export { LinkData, NodeEditorComputations, GeometryCallbacks }
 
 // Custom animated link component with grow effect and sparkles
 component AnimatedLink inherits Rectangle {
@@ -128,14 +128,10 @@ component SimpleNode inherits BaseNode {
         pin-id: root.node-id * 2;
         node-id: root.node-id;
         pin-type: PinTypes.input;
-        zoom: root.zoom;
         base-color: accent-color.darker(30%);
         hover-color: accent-color;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
-        report-position(id, nid, type, x, y) => {
-            root.report-position(id, nid, type, x, y);
-        }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
@@ -148,20 +144,14 @@ component SimpleNode inherits BaseNode {
         pin-id: root.node-id * 2 + 1;
         node-id: root.node-id;
         pin-type: PinTypes.output;
-        zoom: root.zoom;
         base-color: accent-color.darker(30%);
         hover-color: accent-color;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
-        report-position(id, nid, type, x, y) => {
-            root.report-position(id, nid, type, x, y);
-        }
         drag-started(id, x, y) => { root.pin-drag-started(id, x, y); }
         drag-moved(id, x, y) => { root.pin-drag-moved(id, x, y); }
         drag-ended(id, x, y) => { root.pin-drag-ended(id, x, y); }
     }
-
-    callback report-position(int, int, int, length, length);
 }
 
 export component MainWindow inherits Window {
@@ -174,7 +164,6 @@ export component MainWindow inherits Window {
     in property <[AnimatedLinkData]> animated-links;
     in property <[LinkData]> links <=> editor.links;
     in-out property <string> grid_commands <=> editor.grid-commands;
-    in-out property <int> dragged-node-id: 0;
 
     // Animation time (updated from Rust)
     in property <float> animation-time: 0.0;
@@ -182,10 +171,10 @@ export component MainWindow inherits Window {
     // Size for grid generation
     out property <float> width_: self.width / 1px;
     out property <float> height_: self.height / 1px;
+    out property <float> zoom: editor.zoom;
 
     // Callbacks to Rust
     callback node-rect-changed <=> editor.node-rect-changed;
-    callback pin-position-changed <=> editor.pin-position-changed;
     callback request-grid-update <=> editor.request-grid-update;
     callback link-requested <=> editor.link-requested;
 
@@ -193,10 +182,9 @@ export component MainWindow inherits Window {
         editor.refresh-links();
     }
 
-    callback update-viewport(float, float, float);
+    // Note: viewport-changed and compute-link-path are now in NodeEditorComputations global
     callback node-drag-started <=> editor.node-drag-started;
     callback node-drag-ended <=> editor.node-drag-ended;
-    pure callback compute-link-path <=> editor.compute-link-path;
     callback compute-pin-at <=> editor.compute-pin-at;
     callback compute-link-preview-path <=> editor.compute-link-preview-path;
     callback add-animated-link(/* from-pin */ int, /* to-pin */ int);
@@ -209,10 +197,6 @@ export component MainWindow inherits Window {
         background-color: #1a1a2e;
         grid-color: #2a2a4a;
 
-        viewport-changed => {
-            root.update-viewport(self.zoom, self.pan-x / 1px, self.pan-y / 1px);
-        }
-
         link-requested(start-pin, end-pin) => {
             root.add-animated-link(start-pin, end-pin);
         }
@@ -220,7 +204,7 @@ export component MainWindow inherits Window {
         // Render animated links with effects
         for link in root.animated-links: AnimatedLink {
             // Use animated path that grows based on progress
-            path-commands: root.compute-animated-link-path(link.start-pin-id, link.end-pin-id, link.progress, editor.geometry-version);
+            path-commands: root.compute-animated-link-path(link.start-pin-id, link.end-pin-id, link.progress, GeometryVersion.version);
             link-color: link.color;
             line-width: link.line-width > 0 ? link.line-width * 1px : 2px;
             progress: link.progress;
@@ -237,18 +221,9 @@ export component MainWindow inherits Window {
                           data.id == 4 ? #a855f7 : #4a9eff;
             world-x: data.x * 1px;
             world-y: data.y * 1px;
-            zoom: editor.zoom;
-            pan-x: editor.pan-x;
-            pan-y: editor.pan-y;
-            drag-offset-x: data.id == root.dragged-node-id ? editor.drag-offset-x : 0px;
-            drag-offset-y: data.id == root.dragged-node-id ? editor.drag-offset-y : 0px;
+            viewport-width: root.width;
+            viewport-height: root.height;
 
-            report-rect(id, x, y, w, h) => {
-                editor.report-node-rect(id, x, y, w, h);
-            }
-            report-position(pid, nid, pt, x, y) => {
-                editor.report-pin-position(pid, nid, pt, x, y);
-            }
             pin-drag-started(pin-id, x, y) => {
                 editor.start-link-from-pin(pin-id, x, y);
             }
@@ -258,17 +233,6 @@ export component MainWindow inherits Window {
             pin-drag-ended(pin-id, x, y) => {
                 editor.update-link-end(x, y);
                 editor.complete-link-creation();
-            }
-            drag-started(id, already-selected, wx, wy) => {
-                root.dragged-node-id = id;
-                editor.start-node-drag(id, already-selected, wx, wy);
-            }
-            drag-moved(id, dx, dy) => {
-                editor.update-node-drag(dx, dy);
-            }
-            drag-ended(id, dx, dy) => {
-                root.dragged-node-id = 0;
-                editor.end-node-drag(dx, dy);
             }
         }
     }

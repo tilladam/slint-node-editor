@@ -51,6 +51,21 @@ export global GeometryVersion {
     in-out property <int> version: 0;
 }
 
+/// Link creation state - updated by Pin, consumed by NodeEditor.
+/// This allows Pin to trigger link creation without manual callback forwarding.
+export global LinkCreation {
+    /// Version counter - incremented on every start/update/complete
+    in-out property <int> version: 0;
+    /// Current state: 0=idle, 1=started, 2=updating, 3=complete
+    in-out property <int> state: 0;
+    /// The pin ID that started the link
+    in-out property <int> start-pin-id: 0;
+    /// Current X position (screen coordinates)
+    in-out property <length> current-x: 0px;
+    /// Current Y position (screen coordinates)
+    in-out property <length> current-y: 0px;
+}
+
 /// Internal geometry callback registry.
 /// NodeEditor's Rust code wires these up automatically - examples don't touch this!
 /// BaseNode/Pin components call these to report geometry and interactions.
@@ -87,27 +102,23 @@ export global NodeEditorComputations {
         /* geometry-version */ int,
         /* zoom */ float,
         /* pan-x */ float,
-        /* pan-y */ float
-    ) -> string;
+        /* pan-y */ float) -> string;
     
     /// Viewport state changed (zoom or pan)
     callback viewport-changed(
         /* zoom */ float,
         /* pan-x */ float,
-        /* pan-y */ float
-    );
+        /* pan-y */ float);
     
     /// Check if a node is selected
     pure callback is-node-selected(
         /* node-id */ int,
-        /* selection-version */ int
-    ) -> bool;
+        /* selection-version */ int) -> bool;
     
     /// Check if a link is selected
     pure callback is-link-selected(
         /* link-id */ int,
-        /* selection-version */ int
-    ) -> bool;
+        /* selection-version */ int) -> bool;
 }
 
 /// Optional layout helpers for common node structures.
@@ -638,6 +649,7 @@ export component Pin inherits Rectangle {
 
     init => {
         if (pin-id > 0) {
+            GeometryVersion.version += 1;
             GeometryCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
@@ -668,20 +680,26 @@ export component Pin inherits Rectangle {
         pointer-event(event) => {
             if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                 drag-active = true;
-                // These are for visual link preview, should be screen-space
-                // root.x/root.y = Pin's position within the node layout
-                GeometryCallbacks.start-link-from-pin(pin-id, node-screen-x + root.x + self.x + self.width / 2, node-screen-y + root.y + self.y + self.height / 2);
+                // Set LinkCreation state to start link creation (NodeEditor watches this)
+                // Pin position within node must be scaled by zoom since we're inside a scaled container
+                LinkCreation.start-pin-id = pin-id;
+                LinkCreation.current-x = node-screen-x + (root.x + self.x + self.width / 2) * ViewportState.zoom;
+                LinkCreation.current-y = node-screen-y + (root.y + self.y + self.height / 2) * ViewportState.zoom;
+                LinkCreation.state = 1; // started
+                LinkCreation.version += 1;
             }
             if event.kind == PointerEventKind.up && drag-active {
                 drag-active = false;
-                GeometryCallbacks.complete-link();
+                LinkCreation.state = 3; // complete
+                LinkCreation.version += 1;
             }
         }
         moved => {
             if drag-active {
-                GeometryCallbacks.update-link-preview(
-                    node-screen-x + root.x + self.mouse-x,
-                    node-screen-y + root.y + self.mouse-y);
+                LinkCreation.current-x = node-screen-x + (root.x + self.mouse-x) * ViewportState.zoom;
+                LinkCreation.current-y = node-screen-y + (root.y + self.mouse-y) * ViewportState.zoom;
+                LinkCreation.state = 2; // updating
+                LinkCreation.version += 1;
             }
         }
     }

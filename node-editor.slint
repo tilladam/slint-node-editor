@@ -36,6 +36,7 @@ import {
     DragState,
     GeometryVersion,
     GeometryCallbacks,
+    LinkCreation,
     NodeEditorComputations,
     NodeStyleDefaults,
     MinimapNode,
@@ -46,7 +47,7 @@ import {
     BaseNode,
     Pin,
 } from "node-editor-building-blocks.slint";
-export { PinTypes, ViewportState, DragState, GeometryVersion, GeometryCallbacks, NodeEditorComputations, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, Minimap, Link, BaseNode, Pin }
+export { PinTypes, ViewportState, DragState, GeometryVersion, GeometryCallbacks, LinkCreation, NodeEditorComputations, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, Minimap, Link, BaseNode, Pin }
 
 /// Modifier key for triggering box selection over nodes/links
 export enum BoxSelectionModifier {
@@ -438,6 +439,22 @@ export component NodeEditor {
     }
     changed height => {
         request-grid-update();
+    }
+    
+    // Watch LinkCreation global for pin-initiated link creation
+    property <int> link-creation-watch: LinkCreation.version;
+    changed link-creation-watch => {
+        if LinkCreation.state == 1 {
+            // Started - begin link creation
+            root.start-link-from-pin(LinkCreation.start-pin-id, LinkCreation.current-x, LinkCreation.current-y);
+        } else if LinkCreation.state == 2 {
+            // Updating - update link end position
+            root.update-link-end(LinkCreation.current-x, LinkCreation.current-y);
+        } else if LinkCreation.state == 3 {
+            // Complete - try to complete link creation
+            root.complete-link-creation();
+            LinkCreation.state = 0; // Reset to idle
+        }
     }
 
     /// Call this after initial geometry has been reported to force link path recomputation.
