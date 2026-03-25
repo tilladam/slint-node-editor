@@ -553,6 +553,18 @@ export component BaseNode inherits Rectangle {
             GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
+    
+    // Watch world-pos-x/y for live link updates during multi-node drag
+    changed world-pos-x => {
+        if (node-id > 0) {
+            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+        }
+    }
+    changed world-pos-y => {
+        if (node-id > 0) {
+            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+        }
+    }
 
     // === Double-click detection ===
     property <bool> dbl-click-armed: false;
