@@ -67,13 +67,13 @@ export global LinkCreation {
 }
 
 /// Selection request state - updated by BaseNode, consumed by NodeEditor.
-/// This allows BaseNode to trigger selection without manual callback forwarding.
+/// This allows BaseNode to request selection changes without manual callback forwarding.
 export global SelectionRequest {
     /// Version counter - incremented on every selection request
     in-out property <int> version: 0;
-    /// The node ID to select
+    /// The node ID to select/deselect
     in-out property <int> node-id: 0;
-    /// Whether shift key was held
+    /// Whether shift key was held during the click
     in-out property <bool> shift-held: false;
 }
 
@@ -114,29 +114,29 @@ export global NodeEditorComputations {
         /* zoom */ float,
         /* pan-x */ float,
         /* pan-y */ float) -> string;
-    
+
     /// Viewport state changed (zoom or pan)
     callback viewport-changed(
         /* zoom */ float,
         /* pan-x */ float,
         /* pan-y */ float);
-    
+
     /// Check if a node is selected
     pure callback is-node-selected(
         /* node-id */ int,
         /* selection-version */ int) -> bool;
-    
+
     /// Check if a link is selected
     pure callback is-link-selected(
         /* link-id */ int,
         /* selection-version */ int) -> bool;
-    
+
     /// Compute pin ID at screen coordinates (for hit testing)
     pure callback compute-pin-at(
         /* x */ float,
         /* y */ float,
         /* pin-hit-radius */ float) -> int;
-    
+
     /// Compute link preview path (for link creation drag)
     pure callback compute-link-preview-path(
         /* start-x */ float,
@@ -145,14 +145,14 @@ export global NodeEditorComputations {
         /* end-y */ float,
         /* zoom */ float,
         /* bezier-offset */ float) -> string;
-    
+
     /// Compute node IDs in selection box (for rubber-band selection)
     pure callback compute-box-selection(
         /* x */ float,
         /* y */ float,
         /* width */ float,
         /* height */ float) -> [int];
-    
+
     /// Sync selection state to Rust (called when selection changes)
     callback sync-selection-to-nodes(/* node-ids */ [int]);
 }
@@ -549,16 +549,6 @@ export component BaseNode inherits Rectangle {
         }
     }
     changed node-height => {
-        if (node-id > 0) {
-            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
-        }
-    }
-    changed world-pos-x => {
-        if (node-id > 0) {
-            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
-        }
-    }
-    changed world-pos-y => {
         if (node-id > 0) {
             GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
