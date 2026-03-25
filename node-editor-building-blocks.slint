@@ -614,7 +614,7 @@ export component BaseNode inherits Rectangle {
                     GeometryCallbacks.update-node-drag(current-drag-offset-x, current-drag-offset-y);
                     // Update geometry for live link updates
                     GeometryVersion.version += 1;
-                    GeometryCallbacks.report-node-rect(node-id, world-x + current-drag-offset-x, world-y + current-drag-offset-y, node-width, node-height);
+                    GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
                 }
             }
         }
