@@ -1,0 +1,42 @@
+// Node Editor Application Wrapper
+//
+// This component wraps NodeEditor and automatically handles all internal
+// callback routing between BaseNode/Pin components and the NodeEditor.
+// Examples using this component don't need any callback forwarding boilerplate.
+//
+// Usage:
+// ```slint
+// import { NodeEditorApp, BaseNode, Pin } from "node-editor-app.slint";
+//
+// MainWindow {
+//     NodeEditorApp {
+//         //  Your nodes - no callback forwarding needed!
+//         for node in nodes: MyCustomNode { ... }
+//     }
+// }
+// ```
+
+import {
+    NodeEditor,
+    BaseNode,
+    Pin,
+    PinTypes,
+    ViewportState,
+    NodeStyleDefaults,
+    MinimapNode,
+    MinimapPosition,
+    LinkData,
+} from "node-editor.slint";
+
+export { BaseNode, Pin, PinTypes, ViewportState, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData }
+
+/// Application-level wrapper that auto-wires internal callbacks.
+/// Use this instead of NodeEditor directly to eliminate callback boilerplate.
+export component NodeEditorApp inherits NodeEditor {
+    // All NodeEditor properties are inherited and accessible
+    
+    // Internal wiring: BaseNode/Pin callbacks → NodeEditor functions
+    // This happens automatically without examples needing to forward
+    
+    @children
+}

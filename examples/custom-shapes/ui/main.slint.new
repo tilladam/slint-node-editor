@@ -1,12 +1,4 @@
-import {
-    NodeEditor,
-    BaseNode,
-    Pin,
-    PinTypes,
-    LinkData,
-    NodeEditorComputations,
-    GeometryCallbacks,
-} from "@slint-node-editor/node-editor.slint";
+import { NodeEditor, BaseNode, Pin, PinTypes, LinkData, NodeEditorComputations, GeometryCallbacks } from "@slint-node-editor/node-editor.slint";
 import { ComboBox } from "std-widgets.slint";
 
 export struct NodeData {
@@ -15,6 +7,7 @@ export struct NodeData {
     x: float,
     y: float,
 }
+
 export { LinkData, NodeEditorComputations, GeometryCallbacks }
 
 component SimpleNode inherits BaseNode {
@@ -80,13 +73,14 @@ export component MainWindow inherits Window {
     in-out property <int> geometry-version <=> editor.geometry-version;
 
     // Callbacks to Rust
+    callback node-rect-changed <=> editor.node-rect-changed;
     callback request-grid-update <=> editor.request-grid-update;
-    // Note: geometry tracking and viewport changes are now handled via globals
 
     // Function to refresh links after geometry is reported
     public function refresh-links() {
         editor.refresh-links();
     }
+    // Note: viewport-changed and compute-link-path are now in NodeEditorComputations global
     callback node-drag-started <=> editor.node-drag-started;
     callback node-drag-ended <=> editor.node-drag-ended;
 
@@ -118,6 +112,7 @@ export component MainWindow inherits Window {
         HorizontalLayout {
             padding: 10px;
             spacing: 10px;
+            
             Text {
                 text: "Link Style:";
                 color: white;

@@ -11,7 +11,7 @@
 // - Minimal (zoom <= 0.25): Colored rectangle with title
 
 import { LineEdit, SpinBox, ComboBox } from "std-widgets.slint";
-import { Pin, PinTypes, BaseNode } from "@slint-node-editor/node-editor.slint";
+import { Pin, PinTypes, BaseNode, ViewportState } from "@slint-node-editor/node-editor.slint";
 
 // Input node data passed from Rust
 export struct InputNodeData {
@@ -47,8 +47,8 @@ export component InputNode inherits BaseNode {
     in property <length> min-node-height: 40px;
 
     // LOD level: 2=full, 1=simplified, 0=minimal
-    property <int> lod-level: self.zoom > lod-full-threshold ? 2
-                            : self.zoom > lod-simplified-threshold ? 1
+    property <int> lod-level: ViewportState.zoom > lod-full-threshold ? 2
+                            : ViewportState.zoom > lod-simplified-threshold ? 1
                             : 0;
 
     // === Layout constants ===
@@ -59,11 +59,10 @@ export component InputNode inherits BaseNode {
     property <length> label-width: 50px;
     property <length> pin-area-width: 20px;
 
-    // Pin dimensions
+    // Pin dimensions (world-space)
     property <length> base-pin-size: 12px;
-    property <length> pin-size: max(base-pin-size * self.zoom, 8px);  // Minimum 8px for clickability
 
-    // === Size calculations per LOD ===
+    // === Size calculations per LOD (world-space) ===
     // Full size
     property <length> full-width: 280px;
     property <length> full-height: content-padding + title-height + content-padding
@@ -77,17 +76,13 @@ export component InputNode inherits BaseNode {
     property <length> minimal-width: root.min-node-width;
     property <length> minimal-height: root.min-node-height;
 
-    // Effective dimensions based on LOD
-    property <length> effective-base-width: lod-level == 2 ? full-width
-                                          : lod-level == 1 ? simplified-width
-                                          : minimal-width;
-    property <length> effective-base-height: lod-level == 2 ? full-height
-                                           : lod-level == 1 ? simplified-height
-                                           : minimal-height;
-
-    // Apply zoom with minimum size floor
-    width: max(effective-base-width * self.zoom, minimal-width);
-    height: max(effective-base-height * self.zoom, minimal-height);
+    // Effective dimensions based on LOD (no zoom - container handles it)
+    node-width: lod-level == 2 ? full-width
+              : lod-level == 1 ? simplified-width
+              : minimal-width;
+    node-height: lod-level == 2 ? full-height
+               : lod-level == 1 ? simplified-height
+               : minimal-height;
 
     // Node colors
     property <color> node-color: #3d5d3d;
@@ -98,24 +93,24 @@ export component InputNode inherits BaseNode {
         width: 100%;
         height: 100%;
         background: root.selected ? root.node-color-selected : root.node-color;
-        border-radius: 4px * root.zoom;
+        border-radius: 4px;
         border-width: root.selected ? 2px : 1px;
         border-color: root.selected ? #8f8 : #555;
 
         VerticalLayout {
-            padding: root.content-padding * root.zoom;
-            spacing: root.row-spacing * root.zoom;
+            padding: root.content-padding;
+            spacing: root.row-spacing;
 
             // Title bar
             Rectangle {
-                height: root.title-height * root.zoom;
+                height: root.title-height;
                 background: root.selected ? root.node-color-selected.darker(0.2) : root.node-color.darker(0.2);
-                border-radius: 4px * root.zoom;
+                border-radius: 4px;
 
                 Text {
                     text: root.title;
                     color: white;
-                    font-size: 14px * root.zoom;
+                    font-size: 14px;
                     horizontal-alignment: center;
                     vertical-alignment: center;
                 }
@@ -123,16 +118,16 @@ export component InputNode inherits BaseNode {
 
             // Row 1: Text input
             HorizontalLayout {
-                height: root.row-height * root.zoom;
-                spacing: 8px * root.zoom;
-                padding-left: root.pin-area-width * root.zoom;
-                padding-right: root.pin-area-width * root.zoom;
+                height: root.row-height;
+                spacing: 8px;
+                padding-left: root.pin-area-width;
+                padding-right: root.pin-area-width;
 
                 Text {
-                    width: root.label-width * root.zoom;
+                    width: root.label-width;
                     text: "Text:";
                     color: #ccc;
-                    font-size: 12px * root.zoom;
+                    font-size: 12px;
                     vertical-alignment: center;
                 }
 
@@ -148,16 +143,16 @@ export component InputNode inherits BaseNode {
 
             // Row 2: Numeric input
             HorizontalLayout {
-                height: root.row-height * root.zoom;
-                spacing: 8px * root.zoom;
-                padding-left: root.pin-area-width * root.zoom;
-                padding-right: root.pin-area-width * root.zoom;
+                height: root.row-height;
+                spacing: 8px;
+                padding-left: root.pin-area-width;
+                padding-right: root.pin-area-width;
 
                 Text {
-                    width: root.label-width * root.zoom;
+                    width: root.label-width;
                     text: "Value:";
                     color: #ccc;
-                    font-size: 12px * root.zoom;
+                    font-size: 12px;
                     vertical-alignment: center;
                 }
 
@@ -174,16 +169,16 @@ export component InputNode inherits BaseNode {
 
             // Row 3: Dropdown
             HorizontalLayout {
-                height: root.row-height * root.zoom;
-                spacing: 8px * root.zoom;
-                padding-left: root.pin-area-width * root.zoom;
-                padding-right: root.pin-area-width * root.zoom;
+                height: root.row-height;
+                spacing: 8px;
+                padding-left: root.pin-area-width;
+                padding-right: root.pin-area-width;
 
                 Text {
-                    width: root.label-width * root.zoom;
+                    width: root.label-width;
                     text: "Mode:";
                     color: #ccc;
-                    font-size: 12px * root.zoom;
+                    font-size: 12px;
                     vertical-alignment: center;
                 }
 
@@ -204,22 +199,22 @@ export component InputNode inherits BaseNode {
         width: 100%;
         height: 100%;
         background: root.selected ? root.node-color-selected : root.node-color;
-        border-radius: 4px * root.zoom;
+        border-radius: 4px;
         border-width: root.selected ? 2px : 1px;
         border-color: root.selected ? #8f8 : #555;
 
         VerticalLayout {
-            padding: root.content-padding * root.zoom;
+            padding: root.content-padding;
 
             Rectangle {
-                height: root.title-height * root.zoom;
+                height: root.title-height;
                 background: root.selected ? root.node-color-selected.darker(0.2) : root.node-color.darker(0.2);
-                border-radius: 4px * root.zoom;
+                border-radius: 4px;
 
                 Text {
                     text: root.title;
                     color: white;
-                    font-size: max(14px * root.zoom, 9px);  // Minimum readable font
+                    font-size: 14px;
                     horizontal-alignment: center;
                     vertical-alignment: center;
                 }
@@ -245,14 +240,13 @@ export component InputNode inherits BaseNode {
         }
     }
 
-    // === Output pin (visible at all LOD levels, but positioned differently) ===
+    // === Output pin (visible at all LOD levels) ===
     output-pin := Pin {
-        x: parent.width - root.content-padding * root.zoom - root.pin-size;
-        y: parent.height / 2 - root.pin-size / 2;
+        x: parent.width - root.content-padding - root.base-pin-size;
+        y: parent.height / 2 - root.base-pin-size / 2;
         pin-id: root.output-pin-id;
         node-id: root.node-id;
         pin-type: PinTypes.output;
-        zoom: root.zoom;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
         base-color: #4CAF50;

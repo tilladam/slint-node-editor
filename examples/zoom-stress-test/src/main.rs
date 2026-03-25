@@ -3,15 +3,13 @@
 // Tests widget scaling behavior at various zoom levels with three complex nodes.
 
 use slint::{Color, ModelRc, SharedString, VecModel};
-use slint_node_editor::NodeEditorController;
+use slint_node_editor::{NodeEditorSetup, wire_node_editor};
 use std::rc::Rc;
 
 slint::include_modules!();
 
 fn main() {
     let window = MainWindow::new().unwrap();
-    let ctrl = NodeEditorController::new();
-    let w = window.as_weak();
 
     // Create input nodes model
     let input_nodes: Rc<VecModel<InputNodeData>> = Rc::new(VecModel::from(vec![InputNodeData {
@@ -81,45 +79,13 @@ fn main() {
     window.set_display_nodes(ModelRc::from(display_nodes.clone()));
     window.set_links(ModelRc::from(links.clone()));
 
-    // Core callbacks - controller handles link path computation
-    window.on_compute_link_path(ctrl.compute_link_path_callback());
-
-    // Geometry tracking
-    window.on_node_rect_changed({
-        let ctrl = ctrl.clone();
-        move |id, x, y, width, h| {
-            ctrl.handle_node_rect(id, x, y, width, h);
-        }
+    // Create setup with model update logic (no-op since nodes don't move in this example)
+    let setup = NodeEditorSetup::new(|_node_id, _delta_x, _delta_y| {
+        // Nodes are not draggable in this stress test
     });
 
-    window.on_pin_position_changed({
-        let ctrl = ctrl.clone();
-        move |pid, nid, ptype, x, y| {
-            ctrl.handle_pin_position(pid, nid, ptype, x, y);
-        }
-    });
-
-    // Grid updates
-    window.on_request_grid_update({
-        let ctrl = ctrl.clone();
-        let w = w.clone();
-        move || {
-            if let Some(w) = w.upgrade() {
-                w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
-            }
-        }
-    });
-
-    window.on_update_viewport({
-        let ctrl = ctrl.clone();
-        let w = w.clone();
-        move |z, pan_x, pan_y| {
-            if let Some(w) = w.upgrade() {
-                ctrl.set_zoom(z);
-                w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
-            }
-        }
-    });
+    // Wire all standard callbacks with one macro call
+    wire_node_editor!(window, setup);
 
     // Input node callbacks
     window.on_input_text_changed(|id, val| {

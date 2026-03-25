@@ -16,7 +16,7 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
     BasicLinkValidator, CompositeValidator, GeometryCache, LinkModel, LinkValidator,
-    NodeEditorController, SimpleNodeGeometry, ValidationError, ValidationResult,
+    NodeEditorSetup, SimpleNodeGeometry, ValidationError, ValidationResult, wire_node_editor,
 };
 use std::rc::Rc;
 
@@ -163,8 +163,6 @@ impl LinkModel for LinkData {
 
 fn main() {
     let window = MainWindow::new().unwrap();
-    let ctrl = NodeEditorController::new();
-    let w = window.as_weak();
 
     // Set up nodes
     let nodes = Rc::new(VecModel::from(vec![
@@ -190,35 +188,29 @@ fn main() {
     // Link ID counter
     let next_link_id = Rc::new(std::cell::Cell::new(1));
 
-    // Core callbacks
-    window.on_compute_link_path({
-        let ctrl = ctrl.clone();
-        let w = window.as_weak();
-        move |start_pin, end_pin, _version, _zoom: f32, _pan_x: f32, _pan_y: f32| {
-            let w = match w.upgrade() {
-                Some(w) => w,
-                None => return SharedString::default(),
-            };
-            ctrl.cache()
-                .borrow()
-                .compute_link_path(start_pin, end_pin, w.get_zoom(), 50.0)
-                .unwrap_or_default()
-                .into()
+    // Create setup with model update logic
+    let setup = NodeEditorSetup::new({
+        let nodes = nodes.clone();
+        move |node_id, delta_x, delta_y| {
+            for i in 0..nodes.row_count() {
+                if let Some(mut node) = nodes.row_data(i) {
+                    if node.id == node_id {
+                        node.x += delta_x;
+                        node.y += delta_y;
+                        nodes.set_row_data(i, node);
+                        break;
+                    }
+                }
+            }
         }
     });
-    window.on_node_drag_started(ctrl.node_drag_started_callback());
 
-    // Pin hit detection for link completion
-    window.on_compute_pin_at({
-        let ctrl = ctrl.clone();
-        move |x, y| {
-            ctrl.cache().borrow().find_pin_at(x as f32, y as f32, 20.0)
-        }
-    });
+    // Wire all standard callbacks with one macro call
+    wire_node_editor!(window, setup);
 
     // Link validation callback for hover feedback
     window.on_validate_link({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let links = links.clone();
         move |start_pin, end_pin| {
             let cache = ctrl.cache();
@@ -238,44 +230,9 @@ fn main() {
         }
     });
 
-    // Link preview path generation
-    window.on_compute_link_preview_path({
-        let w = window.as_weak();
-        move |start_x, start_y, end_x, end_y| {
-            let w = match w.upgrade() {
-                Some(w) => w,
-                None => return SharedString::default(),
-            };
-            slint_node_editor::generate_bezier_path(
-                start_x as f32,
-                start_y as f32,
-                end_x as f32,
-                end_y as f32,
-                w.get_zoom(),
-                50.0,
-            )
-            .into()
-        }
-    });
-
-    // Geometry tracking
-    window.on_node_rect_changed({
-        let ctrl = ctrl.clone();
-        move |id, x, y, width, h| {
-            ctrl.handle_node_rect(id, x, y, width, h);
-        }
-    });
-
-    window.on_pin_position_changed({
-        let ctrl = ctrl.clone();
-        move |pid, nid, ptype, x, y| {
-            ctrl.handle_pin_position(pid, nid, ptype, x, y);
-        }
-    });
-
     // Link requested - validate and create
     window.on_link_requested({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let links = links.clone();
         let next_link_id = next_link_id.clone();
         move |start_pin, end_pin| {
@@ -342,46 +299,6 @@ fn main() {
         }
     });
 
-    // Grid updates
-    window.on_request_grid_update({
-        let ctrl = ctrl.clone();
-        let w = w.clone();
-        move || {
-            if let Some(w) = w.upgrade() {
-                w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
-            }
-        }
-    });
-
-    window.on_update_viewport({
-        let ctrl = ctrl.clone();
-        let w = w.clone();
-        move |z, pan_x, pan_y| {
-            if let Some(w) = w.upgrade() {
-                ctrl.set_zoom(z);
-                w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
-            }
-        }
-    });
-
-    // Node drag
-    window.on_node_drag_ended({
-        let ctrl = ctrl.clone();
-        move |delta_x, delta_y| {
-            let node_id = ctrl.dragged_node_id();
-            for i in 0..nodes.row_count() {
-                if let Some(mut node) = nodes.row_data(i) {
-                    if node.id == node_id {
-                        node.x += delta_x;
-                        node.y += delta_y;
-                        nodes.set_row_data(i, node);
-                        break;
-                    }
-                }
-            }
-        }
-    });
-
     // Print compatibility matrix on startup
     println!("\n=== Pin Type Compatibility Matrix ===");
     println!("Try connecting pins to see validation in action!\n");
@@ -396,6 +313,5 @@ fn main() {
     println!("  Any      -> All types");
     println!("\nDrag from an output pin (right side) to an input pin (left side).\n");
 
-    window.invoke_request_grid_update();
     window.run().unwrap();
 }

@@ -91,8 +91,11 @@ impl MinimalTestHarness {
         let links = Rc::new(VecModel::from(links));
         window.set_links(ModelRc::from(links.clone()));
 
+        // Wire global computational callbacks
+        let computations = window.global::<NodeEditorComputations>();
+        
         // Core callbacks - controller handles the logic
-        window.on_compute_link_path(ctrl.compute_link_path_callback());
+        computations.on_compute_link_path(ctrl.compute_link_path_callback());
         window.on_node_drag_started({
             let ctrl = ctrl.clone();
             let tracker = tracker.clone();
@@ -102,8 +105,8 @@ impl MinimalTestHarness {
             }
         });
 
-        // Geometry tracking - update cache
-        window.on_node_rect_changed({
+        // Geometry tracking via globals
+        window.global::<GeometryCallbacks>().on_report_node_rect({
             let ctrl = ctrl.clone();
             let tracker = tracker.clone();
             move |id, x, y, width, h| {
@@ -112,7 +115,7 @@ impl MinimalTestHarness {
             }
         });
 
-        window.on_pin_position_changed({
+        window.global::<GeometryCallbacks>().on_report_pin_position({
             let ctrl = ctrl.clone();
             let tracker = tracker.clone();
             move |pid, nid, ptype, x, y| {
@@ -132,7 +135,7 @@ impl MinimalTestHarness {
             }
         });
 
-        window.on_update_viewport({
+        computations.on_viewport_changed({
             let ctrl = ctrl.clone();
             let tracker = tracker.clone();
             let w = w.clone();
@@ -214,39 +217,42 @@ impl MinimalTestHarness {
             }
         });
 
-        // Selection callbacks
-        window.on_select_node({
+        // Selection notification callbacks
+        // NodeEditor handles basic selection internally. These are for tracking and shift-select.
+        window.on_node_selected({
             let selection = selection.clone();
             let w = w.clone();
             move |node_id, shift_held| {
-                let mut sel = selection.borrow_mut();
-                sel.handle_interaction(node_id, shift_held);
-                if let Some(w) = w.upgrade() {
-                    let ids: Vec<i32> = sel.iter().cloned().collect();
-                    w.set_selected_node_ids(ModelRc::from(Rc::new(VecModel::from(ids))));
-                    w.set_selection_version(w.get_selection_version() + 1);
+                if shift_held {
+                    // For shift-select, app must handle adding to selection
+                    let mut sel = selection.borrow_mut();
+                    sel.handle_interaction(node_id, true);
+                    if let Some(w) = w.upgrade() {
+                        let ids: Vec<i32> = sel.iter().cloned().collect();
+                        w.set_selected_node_ids(ModelRc::from(Rc::new(VecModel::from(ids))));
+                        w.set_selection_version(w.get_selection_version() + 1);
+                    }
                 }
+                // For non-shift, NodeEditor already updated selection
             }
         });
 
-        window.on_clear_selection({
-            let selection = selection.clone();
-            let w = w.clone();
+        window.on_selection_cleared({
+            let _selection = selection.clone();
             move || {
-                selection.borrow_mut().clear();
-                if let Some(w) = w.upgrade() {
-                    w.set_selected_node_ids(ModelRc::default());
-                    w.set_selection_version(w.get_selection_version() + 1);
-                }
+                // NodeEditor already cleared node selection
+                // App can do additional cleanup here if needed
             }
         });
 
-        window.on_is_selected({
+        // is-node-selected now uses the global
+        computations.on_is_node_selected({
             let selection = selection.clone();
             move |node_id, _version| selection.borrow().contains(node_id)
         });
 
-        window.on_sync_selection_to_nodes({
+        // Node selection sync now uses the global
+        computations.on_sync_selection_to_nodes({
             let selection = selection.clone();
             move |ids| {
                 let mut sel = selection.borrow_mut();
@@ -275,18 +281,6 @@ impl MinimalTestHarness {
                 });
                 ctrl.cache().borrow().find_link_at(x, y, links_iter, 8.0, ctrl.zoom(), 50.0, 20)
             }
-        });
-
-        window.on_compute_box_selection({
-            let ctrl = ctrl.clone();
-            move |x, y, w, h| {
-                let ids = ctrl.cache().borrow().nodes_in_selection_box(x, y, w, h);
-                ModelRc::from(Rc::new(VecModel::from(ids)))
-            }
-        });
-
-        window.on_compute_link_preview_path(|start_x, start_y, end_x, end_y| {
-            slint_node_editor::generate_bezier_path(start_x, start_y, end_x, end_y, 1.0, 50.0).into()
         });
 
         // Initialize grid
