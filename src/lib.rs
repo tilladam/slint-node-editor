@@ -107,5 +107,22 @@ macro_rules! wire_node_editor {
         gc.on_start_node_drag($setup.start_node_drag());
         gc.on_end_node_drag($setup.end_node_drag());
         $window.global::<NodeEditorComputations>().on_compute_link_path($setup.compute_link_path());
+        
+        // Wire viewport_changed for automatic grid updates
+        let ctrl = $setup.controller().clone();
+        let w = $window.as_weak();
+        $window.global::<NodeEditorComputations>().on_viewport_changed(move |zoom, pan_x, pan_y| {
+            ctrl.set_viewport(zoom, pan_x, pan_y);
+            if let Some(w) = w.upgrade() {
+                w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
+            }
+        });
+        
+        // Generate initial grid
+        let ctrl = $setup.controller().clone();
+        let w = $window.as_weak();
+        if let Some(w) = w.upgrade() {
+            w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
+        }
     }};
 }

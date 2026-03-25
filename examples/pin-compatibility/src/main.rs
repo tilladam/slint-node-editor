@@ -163,7 +163,6 @@ impl LinkModel for LinkData {
 
 fn main() {
     let window = MainWindow::new().unwrap();
-    let w = window.as_weak();
 
     // Set up nodes
     let nodes = Rc::new(VecModel::from(vec![
@@ -331,28 +330,6 @@ fn main() {
         }
     });
 
-    // Grid updates
-    window.on_request_grid_update({
-        let ctrl = setup.controller().clone();
-        let w = w.clone();
-        move || {
-            if let Some(w) = w.upgrade() {
-                w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
-            }
-        }
-    });
-
-    window.global::<NodeEditorComputations>().on_viewport_changed({
-        let ctrl = setup.controller().clone();
-        let w = w.clone();
-        move |z, pan_x, pan_y| {
-            if let Some(w) = w.upgrade() {
-                ctrl.set_viewport(z, pan_x, pan_y);
-                w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
-            }
-        }
-    });
-
     // Print compatibility matrix on startup
     println!("\n=== Pin Type Compatibility Matrix ===");
     println!("Try connecting pins to see validation in action!\n");
@@ -367,6 +344,5 @@ fn main() {
     println!("  Any      -> All types");
     println!("\nDrag from an output pin (right side) to an input pin (left side).\n");
 
-    window.invoke_request_grid_update();
     window.run().unwrap();
 }

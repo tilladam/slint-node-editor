@@ -6,7 +6,6 @@ slint::include_modules!();
 
 fn main() {
     let window = MainWindow::new().unwrap();
-    let w = window.as_weak();
 
     // Set up nodes
     let nodes = Rc::new(VecModel::from(vec![
@@ -45,21 +44,6 @@ fn main() {
 
     // Wire all callbacks with one macro call
     wire_node_editor!(window, setup);
-    
-    // Viewport change handling (for grid updates)
-    window.global::<NodeEditorComputations>().on_viewport_changed({
-        let ctrl = setup.controller().clone();
-        let w = w.clone();
-        move |zoom, pan_x, pan_y| {
-            if let Some(w) = w.upgrade() {
-                ctrl.set_viewport(zoom, pan_x, pan_y);
-                w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
-            }
-        }
-    });
-    
-    // Initial grid generation
-    window.set_grid_commands(setup.generate_initial_grid(window.get_width_(), window.get_height_()));
 
     window.run().unwrap();
 }

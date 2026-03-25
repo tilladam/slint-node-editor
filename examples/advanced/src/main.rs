@@ -283,16 +283,6 @@ fn main() {
     // Wire standard callbacks with one macro call
     wire_node_editor!(window, setup);
 
-    window.on_request_grid_update({
-        let ctrl = setup.controller().clone();
-        let w = window.as_weak();
-        move || {
-            if let Some(w) = w.upgrade() {
-                w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
-            }
-        }
-    });
-
     window.on_compute_pin_at({
         let ctrl = setup.controller().clone();
         let w = window.as_weak();
@@ -465,19 +455,6 @@ fn main() {
                 let data = LinkData { id, start_pin_id: output_pin, end_pin_id: input_pin, color, line_width: 2.0 };
                 links.push(data);
             }
-        }
-    });
-
-    // Viewport change handling (grid updates) - now via NodeEditorComputations global
-    window.global::<NodeEditorComputations>().on_viewport_changed({
-        let ctrl = setup.controller().clone();
-        let w = window.as_weak();
-        move |zoom, pan_x, pan_y| {
-            let w = match w.upgrade() { Some(w) => w, None => return };
-            ctrl.set_viewport(zoom, pan_x, pan_y);
-
-            // Update grid
-            w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
         }
     });
 

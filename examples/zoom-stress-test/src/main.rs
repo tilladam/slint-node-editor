@@ -10,7 +10,6 @@ slint::include_modules!();
 
 fn main() {
     let window = MainWindow::new().unwrap();
-    let w = window.as_weak();
 
     // Create input nodes model
     let input_nodes: Rc<VecModel<InputNodeData>> = Rc::new(VecModel::from(vec![InputNodeData {
@@ -87,29 +86,6 @@ fn main() {
 
     // Wire all standard callbacks with one macro call
     wire_node_editor!(window, setup);
-
-    // Grid updates
-    window.on_request_grid_update({
-        let ctrl = setup.controller().clone();
-        let w = w.clone();
-        move || {
-            if let Some(w) = w.upgrade() {
-                w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
-            }
-        }
-    });
-
-    // Viewport change handling via global
-    window.global::<NodeEditorComputations>().on_viewport_changed({
-        let ctrl = setup.controller().clone();
-        let w = w.clone();
-        move |z, pan_x, pan_y| {
-            if let Some(w) = w.upgrade() {
-                ctrl.set_viewport(z, pan_x, pan_y);
-                w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
-            }
-        }
-    });
 
     // Input node callbacks
     window.on_input_text_changed(|id, val| {

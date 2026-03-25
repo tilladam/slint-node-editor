@@ -406,18 +406,15 @@ export component NodeEditor {
     // === Trigger updates on viewport changes ===
     changed pan-x => {
         ViewportState.pan-x = root.pan-x;
-        request-grid-update();
         NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
     }
     changed pan-y => {
         ViewportState.pan-y = root.pan-y;
-        request-grid-update();
         NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
     }
     changed zoom => {
         ViewportState.zoom = root.zoom;
         GeometryVersion.version += 1;
-        request-grid-update();
         NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
     }
     
@@ -435,10 +432,10 @@ export component NodeEditor {
         DragState.drag-offset-y = root.internal-drag-offset-y;
     }
     changed width => {
-        request-grid-update();
+        NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
     }
     changed height => {
-        request-grid-update();
+        NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
     }
     
     // Watch LinkCreation global for pin-initiated link creation
