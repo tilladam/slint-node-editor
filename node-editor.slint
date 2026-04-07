@@ -53,7 +53,13 @@ export enum BoxSelectionModifier {
 /// - Layer 3: Selection box and link preview overlays
 ///
 /// Computation-heavy operations are delegated to the application via callbacks.
-export component NodeEditor {
+// NodeEditor inherits FocusScope so it IS the keyboard focus surface for the
+// whole editor. Consequences:
+//   * Embedders can call `node-editor.focus()` directly.
+//   * Keys rejected by a focused descendant (e.g. a TextInput inside a node)
+//     bubble up into this component's `key-pressed` handler, so Delete /
+//     Escape / Ctrl+N work even while an in-node input is focused.
+export component NodeEditor inherits FocusScope {
     // === Shared viewport state ===
     in-out property <length> pan-x: 0px;
     in-out property <length> pan-y: 0px;
@@ -216,16 +222,19 @@ export component NodeEditor {
     pure callback compute-link-path(/* start-pin-id */ int, /* end-pin-id */ int, /* version */ int, /* zoom */ float, /* pan-x */ float, /* pan-y */ float) -> string;
 
     // === Callbacks TO Application (events) ===
+    // Keyboard shortcuts are the embedder's responsibility. NodeEditor inherits
+    // FocusScope (so it can be focused via `focus()` and `focus-on-click`), but
+    // defines no `key-pressed` handler — keys land on the focused descendant,
+    // bubble up unhandled, and reach the embedder's parent FocusScope. Bind
+    // operations like `cancel-link-creation()` from there, querying state via
+    // `is-creating-link` as needed.
     callback link-requested(/* start-pin */ int, /* end-pin */ int);
     callback link-cancelled();
     callback link-hovered();
     callback selection-changed();
     callback viewport-changed();
-    callback delete-selected();
-    callback add-node-requested();
     callback context-menu-requested();
     callback node-double-clicked(/* node-id */ int);
-    callback navigate-up();
     callback node-drag-started(/* node-id */ int);
     callback node-drag-ended(/* delta-x */ float, /* delta-y */ float);
 
@@ -637,28 +646,4 @@ export component NodeEditor {
         }
     }
 
-    // === Keyboard handling ===
-    FocusScope {
-        width: 100%;
-        height: 100%;
-
-        key-pressed(event) => {
-            if event.text == Key.Delete || event.text == Key.Backspace {
-                root.delete-selected();
-                accept
-            } else if event.text == Key.Escape {
-                if root.internal-is-creating-link {
-                    root.cancel-link-creation();
-                } else {
-                    root.navigate-up();
-                }
-                accept
-            } else if event.modifiers.control && (event.text == "n" || event.text == "N") {
-                root.add-node-requested();
-                accept
-            } else {
-                reject
-            }
-        }
-    }
 }

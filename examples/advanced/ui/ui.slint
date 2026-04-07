@@ -202,7 +202,7 @@ export component MainWindow inherits Window {
     callback update-viewport(float, float, float);  // zoom, pan-x, pan-y (for link position updates)
     callback create-link <=> editor.link-requested;
     callback delete-selected-nodes();  // delete all selected nodes
-    callback add-node <=> editor.add-node-requested;
+    callback add-node();
 
     // Filter node callbacks
     callback filter-type-changed(int, int);  // node-id, new-index
@@ -296,154 +296,176 @@ export component MainWindow inherits Window {
         editor.graph-max-y = graph-max-y * 1px;
     }
 
-    // The pure Slint NodeEditor handles all three layers:
-    // 1. Background with grid
-    // 2. Children (nodes and links) - placed via @children
-    // 3. Overlay for selection box and link preview
-    editor := NodeEditor {
+    // Focus the editor on startup so keyboard shortcuts work without first
+    // clicking the editor. NodeEditor inherits FocusScope but defines no
+    // key-pressed handler — embedders own the keymap (see `shortcuts` below).
+    init => {
+        editor.focus();
+    }
+
+    // App-level keymap. NodeEditor exposes operations (delete-selected,
+    // cancel-link-creation, …) and state (is-creating-link, …) but does not
+    // bind any keys itself. Wrap it in a parent FocusScope and bind here:
+    // rejected keys from the focused descendant bubble up to this handler.
+    shortcuts := FocusScope {
         width: 100%;
         height: 100%;
-        pan-x <=> root.pan-x;
-        pan-y <=> root.pan-y;
-        zoom <=> root.zoom;
-        min-zoom: 0.25;
-        max-zoom: 4.0;
-        background-color: #1a1a1a;
-        grid-spacing: 24px;
-        grid-snapping <=> grid-snap-enabled;
-        grid-color: #333333;
-        grid-commands <=> root.grid-commands;
-        links <=> root.links;
 
-        // Set pin hit radius from globals
-        pin-hit-radius: NodeConstants.pin-size * zoom * 0.66;
-        link-hover-distance: 8px;
-
-        // Callbacks aliased to root
-
-
-        // Event callbacks aliased to root:
-        // link-requested => root.create-link
-        // node-drag-ended => root.commit-drag
-        // add-node-requested => root.add-node
-
-        context-menu-requested => {
-            debug("Context menu at: " + editor.context-menu-x / 1px + ", " + editor.context-menu-y / 1px);
+        key-pressed(event) => {
+            if (event.text == Key.Delete || event.text == Key.Backspace) {
+                root.delete-selected-nodes();
+                root.delete-selected-links();
+                return accept;
+            }
+            if (event.modifiers.control && (event.text == "n" || event.text == "N")) {
+                root.add-node();
+                return accept;
+            }
+            if (event.text == Key.Escape && editor.is-creating-link) {
+                editor.cancel-link-creation();
+                return accept;
+            }
+            return reject;
         }
 
+        // The pure Slint NodeEditor handles all three layers:
+        // 1. Background with grid
+        // 2. Children (nodes and links) - placed via @children
+        // 3. Overlay for selection box and link preview
+        editor := NodeEditor {
+            width: 100%;
+            height: 100%;
+            pan-x <=> root.pan-x;
+            pan-y <=> root.pan-y;
+            zoom <=> root.zoom;
+            min-zoom: 0.25;
+            max-zoom: 4.0;
+            background-color: #1a1a1a;
+            grid-spacing: 24px;
+            grid-snapping <=> grid-snap-enabled;
+            grid-color: #333333;
+            grid-commands <=> root.grid-commands;
+            links <=> root.links;
 
+            // Set pin hit radius from globals
+            pin-hit-radius: NodeConstants.pin-size * zoom * 0.66;
+            link-hover-distance: 8px;
 
-        // Forward selection checking callbacks to root (version param ignored, just for cache invalidation)
-        is-selected(node-id, version) => {
-            return root.is-node-selected(node-id);
-        }
-        is-link-selected(link-id, version) => {
-            return root.is-link-selected(link-id);
-        }
+            // Event callbacks aliased to root:
+            // link-requested => root.create-link
+            // node-drag-ended => root.commit-drag
 
-        viewport-changed => {
-            root.update-viewport(zoom, pan-x / 1px, pan-y / 1px);
-        }
+            context-menu-requested => {
+                debug("Context menu at: " + editor.context-menu-x / 1px + ", " + editor.context-menu-y / 1px);
+            }
 
-        delete-selected => {
-            root.delete-selected-nodes();
-            root.delete-selected-links();
-        }
+            // Forward selection checking callbacks to root (version param ignored, just for cache invalidation)
+            is-selected(node-id, version) => {
+                return root.is-node-selected(node-id);
+            }
+            is-link-selected(link-id, version) => {
+                return root.is-link-selected(link-id);
+            }
 
-        // Nodes - children of NodeEditor
-        for node-data in nodes: Node {
-            title: node-data.title;
-            node-id: node-data.id;
-            selected: editor.is-selected(node-data.id, editor.selection-version);
-            world-x: node-data.world-x * 1px;
-            world-y: node-data.world-y * 1px;
-            drag-offset-x: editor.is-selected(node-data.id, editor.selection-version) ? editor.drag-offset-x : 0px;
-            drag-offset-y: editor.is-selected(node-data.id, editor.selection-version) ? editor.drag-offset-y : 0px;
-            zoom: zoom;
-            pan-x: pan-x;
-            pan-y: pan-y;
-            clicked(id, shift) => {
-                editor.handle-node-click(id, shift);
+            viewport-changed => {
+                root.update-viewport(zoom, pan-x / 1px, pan-y / 1px);
             }
-            drag-started(id, already-selected, wx, wy) => {
-                editor.start-node-drag(id, already-selected, wx, wy);
-            }
-            drag-moved(id, offset-x, offset-y) => {
-                editor.update-node-drag(offset-x, offset-y);
-            }
-            drag-ended(id, delta-x, delta-y) => {
-                editor.end-node-drag(delta-x, delta-y);
-            }
-            pin-position-changed(pin-id, node-id, pin-type, x, y) => {
-                editor.report-pin-position(pin-id, node-id, pin-type, x, y);
-            }
-            pin-drag-started(pin-id, x, y) => {
-                editor.start-link-from-pin(pin-id, x, y);
-            }
-            pin-drag-moved(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-            }
-            pin-drag-ended(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-                editor.complete-link-creation();
-            }
-            report-rect(id, x, y, w, h) => {
-                editor.report-node-rect(id, x, y, w, h);
-            }
-        }
 
-        // Filter nodes - complex nodes with widgets
-        for filter-data in filter-nodes: FilterNode {
-            title: filter-data.title;
-            node-id: filter-data.id;
-            selected: editor.is-selected(filter-data.id, editor.selection-version);
-            world-x: filter-data.world-x * 1px;
-            world-y: filter-data.world-y * 1px;
-            drag-offset-x: editor.is-selected(filter-data.id, editor.selection-version) ? editor.drag-offset-x : 0px;
-            drag-offset-y: editor.is-selected(filter-data.id, editor.selection-version) ? editor.drag-offset-y : 0px;
-            zoom: zoom;
-            pan-x: pan-x;
-            pan-y: pan-y;
-            filter-type-index: filter-data.filter-type-index;
-            enabled: filter-data.enabled;
-            processed-count: filter-data.processed-count;
+            // Nodes - children of NodeEditor
+            for node-data in nodes: Node {
+                title: node-data.title;
+                node-id: node-data.id;
+                selected: editor.is-selected(node-data.id, editor.selection-version);
+                world-x: node-data.world-x * 1px;
+                world-y: node-data.world-y * 1px;
+                drag-offset-x: editor.is-selected(node-data.id, editor.selection-version) ? editor.drag-offset-x : 0px;
+                drag-offset-y: editor.is-selected(node-data.id, editor.selection-version) ? editor.drag-offset-y : 0px;
+                zoom: zoom;
+                pan-x: pan-x;
+                pan-y: pan-y;
+                clicked(id, shift) => {
+                    editor.handle-node-click(id, shift);
+                }
+                drag-started(id, already-selected, wx, wy) => {
+                    editor.start-node-drag(id, already-selected, wx, wy);
+                }
+                drag-moved(id, offset-x, offset-y) => {
+                    editor.update-node-drag(offset-x, offset-y);
+                }
+                drag-ended(id, delta-x, delta-y) => {
+                    editor.end-node-drag(delta-x, delta-y);
+                }
+                pin-position-changed(pin-id, node-id, pin-type, x, y) => {
+                    editor.report-pin-position(pin-id, node-id, pin-type, x, y);
+                }
+                pin-drag-started(pin-id, x, y) => {
+                    editor.start-link-from-pin(pin-id, x, y);
+                }
+                pin-drag-moved(pin-id, x, y) => {
+                    editor.update-link-end(x, y);
+                }
+                pin-drag-ended(pin-id, x, y) => {
+                    editor.update-link-end(x, y);
+                    editor.complete-link-creation();
+                }
+                report-rect(id, x, y, w, h) => {
+                    editor.report-node-rect(id, x, y, w, h);
+                }
+            }
 
-            clicked(id, shift) => {
-                editor.handle-node-click(id, shift);
-            }
-            drag-started(id, already-selected, wx, wy) => {
-                editor.start-node-drag(id, already-selected, wx, wy);
-            }
-            drag-moved(id, offset-x, offset-y) => {
-                editor.update-node-drag(offset-x, offset-y);
-            }
-            drag-ended(id, delta-x, delta-y) => {
-                editor.end-node-drag(delta-x, delta-y);
-            }
-            pin-position-changed(pin-id, node-id, pin-type, x, y) => {
-                editor.report-pin-position(pin-id, node-id, pin-type, x, y);
-            }
-            pin-drag-started(pin-id, x, y) => {
-                editor.start-link-from-pin(pin-id, x, y);
-            }
-            pin-drag-moved(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-            }
-            pin-drag-ended(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-                editor.complete-link-creation();
-            }
-            report-rect(id, x, y, w, h) => {
-                editor.report-node-rect(id, x, y, w, h);
-            }
-            filter-type-changed(id, idx) => {
-                root.filter-type-changed(id, idx);
-            }
-            toggle-enabled(id) => {
-                root.filter-toggle-enabled(id);
-            }
-            reset-clicked(id) => {
-                root.filter-reset(id);
+            // Filter nodes - complex nodes with widgets
+            for filter-data in filter-nodes: FilterNode {
+                title: filter-data.title;
+                node-id: filter-data.id;
+                selected: editor.is-selected(filter-data.id, editor.selection-version);
+                world-x: filter-data.world-x * 1px;
+                world-y: filter-data.world-y * 1px;
+                drag-offset-x: editor.is-selected(filter-data.id, editor.selection-version) ? editor.drag-offset-x : 0px;
+                drag-offset-y: editor.is-selected(filter-data.id, editor.selection-version) ? editor.drag-offset-y : 0px;
+                zoom: zoom;
+                pan-x: pan-x;
+                pan-y: pan-y;
+                filter-type-index: filter-data.filter-type-index;
+                enabled: filter-data.enabled;
+                processed-count: filter-data.processed-count;
+
+                clicked(id, shift) => {
+                    editor.handle-node-click(id, shift);
+                }
+                drag-started(id, already-selected, wx, wy) => {
+                    editor.start-node-drag(id, already-selected, wx, wy);
+                }
+                drag-moved(id, offset-x, offset-y) => {
+                    editor.update-node-drag(offset-x, offset-y);
+                }
+                drag-ended(id, delta-x, delta-y) => {
+                    editor.end-node-drag(delta-x, delta-y);
+                }
+                pin-position-changed(pin-id, node-id, pin-type, x, y) => {
+                    editor.report-pin-position(pin-id, node-id, pin-type, x, y);
+                }
+                pin-drag-started(pin-id, x, y) => {
+                    editor.start-link-from-pin(pin-id, x, y);
+                }
+                pin-drag-moved(pin-id, x, y) => {
+                    editor.update-link-end(x, y);
+                }
+                pin-drag-ended(pin-id, x, y) => {
+                    editor.update-link-end(x, y);
+                    editor.complete-link-creation();
+                }
+                report-rect(id, x, y, w, h) => {
+                    editor.report-node-rect(id, x, y, w, h);
+                }
+                filter-type-changed(id, idx) => {
+                    root.filter-type-changed(id, idx);
+                }
+                toggle-enabled(id) => {
+                    root.filter-toggle-enabled(id);
+                }
+                reset-clicked(id) => {
+                    root.filter-reset(id);
+                }
             }
         }
     }

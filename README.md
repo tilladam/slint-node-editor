@@ -314,12 +314,6 @@ callback link-hovered();
 /// Viewport changed (pan/zoom)
 callback viewport-changed();
 
-/// User pressed Delete key
-callback delete-selected();
-
-/// User pressed Ctrl+N or clicked add button
-callback add-node-requested();
-
 /// User right-clicked (context menu)
 callback context-menu-requested();
 
