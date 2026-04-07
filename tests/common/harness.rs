@@ -190,27 +190,11 @@ impl MinimalTestHarness {
             }
         });
 
-        // Delete selected callback
-        window.on_delete_selected({
-            let tracker = tracker.clone();
-            move || {
-                *tracker.delete_selected.borrow_mut() += 1;
-            }
-        });
-
         // Context menu requested callback
         window.on_context_menu_requested({
             let tracker = tracker.clone();
             move || {
                 *tracker.context_menu_requested.borrow_mut() += 1;
-            }
-        });
-
-        // Add node requested callback
-        window.on_add_node_requested({
-            let tracker = tracker.clone();
-            move || {
-                *tracker.add_node_requested.borrow_mut() += 1;
             }
         });
 

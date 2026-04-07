@@ -22,8 +22,6 @@ pub struct CallbackTracker {
     pub link_cancelled: Rc<RefCell<usize>>,
     /// Count of selection_changed calls
     pub selection_changed: Rc<RefCell<usize>>,
-    /// Count of delete_selected calls
-    pub delete_selected: Rc<RefCell<usize>>,
     /// (node_id, x, y, width, height)
     #[allow(clippy::type_complexity)]
     pub node_rect_changed: Rc<RefCell<Vec<(i32, f32, f32, f32, f32)>>>,
@@ -34,8 +32,6 @@ pub struct CallbackTracker {
     pub update_viewport: Rc<RefCell<Vec<(f32, f32, f32)>>>,
     /// Count of context_menu_requested calls
     pub context_menu_requested: Rc<RefCell<usize>>,
-    /// Count of add_node_requested calls
-    pub add_node_requested: Rc<RefCell<usize>>,
 }
 
 impl CallbackTracker {
@@ -50,11 +46,9 @@ impl CallbackTracker {
         self.link_requested.borrow_mut().clear();
         *self.link_cancelled.borrow_mut() = 0;
         *self.selection_changed.borrow_mut() = 0;
-        *self.delete_selected.borrow_mut() = 0;
         self.node_rect_changed.borrow_mut().clear();
         self.pin_position_changed.borrow_mut().clear();
         self.update_viewport.borrow_mut().clear();
         *self.context_menu_requested.borrow_mut() = 0;
-        *self.add_node_requested.borrow_mut() = 0;
     }
 }

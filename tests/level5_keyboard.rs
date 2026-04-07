@@ -25,33 +25,21 @@ fn setup_test_geometry(harness: &MinimalTestHarness) {
 // ============================================================================
 // Delete Key Tests
 // ============================================================================
-
-#[test]
-fn test_delete_selected_callback_tracks_calls() {
-    let harness = MinimalTestHarness::new();
-
-    assert_eq!(*harness.tracker.delete_selected.borrow(), 0);
-
-    // Simulate delete_selected being called
-    *harness.tracker.delete_selected.borrow_mut() += 1;
-
-    assert_eq!(*harness.tracker.delete_selected.borrow(), 1);
-}
+//
+// NodeEditor no longer binds Delete/Backspace/Ctrl+N itself — embedders own
+// the keymap. The tests below verify that key events still dispatch through
+// the harness without panicking, and that model-level delete operations work
+// independently of any key binding.
 
 #[test]
 fn test_delete_key_sends_event() {
     let harness = MinimalTestHarness::new();
     setup_test_geometry(&harness);
 
-    // The harness sets up on_delete_selected to increment the tracker
-    // When we send Delete key, if the FocusScope receives it, it calls delete_selected
-
-    // Note: In integration tests, we may need to ensure focus is set correctly
-    // For now, we test that the callback mechanism works via tracker
+    // NodeEditor no longer binds Delete itself; this just verifies the key
+    // event mechanism dispatches without panicking. The embedder is expected
+    // to bind Delete in its own parent FocusScope.
     harness.key_tap(Key::Delete);
-
-    // The actual behavior depends on Slint's focus handling
-    // This test verifies the key event mechanism works
 }
 
 #[test]
@@ -101,9 +89,9 @@ fn test_delete_removes_selected_nodes_from_model() {
     // Select node 2
     harness.selection.borrow_mut().handle_interaction(2, false);
 
-    // Simulate delete operation
-    // In real code, on_delete_selected would remove selected nodes
-    // Here we simulate that behavior directly
+    // Simulate delete operation directly on the model. Embedders are
+    // responsible for binding a key to invoke this work; the test exercises
+    // the model-level outcome independent of any keymap.
     let to_delete: Vec<i32> = harness.selection.borrow().iter().copied().collect();
     for id in to_delete {
         for i in 0..harness.nodes.row_count() {
@@ -360,22 +348,6 @@ fn test_text_input_dispatch() {
 
     // Test that text input can be dispatched (for potential search/rename features)
     harness.text_input("test");
-}
-
-// ============================================================================
-// Ctrl+N Add Node Tests
-// ============================================================================
-
-#[test]
-fn test_add_node_requested_callback_tracking() {
-    let harness = MinimalTestHarness::new();
-
-    assert_eq!(*harness.tracker.add_node_requested.borrow(), 0);
-
-    // Simulate Ctrl+N triggering add_node_requested
-    *harness.tracker.add_node_requested.borrow_mut() += 1;
-
-    assert_eq!(*harness.tracker.add_node_requested.borrow(), 1);
 }
 
 // ============================================================================

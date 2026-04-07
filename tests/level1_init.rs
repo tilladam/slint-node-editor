@@ -109,7 +109,6 @@ fn test_callback_tracker_starts_empty() {
     assert!(harness.tracker.link_requested.borrow().is_empty());
     assert_eq!(*harness.tracker.link_cancelled.borrow(), 0);
     assert_eq!(*harness.tracker.selection_changed.borrow(), 0);
-    assert_eq!(*harness.tracker.delete_selected.borrow(), 0);
 }
 
 #[test]
