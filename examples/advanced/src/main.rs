@@ -5,8 +5,9 @@
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    GraphLogic, LinkModel, MovableNode, NodeEditorController, SelectionManager,
+    GraphLogic, LinkModel, MovableNode, NodeEditorSetup, SelectionManager,
     BasicLinkValidator, NoDuplicatesValidator, CompositeValidator, LinkValidator, ValidationResult,
+    wire_node_editor,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -168,7 +169,6 @@ fn build_minimap_nodes(
 
 fn main() {
     let window = MainWindow::new().unwrap();
-    let ctrl = NodeEditorController::new();
 
     let selection_manager = Rc::new(RefCell::new(SelectionManager::new()));
     let link_selection_manager = Rc::new(RefCell::new(SelectionManager::new()));
@@ -247,8 +247,20 @@ fn main() {
     let filter_width = filter_node_constants.get_base_width();
     let filter_height = filter_node_constants.get_base_height();
 
+    // Create setup with model update logic for both node types
+    let setup = NodeEditorSetup::new({
+        let nodes = nodes.clone();
+        let filter_nodes = filter_nodes.clone();
+        let sm = selection_manager.clone();
+        move |_node_id, delta_x, delta_y| {
+            let sm = sm.borrow();
+            GraphLogic::commit_drag(&nodes, &sm, delta_x, delta_y);
+            GraphLogic::commit_drag(&filter_nodes, &sm, delta_x, delta_y);
+        }
+    });
+
     // Configure controller
-    ctrl.set_grid_spacing(node_constants.get_grid_spacing());
+    setup.controller().set_grid_spacing(node_constants.get_grid_spacing());
 
     // Create selection models
     let selected_node_ids: Rc<VecModel<i32>> = Rc::new(VecModel::default());
@@ -268,41 +280,11 @@ fn main() {
 
     // === Computation Callbacks ===
 
-    window.on_request_grid_update({
-        let ctrl = ctrl.clone();
-        let w = window.as_weak();
-        move || {
-            if let Some(w) = w.upgrade() {
-                w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
-            }
-        }
-    });
-
-    window.on_pin_position_changed({
-        let ctrl = ctrl.clone();
-        move |pin_id, node_id, pin_type, rel_x, rel_y| {
-            ctrl.handle_pin_position(pin_id, node_id, pin_type, rel_x, rel_y);
-        }
-    });
-
-    window.on_node_rect_changed({
-        let ctrl = ctrl.clone();
-        move |id, x, y, width, height| {
-            ctrl.handle_node_rect(id, x, y, width, height);
-        }
-    });
-
-    window.on_compute_pin_at({
-        let ctrl = ctrl.clone();
-        let w = window.as_weak();
-        move |x, y| {
-            let w = match w.upgrade() { Some(w) => w, None => return 0 };
-            ctrl.cache().borrow().find_pin_at(x as f32, y as f32, w.get_pin_hit_radius() as f32)
-        }
-    });
+    // Wire standard callbacks with one macro call
+    wire_node_editor!(window, setup);
 
     window.on_compute_link_at({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let links = links.clone();
         let w = window.as_weak();
         move |x, y| {
@@ -314,15 +296,8 @@ fn main() {
         }
     });
 
-    window.on_compute_box_selection({
-        let ctrl = ctrl.clone();
-        move |x, y, w, h| {
-            ModelRc::from(Rc::new(VecModel::from(ctrl.cache().borrow().nodes_in_selection_box(x as f32, y as f32, w as f32, h as f32))))
-        }
-    });
-
     window.on_compute_link_box_selection({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let links = links.clone();
         move |x, y, w, h| {
             let cache = ctrl.cache();
@@ -332,51 +307,38 @@ fn main() {
         }
     });
 
-    window.on_compute_link_path({
-        let ctrl = ctrl.clone();
-        let w = window.as_weak();
-        move |start_pin, end_pin, _version, _zoom: f32, _pan_x: f32, _pan_y: f32| {
-            let w = match w.upgrade() { Some(w) => w, None => return SharedString::default() };
-            ctrl.cache().borrow()
-                .compute_link_path(start_pin, end_pin, w.get_zoom(), w.get_bezier_min_offset())
-                .unwrap_or_default()
-                .into()
-        }
-    });
-
-    let window_for_preview = window.as_weak();
-    window.on_compute_link_preview_path(move |start_x, start_y, end_x, end_y| {
-        let w = match window_for_preview.upgrade() { Some(w) => w, None => return "".into() };
-        slint_node_editor::generate_bezier_path(start_x as f32, start_y as f32, end_x as f32, end_y as f32, w.get_zoom(), w.get_bezier_min_offset()).into()
-    });
-
-    // === Selection Checking Callbacks ===
+    // === Selection Checking Callbacks (now on NodeEditorComputations global) ===
 
     let sm_check = selection_manager.clone();
-    window.on_is_node_selected(move |id| sm_check.borrow().contains(id));
+    window.global::<NodeEditorComputations>().on_is_node_selected(move |id, _version| sm_check.borrow().contains(id));
 
     let lsm_check = link_selection_manager.clone();
-    window.on_is_link_selected(move |id| lsm_check.borrow().contains(id));
+    window.global::<NodeEditorComputations>().on_is_link_selected(move |id, _version| lsm_check.borrow().contains(id));
 
-    // === Selection Manipulation Callbacks ===
+    // === Selection Notification Callbacks ===
+    // NodeEditor handles basic selection logic internally. These callbacks allow the app
+    // to perform additional actions (like clearing link selection when a node is selected).
 
-    let sn_ids = selected_node_ids.clone();
     let sl_ids = selected_link_ids.clone();
-    let sm_select = selection_manager.clone();
     let lsm_select = link_selection_manager.clone();
-    let window_for_select_node = window.as_weak();
-    window.on_select_node(move |node_id, shift| {
+    let sm_for_shift = selection_manager.clone();
+    let sn_ids_shift = selected_node_ids.clone();
+    let window_for_node_selected = window.as_weak();
+    window.on_node_selected(move |node_id, shift| {
+        // Clear link selection when a node is selected
         lsm_select.borrow_mut().clear();
         lsm_select.borrow().sync_to_model(&*sl_ids);
 
-        let mut sm = sm_select.borrow_mut();
-        sm.handle_interaction(node_id, shift);
-        sm.sync_to_model(&*sn_ids);
-
-        if let Some(w) = window_for_select_node.upgrade() {
-            w.set_selection_version(w.get_selection_version() + 1);
-            w.invoke_selection_changed();
+        if shift {
+            // For shift-select, NodeEditor doesn't modify selection, app must handle it
+            let mut sm = sm_for_shift.borrow_mut();
+            sm.handle_interaction(node_id, true);
+            sm.sync_to_model(&*sn_ids_shift);
+            if let Some(w) = window_for_node_selected.upgrade() {
+                w.set_selection_version(w.get_selection_version() + 1);
+            }
         }
+        // For non-shift, NodeEditor already updated selection and version
     });
 
     let sn_ids_l = selected_node_ids.clone();
@@ -402,41 +364,29 @@ fn main() {
         }
     });
 
-    let sn_ids_c = selected_node_ids.clone();
     let sl_ids_c = selected_link_ids.clone();
-    let sm_clear = selection_manager.clone();
     let lsm_clear = link_selection_manager.clone();
-    let window_for_clear = window.as_weak();
-    window.on_clear_selection(move || {
-        sm_clear.borrow_mut().clear();
-        sm_clear.borrow().sync_to_model(&*sn_ids_c);
+    window.on_selection_cleared(move || {
+        // NodeEditor already cleared node selection, just clear link selection
         lsm_clear.borrow_mut().clear();
         lsm_clear.borrow().sync_to_model(&*sl_ids_c);
-
-        if let Some(w) = window_for_clear.upgrade() {
-            w.set_selection_version(w.get_selection_version() + 1);
-            w.invoke_selection_changed();
-        }
     });
 
+    // Override global selection sync to use our SelectionManager (NodeEditor increments selection-version)
     let sm_sync = selection_manager.clone();
-    let window_for_sync = window.as_weak();
-    window.on_sync_selection_to_nodes(move |ids_model| {
+    window.global::<NodeEditorComputations>().on_sync_selection_to_nodes(move |ids_model| {
         sm_sync.borrow_mut().sync_from_model(&ids_model);
-        if let Some(w) = window_for_sync.upgrade() { w.set_selection_version(w.get_selection_version() + 1); }
     });
 
     let lsm_sync = link_selection_manager.clone();
-    let window_for_sync_links = window.as_weak();
     window.on_sync_selection_to_links(move |ids_model| {
         lsm_sync.borrow_mut().sync_from_model(&ids_model);
-        if let Some(w) = window_for_sync_links.upgrade() { w.set_selection_version(w.get_selection_version() + 1); }
     });
 
     // === Event Callbacks ===
 
     window.on_create_link({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let links = links.clone();
         let next_link_id = next_link_id.clone();
         let color_index = color_index.clone();
@@ -479,29 +429,8 @@ fn main() {
         }
     });
 
-    window.on_update_viewport({
-        let ctrl = ctrl.clone();
-        let w = window.as_weak();
-        move |zoom, pan_x, pan_y| {
-            let w = match w.upgrade() { Some(w) => w, None => return };
-            ctrl.set_zoom(zoom);
-
-            // Update grid
-            w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
-        }
-    });
-
-    let nodes_for_drag = nodes.clone();
-    let filter_nodes_for_drag = filter_nodes.clone();
-    let sm_drag = selection_manager.clone();
-    window.on_commit_drag(move |dx, dy| {
-        let sm = sm_drag.borrow();
-        GraphLogic::commit_drag(&nodes_for_drag, &sm, dx, dy);
-        GraphLogic::commit_drag(&filter_nodes_for_drag, &sm, dx, dy);
-    });
-
     window.on_delete_selected_nodes({
-        let ctrl = ctrl.clone();
+        let ctrl = setup.controller().clone();
         let nodes = nodes.clone();
         let filter_nodes = filter_nodes.clone();
         let links = links.clone();
