@@ -148,7 +148,24 @@ where
         )
     }
 
-    /// Compute bezier path for a link (same-space: node rects and pin offsets in same coordinate system)
+    /// Resolve absolute world-space positions for a link's start and end pins.
+    /// Returns `(start_x, start_y, end_x, end_y)` or `None` if pins/nodes are missing.
+    fn resolve_link_endpoints(&self, start_pin: i32, end_pin: i32) -> Option<(f32, f32, f32, f32)> {
+        let start_pos = self.pin_positions.get(&start_pin)?;
+        let end_pos = self.pin_positions.get(&end_pin)?;
+
+        let start_rect = self.node_rects.get(&start_pos.node_id)?.rect();
+        let end_rect = self.node_rects.get(&end_pos.node_id)?.rect();
+
+        Some((
+            start_rect.0 + start_pos.rel_x,
+            start_rect.1 + start_pos.rel_y,
+            end_rect.0 + end_pos.rel_x,
+            end_rect.1 + end_pos.rel_y,
+        ))
+    }
+
+    /// Compute bezier path in world coordinates with explicit zoom for bezier offset scaling.
     pub fn compute_link_path(
         &self,
         start_pin: i32,
@@ -156,28 +173,13 @@ where
         zoom: f32,
         bezier_min_offset: f32,
     ) -> Option<String> {
-        let start_pos = self.pin_positions.get(&start_pin)?;
-        let end_pos = self.pin_positions.get(&end_pin)?;
-
-        let start_rect = self.node_rects.get(&start_pos.node_id)?.rect();
-        let end_rect = self.node_rects.get(&end_pos.node_id)?.rect();
-
-        Some(generate_bezier_path(
-            start_rect.0 + start_pos.rel_x,
-            start_rect.1 + start_pos.rel_y,
-            end_rect.0 + end_pos.rel_x,
-            end_rect.1 + end_pos.rel_y,
-            zoom,
-            bezier_min_offset,
-        ))
+        let (sx, sy, ex, ey) = self.resolve_link_endpoints(start_pin, end_pin)?;
+        Some(generate_bezier_path(sx, sy, ex, ey, zoom, bezier_min_offset))
     }
 
-    /// Compute bezier path in screen space from world-space node rects and world-space relative pin offsets.
+    /// Compute bezier path in screen space from world-space cache data.
     ///
-    /// Node rects are stored in world coordinates. Pin rel_x/rel_y are also in world space
-    /// (unscaled). The screen-space pin position is:
-    ///   screen_x = (node_world_x + pin_rel_x) * zoom + pan_x
-    ///   screen_y = (node_world_y + pin_rel_y) * zoom + pan_y
+    /// Transforms world positions to screen: `screen = world * zoom + pan`
     pub fn compute_link_path_screen(
         &self,
         start_pin: i32,
@@ -187,18 +189,26 @@ where
         pan_y: f32,
         bezier_min_offset: f32,
     ) -> Option<String> {
-        let start_pos = self.pin_positions.get(&start_pin)?;
-        let end_pos = self.pin_positions.get(&end_pin)?;
+        let (sx, sy, ex, ey) = self.resolve_link_endpoints(start_pin, end_pin)?;
+        Some(generate_bezier_path(
+            sx * zoom + pan_x, sy * zoom + pan_y,
+            ex * zoom + pan_x, ey * zoom + pan_y,
+            zoom, bezier_min_offset,
+        ))
+    }
 
-        let start_rect = self.node_rects.get(&start_pos.node_id)?.rect();
-        let end_rect = self.node_rects.get(&end_pos.node_id)?.rect();
-
-        let sx = (start_rect.0 + start_pos.rel_x) * zoom + pan_x;
-        let sy = (start_rect.1 + start_pos.rel_y) * zoom + pan_y;
-        let ex = (end_rect.0 + end_pos.rel_x) * zoom + pan_x;
-        let ey = (end_rect.1 + end_pos.rel_y) * zoom + pan_y;
-
-        Some(generate_bezier_path(sx, sy, ex, ey, zoom, bezier_min_offset))
+    /// Compute bezier path in pure world coordinates (zoom=1.0).
+    ///
+    /// Used when links are rendered inside a transform-scale container
+    /// that handles zoom visually. Bezier offset is unscaled.
+    pub fn compute_link_path_world(
+        &self,
+        start_pin: i32,
+        end_pin: i32,
+        bezier_min_offset: f32,
+    ) -> Option<String> {
+        let (sx, sy, ex, ey) = self.resolve_link_endpoints(start_pin, end_pin)?;
+        Some(generate_bezier_path(sx, sy, ex, ey, 1.0, bezier_min_offset))
     }
 
     /// Standard handler for pin position reports from Slint
