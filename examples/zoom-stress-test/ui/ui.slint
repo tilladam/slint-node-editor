@@ -7,14 +7,20 @@
 // - Hit targets are adequate for interaction
 // - Layout consistency across zoom levels
 
-import { NodeEditor, Link, LinkData } from "@slint-node-editor/node-editor.slint";
+import {
+    NodeEditor,
+    Link,
+    LinkData,
+    NodeEditorComputations,
+    GeometryCallbacks,
+} from "@slint-node-editor/node-editor.slint";
 import { InputNode, InputNodeData } from "input_node.slint";
 import { ControlNode, ControlNodeData } from "control_node.slint";
 import { DisplayNode, DisplayNodeData } from "display_node.slint";
 import { Button } from "std-widgets.slint";
 
 // Re-export for Rust
-export { InputNodeData, ControlNodeData, DisplayNodeData, LinkData }
+export { InputNodeData, ControlNodeData, DisplayNodeData, LinkData, NodeEditorComputations, GeometryCallbacks }
 
 export component MainWindow inherits Window {
     title: "Zoom Stress Test - Widget Scaling";
@@ -44,10 +50,7 @@ export component MainWindow inherits Window {
 
     // Callbacks to Rust
     callback request-grid-update <=> editor.request-grid-update;
-    callback node-rect-changed <=> editor.node-rect-changed;
-    callback pin-position-changed <=> editor.pin-position-changed;
-    callback update-viewport(float, float, float);
-    pure callback compute-link-path <=> editor.compute-link-path;
+    // Note: geometry tracking and viewport changes are now handled via globals
 
     // Input node callbacks
     callback input-text-changed(int, string);
@@ -71,8 +74,7 @@ export component MainWindow inherits Window {
             root.width / 2,
             root.height / 2,
             (root.width / 2 - root.pan-x) / root.zoom / 1px,
-            (root.height / 2 - root.pan-y) / root.zoom / 1px
-        );
+            (root.height / 2 - root.pan-y) / root.zoom / 1px);
     }
 
     editor := NodeEditor {
@@ -89,19 +91,12 @@ export component MainWindow inherits Window {
         grid-commands <=> root.grid-commands;
         links <=> root.links;
 
-        viewport-changed => {
-            root.update-viewport(self.zoom, self.pan-x / 1px, self.pan-y / 1px);
-        }
-
         // Input nodes
         for data in root.input-nodes: InputNode {
             node-id: data.id;
             title: data.title;
             world-x: data.world-x * 1px;
             world-y: data.world-y * 1px;
-            zoom: editor.zoom;
-            pan-x: editor.pan-x;
-            pan-y: editor.pan-y;
             text-value: data.text-value;
             spin-value: data.spin-value;
             combo-index: data.combo-index;
@@ -111,22 +106,6 @@ export component MainWindow inherits Window {
             min-node-width: editor.min-node-width;
             min-node-height: editor.min-node-height;
 
-            report-rect(id, x, y, w, h) => {
-                editor.report-node-rect(id, x, y, w, h);
-            }
-            pin-position-changed(pin-id, node-id, pin-type, x, y) => {
-                editor.report-pin-position(pin-id, node-id, pin-type, x, y);
-            }
-            pin-drag-started(pin-id, x, y) => {
-                editor.start-link-from-pin(pin-id, x, y);
-            }
-            pin-drag-moved(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-            }
-            pin-drag-ended(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-                editor.complete-link-creation();
-            }
             text-changed(id, val) => {
                 root.input-text-changed(id, val);
             }
@@ -144,9 +123,6 @@ export component MainWindow inherits Window {
             title: data.title;
             world-x: data.world-x * 1px;
             world-y: data.world-y * 1px;
-            zoom: editor.zoom;
-            pan-x: editor.pan-x;
-            pan-y: editor.pan-y;
             check-a: data.check-a;
             check-b: data.check-b;
             switch-value: data.switch-value;
@@ -157,22 +133,6 @@ export component MainWindow inherits Window {
             min-node-width: editor.min-node-width;
             min-node-height: editor.min-node-height;
 
-            report-rect(id, x, y, w, h) => {
-                editor.report-node-rect(id, x, y, w, h);
-            }
-            pin-position-changed(pin-id, node-id, pin-type, x, y) => {
-                editor.report-pin-position(pin-id, node-id, pin-type, x, y);
-            }
-            pin-drag-started(pin-id, x, y) => {
-                editor.start-link-from-pin(pin-id, x, y);
-            }
-            pin-drag-moved(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-            }
-            pin-drag-ended(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-                editor.complete-link-creation();
-            }
             check-a-toggled(id, val) => {
                 root.control-check-a-toggled(id, val);
             }
@@ -196,9 +156,6 @@ export component MainWindow inherits Window {
             title: data.title;
             world-x: data.world-x * 1px;
             world-y: data.world-y * 1px;
-            zoom: editor.zoom;
-            pan-x: editor.pan-x;
-            pan-y: editor.pan-y;
             progress: data.progress;
             status-text: data.status-text;
             color-r: data.color-r;
@@ -210,23 +167,6 @@ export component MainWindow inherits Window {
             lod-simplified-threshold: editor.lod-simplified-threshold;
             min-node-width: editor.min-node-width;
             min-node-height: editor.min-node-height;
-
-            report-rect(id, x, y, w, h) => {
-                editor.report-node-rect(id, x, y, w, h);
-            }
-            pin-position-changed(pin-id, node-id, pin-type, x, y) => {
-                editor.report-pin-position(pin-id, node-id, pin-type, x, y);
-            }
-            pin-drag-started(pin-id, x, y) => {
-                editor.start-link-from-pin(pin-id, x, y);
-            }
-            pin-drag-moved(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-            }
-            pin-drag-ended(pin-id, x, y) => {
-                editor.update-link-end(x, y);
-                editor.complete-link-creation();
-            }
         }
     }
 
@@ -251,14 +191,8 @@ export component MainWindow inherits Window {
             }
 
             Text {
-                text: zoom < 0.5 ? "Very small" :
-                      zoom < 0.8 ? "Small" :
-                      zoom < 1.2 ? "Normal" :
-                      zoom < 2.0 ? "Large" : "Very large";
-                color: zoom < 0.5 ? #f88 :
-                       zoom < 0.8 ? #fa8 :
-                       zoom < 1.2 ? #8f8 :
-                       zoom < 2.0 ? #8af : #f8f;
+                text: zoom < 0.5 ? "Very small" : zoom < 0.8 ? "Small" : zoom < 1.2 ? "Normal" : zoom < 2.0 ? "Large" : "Very large";
+                color: zoom < 0.5 ? #f88 : zoom < 0.8 ? #fa8 : zoom < 1.2 ? #8f8 : zoom < 2.0 ? #8af : #f8f;
                 font-size: 11px;
                 horizontal-alignment: center;
             }
