@@ -451,17 +451,27 @@ export component Link inherits Path {
 }
 
 /// Base component for all node types in the node editor.
+/// Nodes are positioned in pure WORLD coordinates. The parent container (at pan-x, pan-y)
+/// applies transform-scale for zoom, so nodes just use x: world-x, y: world-y directly.
+///
+/// Zoom/pan values are accessed from the ViewportState global - examples don't need to pass them.
 export component BaseNode inherits Rectangle {
     // === Common Properties ===
     in property <int> node-id;
     in property <bool> selected: false;
     in property <length> world-x;
     in property <length> world-y;
-    in property <float> zoom: 1.0;
-    in property <length> pan-x: 0px;
-    in property <length> pan-y: 0px;
-    in property <length> drag-offset-x: 0px;
-    in property <length> drag-offset-y: 0px;
+    // Persistent position offset (survives drag end until model updates)
+    property <length> persistent-offset-x: 0px;
+    property <length> persistent-offset-y: 0px;
+    // === Viewport (for visibility culling) - provided by parent ===
+    in property <length> viewport-width: 10000px;
+    in property <length> viewport-height: 10000px;
+
+    // === Node Size ===
+    // Set these to match your node's visual dimensions.
+    in property <length> node-width: 150px;
+    in property <length> node-height: 100px;
 
     // === Styling Properties (overridable) ===
     in property <color> background-color: #2d2d2d;
@@ -472,61 +482,76 @@ export component BaseNode inherits Rectangle {
     in property <length> border-width-normal: 1px;
     in property <length> border-width-selected: 2px;
 
-    // === Common Callbacks ===
+    // === Legacy callbacks — kept for backward compatibility with examples that wire them. ===
+    // New code should use the globals (GeometryCallbacks, SelectionRequest, DragState) instead.
     callback pin-drag-started(int, length, length);
     callback pin-drag-moved(int, length, length);
     callback pin-drag-ended(int, length, length);
     callback pin-position-changed(/* pin-id */ int, /* node-id */ int, /* pin-type */ int, /* rel-x */ length, /* rel-y */ length);
-    callback clicked(int, bool);
-    callback double-clicked(int);
-    callback drag-started(int, bool, length, length);
-    callback drag-moved(int, length, length);
-    callback drag-ended(int, length, length);
-    callback report-rect(int, length, length, length, length);
 
     // === Computed Properties ===
-    out property <length> screen-x: (world-x + drag-offset-x) * zoom + pan-x;
-    out property <length> screen-y: (world-y + drag-offset-y) * zoom + pan-y;
+    // World position (for reporting to Rust)
+    // For multi-node drag: selected nodes that aren't being directly dragged use global DragState offset
+    property <length> world-pos-x: world-x + persistent-offset-x + (DragState.is-dragging && root.selected && node-id != DragState.dragged-node-id ? DragState.drag-offset-x : drag-area.current-drag-offset-x);
+    property <length> world-pos-y: world-y + persistent-offset-y + (DragState.is-dragging && root.selected && node-id != DragState.dragged-node-id ? DragState.drag-offset-y : drag-area.current-drag-offset-y);
+    // Screen position (for external reference only)
+    out property <length> screen-x: world-pos-x * ViewportState.zoom + ViewportState.pan-x;
+    out property <length> screen-y: world-pos-y * ViewportState.zoom + ViewportState.pan-y;
 
     // === Common Styling ===
-    x: screen-x;
-    y: screen-y;
-    background: selected ? background-color-selected : background-color;
-    border-radius: border-radius-base * zoom;
-    border-width: selected ? border-width-selected * zoom : border-width-normal * zoom;
-    border-color: selected ? border-color-selected : border-color-normal;
+    // Pure world coordinates - container handles pan and transform-scale handles zoom
+    x: world-pos-x;
+    y: world-pos-y;
+    width: node-width;
+    height: node-height;
+    // BaseNode is transparent - visual styling should be in child elements
+    background: transparent;
+    clip: false;
 
-    // Report rect on changes
+    // Report rect on changes (in WORLD coordinates - without offset)
     init => {
         if (node-id > 0) {
-            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
 
     changed node-id => {
         if (node-id > 0) {
-            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
 
-    changed drag-offset-x => {
-        if (node-id > 0) {
-            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+    changed world-x => {
+        // Model updated — clear persistent offset (world-pos-x changed handler reports geometry)
+        if abs(persistent-offset-x) > 0.1px {
+            root.persistent-offset-x = 0px;
         }
     }
-    changed drag-offset-y => {
-        if (node-id > 0) {
-            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+    changed world-y => {
+        if abs(persistent-offset-y) > 0.1px {
+            root.persistent-offset-y = 0px;
         }
     }
-    changed width => {
+    changed node-width => {
         if (node-id > 0) {
-            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
-    changed height => {
+    changed node-height => {
         if (node-id > 0) {
-            report-rect(node-id, screen-x, screen-y, self.width, self.height);
+            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+        }
+    }
+    
+    // Watch world-pos-x/y for live link updates during multi-node drag
+    changed world-pos-x => {
+        if (node-id > 0) {
+            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+        }
+    }
+    changed world-pos-y => {
+        if (node-id > 0) {
+            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
 
@@ -534,11 +559,19 @@ export component BaseNode inherits Rectangle {
     property <bool> dbl-click-armed: false;
     dbl-click-timer := Timer {
         interval: 400ms;
-        triggered => { root.dbl-click-armed = false; }
+        triggered => {
+            root.dbl-click-armed = false;
+        }
     }
 
     // === Drag Handling ===
-    TouchArea {
+    // TouchArea covers the full node area
+    drag-area := TouchArea {
+        x: 0;
+        y: 0;
+        width: root.node-width;
+        height: root.node-height;
+
         property <bool> shift-held: false;
         property <bool> is-dragging: false;
         property <length> drag-threshold: 5px;
@@ -548,6 +581,11 @@ export component BaseNode inherits Rectangle {
         property <length> current-drag-offset-x: 0px;
         property <length> current-drag-offset-y: 0px;
 
+        // True screen mouse position: absolute-position is in screen space,
+        // but self.mouse-x/y is in world space (inside scaled container)
+        property <length> screen-mouse-x: self.absolute-position.x + self.mouse-x * ViewportState.zoom;
+        property <length> screen-mouse-y: self.absolute-position.y + self.mouse-y * ViewportState.zoom;
+
         pointer-event(event) => {
             // IMPORTANT: Ignore Ctrl+click to allow box selection through nodes
             if event.button == PointerEventButton.left && event.modifiers.control {
@@ -556,9 +594,8 @@ export component BaseNode inherits Rectangle {
             if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                 shift-held = event.modifiers.shift;
                 is-dragging = false;
-                // Store ABSOLUTE mouse position to avoid coordinate system issues
-                start-abs-x = self.absolute-position.x + self.mouse-x;
-                start-abs-y = self.absolute-position.y + self.mouse-y;
+                start-abs-x = screen-mouse-x;
+                start-abs-y = screen-mouse-y;
                 current-drag-offset-x = 0px;
                 current-drag-offset-y = 0px;
                 was-selected-on-press = selected;
@@ -566,24 +603,38 @@ export component BaseNode inherits Rectangle {
                 // Only select immediately if shift is held (multi-select toggle)
                 // or if node is not already selected
                 if shift-held || !selected {
-                    root.clicked(node-id, shift-held);
+                    SelectionRequest.node-id = node-id;
+                    SelectionRequest.shift-held = shift-held;
+                    SelectionRequest.version += 1;
                 }
                 // If node is already selected and shift not held, defer selection
                 // until we know if it's a drag or a click
             }
             if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
                 if is-dragging {
+                    // Transfer drag offset to persistent before ending drag
+                    root.persistent-offset-x += current-drag-offset-x;
+                    root.persistent-offset-y += current-drag-offset-y;
                     // End drag using the tracked offset, not recalculated from mouse position
-                    root.drag-ended(node-id, current-drag-offset-x, current-drag-offset-y);
+                    GeometryCallbacks.end-node-drag(current-drag-offset-x, current-drag-offset-y);
                     is-dragging = false;
+                    current-drag-offset-x = 0px;
+                    current-drag-offset-y = 0px;
+                    // Reset global drag state
+                    DragState.is-dragging = false;
+                    DragState.dragged-node-id = 0;
+                    DragState.drag-offset-x = 0px;
+                    DragState.drag-offset-y = 0px;
                 } else {
                     // Click without drag - if we deferred selection, do it now
                     if was-selected-on-press && !shift-held {
-                        root.clicked(node-id, shift-held);
+                        SelectionRequest.node-id = node-id;
+                        SelectionRequest.shift-held = shift-held;
+                        SelectionRequest.version += 1;
                     }
                     // Double-click detection
                     if root.dbl-click-armed {
-                        root.double-clicked(node-id);
+                        GeometryCallbacks.double-click-node(node-id);
                         root.dbl-click-armed = false;
                     } else {
                         root.dbl-click-armed = true;
@@ -595,17 +646,26 @@ export component BaseNode inherits Rectangle {
 
         moved => {
             if self.pressed {
-                // Calculate offset from start position using absolute coordinates
                 if !is-dragging {
-                    if abs((self.absolute-position.x + self.mouse-x) - start-abs-x) > drag-threshold || abs((self.absolute-position.y + self.mouse-y) - start-abs-y) > drag-threshold {
+                    if abs(screen-mouse-x - start-abs-x) > drag-threshold || abs(screen-mouse-y - start-abs-y) > drag-threshold {
                         is-dragging = true;
-                        root.drag-started(node-id, selected, world-x, world-y);
+                        GeometryCallbacks.start-node-drag(node-id, selected, world-x, world-y);
+                        // Set global drag state for multi-node drag
+                        DragState.is-dragging = true;
+                        DragState.dragged-node-id = node-id;
                     }
                 }
                 if is-dragging {
-                    current-drag-offset-x = ((self.absolute-position.x + self.mouse-x) - start-abs-x) / zoom;
-                    current-drag-offset-y = ((self.absolute-position.y + self.mouse-y) - start-abs-y) / zoom;
-                    root.drag-moved(node-id, current-drag-offset-x, current-drag-offset-y);
+                    current-drag-offset-x = (screen-mouse-x - start-abs-x) / ViewportState.zoom;
+                    current-drag-offset-y = (screen-mouse-y - start-abs-y) / ViewportState.zoom;
+                    
+                    GeometryCallbacks.update-node-drag(current-drag-offset-x, current-drag-offset-y);
+                    // Update global drag offset for other selected nodes
+                    DragState.drag-offset-x = current-drag-offset-x;
+                    DragState.drag-offset-y = current-drag-offset-y;
+                    // Update geometry for live link updates
+                    GeometryVersion.version += 1;
+                    GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
                 }
             }
         }
@@ -617,86 +677,89 @@ export component Pin inherits Rectangle {
     in property <int> pin-id;
     in property <int> node-id;  // Node this pin belongs to (for position reporting)
     in property <int> pin-type;  // Type of pin (input/output/custom)
-    in property <float> zoom: 1.0;
     in property <color> base-color: #888888;
     in property <color> hover-color: #aaaaaa;
     in property <length> base-size: 12px;
-    in property <length> node-screen-x: 0px;
+    in property <length> node-screen-x: 0px;  // Needed for drag preview coordinates
     in property <length> node-screen-y: 0px;
+    in property <length> parent-offset-x: 0px;  // For wrapped pins (offset from node)
+    in property <length> parent-offset-y: 0px;  // For wrapped pins (offset from node)
     /// Increment this to force pin position re-reporting (workaround for init timing)
     in property <int> refresh-trigger: 0;
 
-    property <length> pin-size: base-size * zoom;
-    property <length> pin-radius: pin-size / 2;
+    property <length> pin-radius: base-size / 2;
 
-    /// Pin center X relative to node top-left, UNSCALED by zoom
-    out property <length> center-x: (self.x + self.width / 2) / zoom;
-    /// Pin center Y relative to node top-left, UNSCALED by zoom
-    out property <length> center-y: (self.y + self.height / 2) / zoom;
+    /// Pin center X relative to node top-left
+    out property <length> center-x: parent-offset-x + self.x + self.width / 2;
+    /// Pin center Y relative to node top-left
+    out property <length> center-y: parent-offset-y + self.y + self.height / 2;
 
+    // Legacy callbacks — kept for backward compatibility with examples that wire them.
+    // New code should use the globals (LinkCreation, GeometryCallbacks) instead.
     callback drag-started(int, length, length);
     callback drag-moved(int, length, length);
     callback drag-ended(int, length, length);
     callback report-position(/* pin-id */ int, /* node-id */ int, /* pin-type */ int, /* rel-x */ length, /* rel-y */ length);
 
-    width: pin-size;
-    height: pin-size;
+    width: base-size;
+    height: base-size;
     background: touch.has-hover ? hover-color : base-color;
     border-radius: pin-radius;
 
     init => {
         if (pin-id > 0) {
-            report-position(pin-id, node-id, pin-type, center-x, center-y);
+            GeometryVersion.version += 1;
+            GeometryCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
     changed pin-id => {
         if (pin-id > 0) {
-            report-position(pin-id, node-id, pin-type, center-x, center-y);
+            GeometryCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
     changed center-x => {
         if (pin-id > 0) {
-            report-position(pin-id, node-id, pin-type, center-x, center-y);
+            GeometryCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
     changed center-y => {
         if (pin-id > 0) {
-            report-position(pin-id, node-id, pin-type, center-x, center-y);
-        }
-    }
-    changed zoom => {
-        if (pin-id > 0) {
-            report-position(pin-id, node-id, pin-type, center-x, center-y);
+            GeometryCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
     changed refresh-trigger => {
         if (pin-id > 0) {
-            report-position(pin-id, node-id, pin-type, center-x, center-y);
+            GeometryCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
 
     touch := TouchArea {
-        property <bool> drag-active: false;
-
-        pointer-event(event) => {
-            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
-                drag-active = true;
-                // These are for visual link preview, should be screen-space
-                // root.x/root.y = Pin's position within the node layout
-                root.drag-started(pin-id, node-screen-x + root.x + self.x + self.width/2, node-screen-y + root.y + self.y + self.height/2);
-            }
-            if event.kind == PointerEventKind.up && drag-active {
-                drag-active = false;
-                root.drag-ended(pin-id,
-                    node-screen-x + root.x + self.mouse-x,
-                    node-screen-y + root.y + self.mouse-y);
+        moved => {
+            if LinkCreation.state != LinkCreationState.idle {
+                // Include parent-offset in screen coordinate calculation so examples don't need zoom math
+                LinkCreation.current-x = node-screen-x + (parent-offset-x + root.x + self.mouse-x) * ViewportState.zoom;
+                LinkCreation.current-y = node-screen-y + (parent-offset-y + root.y + self.mouse-y) * ViewportState.zoom;
+                LinkCreation.state = LinkCreationState.updating;
+                LinkCreation.version += 1;
             }
         }
-        moved => {
-            if drag-active {
-                root.drag-moved(pin-id,
-                    node-screen-x + root.x + self.mouse-x,
-                    node-screen-y + root.y + self.mouse-y);
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                // Set LinkCreation state to start link creation (NodeEditor watches this)
+                // Pin position within node must be scaled by zoom since we're inside a scaled container
+                LinkCreation.start-pin-id = pin-id;
+                LinkCreation.current-x = node-screen-x + (parent-offset-x + root.x + self.x + self.width / 2) * ViewportState.zoom;
+                LinkCreation.current-y = node-screen-y + (parent-offset-y + root.y + self.y + self.height / 2) * ViewportState.zoom;
+                LinkCreation.state = LinkCreationState.started;
+                LinkCreation.version += 1;
+            } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                // If we're currently creating a link (started from another pin), complete it
+                if LinkCreation.state != LinkCreationState.idle {
+                    LinkCreation.current-x = node-screen-x + (parent-offset-x + root.x + self.mouse-x) * ViewportState.zoom;
+                    LinkCreation.current-y = node-screen-y + (parent-offset-y + root.y + self.mouse-y) * ViewportState.zoom;
+                    LinkCreation.state = LinkCreationState.complete;
+                    LinkCreation.version += 1;
+                }
             }
         }
     }
