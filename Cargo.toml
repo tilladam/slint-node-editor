@@ -46,6 +46,6 @@ members = [
 ]
 
 [workspace.dependencies]
-slint = { git = "https://github.com/slint-ui/slint", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-femtovg"] }
+slint = { git = "https://github.com/slint-ui/slint", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-skia"] }
 slint-build = { git = "https://github.com/slint-ui/slint" }
 slint-node-editor = { path = "." }
