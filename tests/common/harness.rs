@@ -10,7 +10,7 @@ use slint::{
     platform::{Key, PointerEventButton, WindowEvent},
     Color, ComponentHandle, LogicalPosition, Model, ModelRc, SharedString, VecModel,
 };
-use slint_node_editor::{NodeEditorController, SelectionManager};
+use slint_node_editor::{NodeEditorController, NodeEditorSetup, SelectionManager, wire_node_editor};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -39,7 +39,7 @@ fn init_testing_backend() {
 /// Sets up nodes, links, and all callbacks with tracking.
 pub struct MinimalTestHarness {
     pub window: MainWindow,
-    pub ctrl: NodeEditorController,
+    pub ctrl: Rc<NodeEditorController>,
     pub nodes: Rc<VecModel<NodeData>>,
     pub links: Rc<VecModel<LinkData>>,
     pub tracker: CallbackTracker,
@@ -78,7 +78,6 @@ impl MinimalTestHarness {
     pub fn with_nodes_and_links(nodes: Vec<NodeData>, links: Vec<LinkData>) -> Self {
         init_testing_backend();
         let window = MainWindow::new().unwrap();
-        let ctrl = NodeEditorController::new();
         let tracker = CallbackTracker::new();
         let selection = Rc::new(RefCell::new(SelectionManager::new()));
         let w = window.as_weak();
@@ -91,67 +90,10 @@ impl MinimalTestHarness {
         let links = Rc::new(VecModel::from(links));
         window.set_links(ModelRc::from(links.clone()));
 
-        // Core callbacks - controller handles the logic
-        window.on_compute_link_path(ctrl.compute_link_path_callback());
-        window.on_node_drag_started({
-            let ctrl = ctrl.clone();
-            let tracker = tracker.clone();
-            move |node_id| {
-                ctrl.handle_node_drag_started(node_id);
-                tracker.node_drag_started.borrow_mut().push(node_id);
-            }
-        });
-
-        // Geometry tracking - update cache
-        window.on_node_rect_changed({
-            let ctrl = ctrl.clone();
-            let tracker = tracker.clone();
-            move |id, x, y, width, h| {
-                ctrl.handle_node_rect(id, x, y, width, h);
-                tracker.node_rect_changed.borrow_mut().push((id, x, y, width, h));
-            }
-        });
-
-        window.on_pin_position_changed({
-            let ctrl = ctrl.clone();
-            let tracker = tracker.clone();
-            move |pid, nid, ptype, x, y| {
-                ctrl.handle_pin_position(pid, nid, ptype, x, y);
-                tracker.pin_position_changed.borrow_mut().push((pid, nid, ptype, x, y));
-            }
-        });
-
-        // Grid updates
-        window.on_request_grid_update({
-            let ctrl = ctrl.clone();
-            let w = w.clone();
-            move || {
-                if let Some(w) = w.upgrade() {
-                    w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
-                }
-            }
-        });
-
-        window.on_update_viewport({
-            let ctrl = ctrl.clone();
-            let tracker = tracker.clone();
-            let w = w.clone();
-            move |z, pan_x, pan_y| {
-                if let Some(w) = w.upgrade() {
-                    ctrl.set_viewport(z, pan_x, pan_y);
-                    w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
-                    tracker.update_viewport.borrow_mut().push((z, pan_x, pan_y));
-                }
-            }
-        });
-
-        // Node drag - update positions in model
-        window.on_node_drag_ended({
-            let ctrl = ctrl.clone();
+        // Wire all standard callbacks via the macro
+        let setup = NodeEditorSetup::new({
             let nodes = nodes.clone();
-            let tracker = tracker.clone();
-            move |delta_x, delta_y| {
-                let node_id = ctrl.dragged_node_id();
+            move |node_id, delta_x, delta_y| {
                 for i in 0..nodes.row_count() {
                     if let Some(mut node) = nodes.row_data(i) {
                         if node.id == node_id {
@@ -162,9 +104,63 @@ impl MinimalTestHarness {
                         }
                     }
                 }
+            }
+        });
+        wire_node_editor!(window, setup);
+
+        // Layer tracking on top of the macro-wired callbacks.
+        // We re-wire globals callbacks to add tracking, forwarding to the controller.
+        window.global::<GeometryCallbacks>().on_report_node_rect({
+            let ctrl = setup.controller().clone();
+            let tracker = tracker.clone();
+            move |id, x, y, width, h| {
+                ctrl.handle_node_rect(id, x, y, width, h);
+                tracker.node_rect_changed.borrow_mut().push((id, x, y, width, h));
+            }
+        });
+
+        window.global::<GeometryCallbacks>().on_report_pin_position({
+            let ctrl = setup.controller().clone();
+            let tracker = tracker.clone();
+            move |pid, nid, ptype, x, y| {
+                ctrl.handle_pin_position(pid, nid, ptype, x, y);
+                tracker.pin_position_changed.borrow_mut().push((pid, nid, ptype, x, y));
+            }
+        });
+
+        window.global::<NodeEditorComputations>().on_viewport_changed({
+            let ctrl = setup.controller().clone();
+            let tracker = tracker.clone();
+            let w = w.clone();
+            move |z, pan_x, pan_y| {
+                ctrl.set_viewport(z, pan_x, pan_y);
+                if let Some(w) = w.upgrade() {
+                    w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
+                }
+                tracker.update_viewport.borrow_mut().push((z, pan_x, pan_y));
+            }
+        });
+
+        // Track drag events via GeometryCallbacks (the actual new architecture path)
+        window.global::<GeometryCallbacks>().on_start_node_drag({
+            let setup_start = setup.start_node_drag();
+            let tracker = tracker.clone();
+            move |node_id, already_selected, wx, wy| {
+                setup_start(node_id, already_selected, wx, wy);
+                tracker.node_drag_started.borrow_mut().push(node_id);
+            }
+        });
+
+        window.global::<GeometryCallbacks>().on_end_node_drag({
+            let setup_end = setup.end_node_drag();
+            let tracker = tracker.clone();
+            move |delta_x, delta_y| {
+                setup_end(delta_x, delta_y);
                 tracker.node_drag_ended.borrow_mut().push((delta_x, delta_y));
             }
         });
+
+        let ctrl = setup.controller().clone();
 
         // Link requested callback
         window.on_link_requested({
@@ -214,57 +210,49 @@ impl MinimalTestHarness {
             }
         });
 
-        // Selection callbacks
-        window.on_select_node({
+        // Selection notifications — shift-select is handled by app, non-shift by NodeEditor
+        window.on_node_selected({
             let selection = selection.clone();
             let w = w.clone();
             move |node_id, shift_held| {
-                let mut sel = selection.borrow_mut();
-                sel.handle_interaction(node_id, shift_held);
-                if let Some(w) = w.upgrade() {
-                    let ids: Vec<i32> = sel.iter().cloned().collect();
-                    w.set_selected_node_ids(ModelRc::from(Rc::new(VecModel::from(ids))));
-                    w.set_selection_version(w.get_selection_version() + 1);
+                if shift_held {
+                    let mut sel = selection.borrow_mut();
+                    sel.handle_interaction(node_id, true);
+                    if let Some(w) = w.upgrade() {
+                        let ids: Vec<i32> = sel.iter().cloned().collect();
+                        w.set_selected_node_ids(ModelRc::from(Rc::new(VecModel::from(ids))));
+                        w.set_selection_version(w.get_selection_version() + 1);
+                    }
                 }
+                // Non-shift: synced via sync-selection-to-nodes callback
             }
         });
 
-        window.on_clear_selection({
-            let selection = selection.clone();
-            let w = w.clone();
-            move || {
-                selection.borrow_mut().clear();
-                if let Some(w) = w.upgrade() {
-                    w.set_selected_node_ids(ModelRc::default());
-                    w.set_selection_version(w.get_selection_version() + 1);
-                }
-            }
+        window.on_selection_cleared(move || {
+            // NodeEditor already cleared selection and synced via globals
         });
 
-        window.on_is_selected({
+        // Override is-node-selected and sync-selection-to-nodes to use our SelectionManager
+        // (overrides the defaults wired by wire_node_editor!)
+        window.global::<NodeEditorComputations>().on_is_node_selected({
             let selection = selection.clone();
             move |node_id, _version| selection.borrow().contains(node_id)
         });
 
-        window.on_sync_selection_to_nodes({
+        window.global::<NodeEditorComputations>().on_sync_selection_to_nodes({
             let selection = selection.clone();
-            move |ids| {
+            move |ids: ModelRc<i32>| {
                 let mut sel = selection.borrow_mut();
                 sel.clear();
                 for i in 0..ids.row_count() {
                     if let Some(id) = ids.row_data(i) {
-                        sel.handle_interaction(id, true); // Add each ID
+                        sel.handle_interaction(id, true);
                     }
                 }
             }
         });
 
-        // Compute callbacks using controller's cache
-        window.on_compute_pin_at({
-            let ctrl = ctrl.clone();
-            move |x, y| ctrl.cache().borrow().find_pin_at(x, y, 10.0)
-        });
-
+        // Compute callbacks — link-at needs the links model for hit testing
         window.on_compute_link_at({
             let ctrl = ctrl.clone();
             let links = links.clone();
@@ -275,18 +263,6 @@ impl MinimalTestHarness {
                 });
                 ctrl.cache().borrow().find_link_at(x, y, links_iter, 8.0, ctrl.zoom(), 50.0, 20)
             }
-        });
-
-        window.on_compute_box_selection({
-            let ctrl = ctrl.clone();
-            move |x, y, w, h| {
-                let ids = ctrl.cache().borrow().nodes_in_selection_box(x, y, w, h);
-                ModelRc::from(Rc::new(VecModel::from(ids)))
-            }
-        });
-
-        window.on_compute_link_preview_path(|start_x, start_y, end_x, end_y| {
-            slint_node_editor::generate_bezier_path(start_x, start_y, end_x, end_y, 1.0, 50.0).into()
         });
 
         // Initialize grid
