@@ -17,6 +17,146 @@ export global PinTypes {
     out property <int> output: 2;
 }
 
+/// Viewport state shared from NodeEditor to all child components.
+/// This allows nodes and pins to access zoom/pan without requiring
+/// these properties to be passed explicitly by examples.
+export global ViewportState {
+    /// Current zoom level (updated by NodeEditor)
+    in-out property <float> zoom: 1.0;
+    /// Current pan X offset (updated by NodeEditor)
+    in-out property <length> pan-x: 0px;
+    /// Current pan Y offset (updated by NodeEditor)
+    in-out property <length> pan-y: 0px;
+}
+
+/// Drag state shared from NodeEditor to all child nodes.
+/// This allows BaseNode to compute drag offsets internally without
+/// requiring examples to pass drag state to each node.
+export global DragState {
+    /// Whether any node is currently being dragged
+    in-out property <bool> is-dragging: false;
+    /// ID of the node currently being dragged (0 if none)
+    in-out property <int> dragged-node-id: 0;
+    /// X offset of the drag operation
+    in-out property <length> drag-offset-x: 0px;
+    /// Y offset of the drag operation
+    in-out property <length> drag-offset-y: 0px;
+}
+
+/// Geometry version counter for link path invalidation.
+/// BaseNode/Pin increment this automatically when geometry changes.
+/// NodeEditor binds to it for live link updates.
+export global GeometryVersion {
+    /// Counter incremented on every geometry change
+    in-out property <int> version: 0;
+}
+
+/// Link creation lifecycle states.
+export enum LinkCreationState { idle, started, updating, complete }
+
+/// Link creation state - updated by Pin, consumed by NodeEditor.
+/// This allows Pin to trigger link creation without manual callback forwarding.
+export global LinkCreation {
+    /// Version counter - incremented on every start/update/complete
+    in-out property <int> version: 0;
+    /// Current lifecycle state
+    in-out property <LinkCreationState> state: LinkCreationState.idle;
+    /// The pin ID that started the link
+    in-out property <int> start-pin-id: 0;
+    /// Current X position (screen coordinates)
+    in-out property <length> current-x: 0px;
+    /// Current Y position (screen coordinates)
+    in-out property <length> current-y: 0px;
+}
+
+/// Selection request state - updated by BaseNode, consumed by NodeEditor.
+/// This allows BaseNode to request selection changes without manual callback forwarding.
+export global SelectionRequest {
+    /// Version counter - incremented on every selection request
+    in-out property <int> version: 0;
+    /// The node ID to select/deselect
+    in-out property <int> node-id: 0;
+    /// Whether shift key was held during the click
+    in-out property <bool> shift-held: false;
+}
+
+/// Internal geometry callback registry.
+/// NodeEditor's Rust code wires these up automatically - examples don't touch this!
+/// BaseNode/Pin components call these to report geometry and interactions.
+export global GeometryCallbacks {
+    /// Report node rectangle (world coordinates)
+    callback report-node-rect(/* id */ int, /* x */ length, /* y */ length, /* width */ length, /* height */ length);
+    /// Report pin position relative to node
+    callback report-pin-position(/* pin-id */ int, /* node-id */ int, /* pin-type */ int, /* rel-x */ length, /* rel-y */ length);
+    /// Start node drag
+    callback start-node-drag(/* node-id */ int, /* already-selected */ bool, /* world-x */ length, /* world-y */ length);
+    /// Update node drag
+    callback update-node-drag(/* delta-x */ length, /* delta-y */ length);
+    /// End node drag
+    callback end-node-drag(/* delta-x */ length, /* delta-y */ length);
+    /// Click on node
+    callback click-node(/* node-id */ int, /* shift-held */ bool);
+    /// Double-click on node
+    callback double-click-node(/* node-id */ int);
+    /// Start link from pin
+    callback start-link-from-pin(/* pin-id */ int, /* abs-x */ length, /* abs-y */ length);
+    /// Update link preview during pin drag
+    callback update-link-preview(/* x */ length, /* y */ length);
+    /// Complete link creation
+    callback complete-link();
+}
+
+/// Computational callbacks wired by Rust - examples don't touch these!
+/// NodeEditor calls these for expensive operations.
+export global NodeEditorComputations {
+    /// Compute SVG path commands for a link between two pins.
+    /// The geometry-version parameter triggers re-evaluation when geometry changes.
+    pure callback compute-link-path(
+        /* start-pin-id */ int,
+        /* end-pin-id */ int,
+        /* geometry-version */ int) -> string;
+
+    /// Viewport state changed (zoom or pan)
+    callback viewport-changed(
+        /* zoom */ float,
+        /* pan-x */ float,
+        /* pan-y */ float);
+
+    /// Check if a node is selected
+    pure callback is-node-selected(
+        /* node-id */ int,
+        /* selection-version */ int) -> bool;
+
+    /// Check if a link is selected
+    pure callback is-link-selected(
+        /* link-id */ int,
+        /* selection-version */ int) -> bool;
+
+    /// Compute pin ID at screen coordinates (for hit testing)
+    pure callback compute-pin-at(
+        /* x */ float,
+        /* y */ float,
+        /* pin-hit-radius */ float) -> int;
+
+    /// Compute link preview path (for link creation drag)
+    pure callback compute-link-preview-path(
+        /* start-x */ float,
+        /* start-y */ float,
+        /* end-x */ float,
+        /* end-y */ float,
+        /* zoom */ float,
+        /* bezier-offset */ float) -> string;
+
+    /// Compute node IDs in selection box (for rubber-band selection)
+    pure callback compute-box-selection(
+        /* x */ float,
+        /* y */ float,
+        /* width */ float,
+        /* height */ float) -> [int];
+
+    /// Sync selection state to Rust (called when selection changes)
+    callback sync-selection-to-nodes(/* node-ids */ [int]);
+}
 
 /// Optional layout helpers for common node structures.
 ///
@@ -209,8 +349,7 @@ export component Minimap inherits Rectangle {
         root.path-version,
         root.scale,
         root.minimap-padding / 1px - (root.graph-min-x / 1px) * root.scale,
-        root.minimap-padding / 1px - (root.graph-min-y / 1px) * root.scale
-    );
+        root.minimap-padding / 1px - (root.graph-min-y / 1px) * root.scale);
 
     // Use computed path, or nodes-path if provided externally
     property <string> effective-path: root.nodes-path != "" ? root.nodes-path : root.computed-path;
