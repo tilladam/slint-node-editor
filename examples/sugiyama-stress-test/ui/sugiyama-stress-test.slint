@@ -3,11 +3,12 @@ import {
     BaseNode,
     Pin,
     PinTypes,
-    DragState,
+    LinkData,
     GeometryCallbacks,
     NodeEditorComputations,
-    LinkData,
+    GeometryVersion,
 } from "@slint-node-editor/node-editor.slint";
+import { Button } from "std-widgets.slint";
 
 export struct NodeData {
     id: int,
@@ -15,17 +16,13 @@ export struct NodeData {
     x: float,
     y: float,
 }
-
-// Re-export for Rust
-export { LinkData, DragState, GeometryCallbacks, NodeEditorComputations }
+export { LinkData, GeometryCallbacks, NodeEditorComputations, GeometryVersion }
 
 component SimpleNode inherits BaseNode {
     in property <string> title: "Node";
-    // Set node size for BaseNode
-    node-width: 250px;
-    node-height: 80px;
+    node-width: 120px;
+    node-height: 60px;
 
-    // Visual content - Add any bespoke UI here!
     Rectangle {
         width: 100%;
         height: 100%;
@@ -37,14 +34,13 @@ component SimpleNode inherits BaseNode {
         Text {
             text: root.title;
             color: white;
-            font-size: 14px;
+            font-size: 12px;
         }
     }
 
-    // Pins - no callback forwarding needed!
     Pin {
         x: 0px;
-        y: root.node-height / 2 - self.height / 2;
+        y: parent.height / 2 - self.height / 2;
         pin-id: root.node-id * 2;
         node-id: root.node-id;
         pin-type: PinTypes.input;
@@ -53,8 +49,8 @@ component SimpleNode inherits BaseNode {
     }
 
     Pin {
-        x: root.node-width - self.width;
-        y: root.node-height / 2 - self.height / 2;
+        x: parent.width - self.width;
+        y: parent.height / 2 - self.height / 2;
         pin-id: root.node-id * 2 + 1;
         node-id: root.node-id;
         pin-type: PinTypes.output;
@@ -64,32 +60,49 @@ component SimpleNode inherits BaseNode {
 }
 
 export component MainWindow inherits Window {
-    title: "Minimal Node Editor";
-    width: 800px;
-    height: 600px;
+    title: "Sugiyama Stress Test (2500 nodes)";
+    width: 1000px;
+    height: 700px;
 
     in property <[NodeData]> nodes;
     in property <[LinkData]> links <=> editor.links;
     in-out property <string> grid_commands <=> editor.grid-commands;
 
-    // Size for grid generation (used by Rust)
     out property <float> width_: self.width / 1px;
     out property <float> height_: self.height / 1px;
 
-    editor := NodeEditor {
-        width: 100%;
-        height: 100%;
-        grid-snapping: true;  // Disable grid snapping for testing
+    callback layout-requested();
+    callback scramble-requested();
 
-        // Zero boilerplate! Drag offsets computed automatically in BaseNode
-        for data in root.nodes: SimpleNode {
-            node-id: data.id;
-            title: data.title;
-            world-x: data.x * 1px;
-            world-y: data.y * 1px;
-            viewport-width: editor.width;
-            viewport-height: editor.height;
-            selected: NodeEditorComputations.is-node-selected(data.id, editor.selection-version);
+    VerticalLayout {
+        HorizontalLayout {
+            padding: 8px;
+            height: 40px;
+            spacing: 8px;
+
+            Button {
+                text: "Auto Layout";
+                clicked => {
+                    root.layout-requested();
+                }
+            }
+
+            Button {
+                text: "Scramble";
+                clicked => {
+                    root.scramble-requested();
+                }
+            }
+        }
+
+        editor := NodeEditor {
+            for data in root.nodes: SimpleNode {
+                node-id: data.id;
+                title: data.title;
+                world-x: data.x * 1px;
+                world-y: data.y * 1px;
+                selected: NodeEditorComputations.is-node-selected(data.id, editor.selection-version);
+            }
         }
     }
 }

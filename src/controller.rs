@@ -171,22 +171,18 @@ impl NodeEditorController {
 
     /// Returns a callback for `compute-link-path`.
     ///
-    /// Computes screen-space bezier paths from world-space cache data.
-    /// Zoom and pan are passed directly from Slint to guarantee they match
-    /// the values used for node positioning (eliminates sync issues).
-    pub fn compute_link_path_callback(&self) -> impl Fn(i32, i32, i32, f32, f32, f32) -> SharedString {
+    /// Computes bezier paths for use inside a scaled container at origin.
+    /// Positions are calculated so that after transform-scale, links appear at correct screen position.
+    pub fn compute_link_path_callback(&self) -> impl Fn(i32, i32, i32) -> SharedString {
         let cache = self.cache.clone();
         let state = self.state.clone();
-        move |start_pin, end_pin, _version, zoom, pan_x, pan_y| {
+        move |start_pin, end_pin, _version| {
             let s = state.borrow();
             cache
                 .borrow()
-                .compute_link_path_screen(
+                .compute_link_path_world(
                     start_pin,
                     end_pin,
-                    zoom,
-                    pan_x,
-                    pan_y,
                     s.bezier_offset,
                 )
                 .unwrap_or_default()
@@ -204,21 +200,11 @@ impl NodeEditorController {
 
     // === Direct handlers ===
 
-    /// Handle node-rect-changed: convert screen→world and update cache.
-    ///
-    /// The UI reports node rects in screen coordinates. This method converts
-    /// to world coordinates before caching, making the cache zoom/pan invariant.
+    /// Update cached node rectangle (world coordinates).
     pub fn handle_node_rect(&self, id: i32, x: f32, y: f32, w: f32, h: f32) {
-        let s = self.state.borrow();
-        let z = s.safe_zoom();
-        let world_x = (x - s.pan_x) / z;
-        let world_y = (y - s.pan_y) / z;
-        let world_w = w / z;
-        let world_h = h / z;
-        drop(s);
         self.cache
             .borrow_mut()
-            .handle_node_rect_report(id, world_x, world_y, world_w, world_h);
+            .handle_node_rect_report(id, x, y, w, h);
     }
 
     /// Handle pin-position-changed: update cache.
@@ -559,37 +545,13 @@ mod tests {
     }
 
     // ========================================================================
-    // handle_node_rect: screen→world conversion
+    // handle_node_rect: stores world coordinates directly
     // ========================================================================
 
     #[test]
-    fn test_handle_node_rect_zoom1() {
+    fn test_handle_node_rect_stores_directly() {
         let ctrl = NodeEditorController::new();
-        ctrl.set_viewport(1.0, 0.0, 0.0);
         ctrl.handle_node_rect(1, 100.0, 200.0, 50.0, 30.0);
-        let cache = ctrl.cache.borrow();
-        let rect = cache.node_rects.get(&1).unwrap().rect();
-        assert_eq!(rect, (100.0, 200.0, 50.0, 30.0));
-    }
-
-    #[test]
-    fn test_handle_node_rect_zoom2_with_pan() {
-        let ctrl = NodeEditorController::new();
-        ctrl.set_viewport(2.0, 50.0, 100.0);
-        // Screen coords: x=250, y=300, w=100, h=60
-        // World: x=(250-50)/2=100, y=(300-100)/2=100, w=50, h=30
-        ctrl.handle_node_rect(1, 250.0, 300.0, 100.0, 60.0);
-        let cache = ctrl.cache.borrow();
-        let rect = cache.node_rects.get(&1).unwrap().rect();
-        assert_eq!(rect, (100.0, 100.0, 50.0, 30.0));
-    }
-
-    #[test]
-    fn test_handle_node_rect_zero_zoom_fallback() {
-        let ctrl = NodeEditorController::new();
-        ctrl.set_viewport(0.0, 0.0, 0.0);
-        ctrl.handle_node_rect(1, 100.0, 200.0, 50.0, 30.0);
-        // Should use zoom=1.0 fallback
         let cache = ctrl.cache.borrow();
         let rect = cache.node_rects.get(&1).unwrap().rect();
         assert_eq!(rect, (100.0, 200.0, 50.0, 30.0));

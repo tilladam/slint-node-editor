@@ -43,6 +43,7 @@ members = [
     "examples/pin-compatibility",
     "examples/zoom-stress-test",
     "examples/sugiyama",
+    "examples/sugiyama-stress-test",
 ]
 
 [workspace.dependencies]

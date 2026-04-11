@@ -30,8 +30,26 @@
 // ```
 
 // Import building blocks and re-export for users
-import { PinTypes, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, Minimap, Link, BaseNode, Pin } from "node-editor-building-blocks.slint";
-export { PinTypes, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, Minimap, Link, BaseNode, Pin }
+import {
+    PinTypes,
+    ViewportState,
+    DragState,
+    GeometryVersion,
+    GeometryCallbacks,
+    LinkCreationState,
+    LinkCreation,
+    SelectionRequest,
+    NodeEditorComputations,
+    NodeStyleDefaults,
+    MinimapNode,
+    MinimapPosition,
+    LinkData,
+    Minimap,
+    Link,
+    BaseNode,
+    Pin,
+} from "node-editor-building-blocks.slint";
+export { PinTypes, ViewportState, DragState, GeometryVersion, GeometryCallbacks, LinkCreationState, LinkCreation, SelectionRequest, NodeEditorComputations, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, Minimap, Link, BaseNode, Pin }
 
 /// Modifier key for triggering box selection over nodes/links
 export enum BoxSelectionModifier {
@@ -53,11 +71,28 @@ export enum BoxSelectionModifier {
 /// - Layer 3: Selection box and link preview overlays
 ///
 /// Computation-heavy operations are delegated to the application via callbacks.
+///
+/// **Note:** Only one NodeEditor per Window is supported. The library uses Slint
+/// globals for internal communication between BaseNode/Pin and NodeEditor.
+/// Multiple editors in separate windows work fine. This limitation will be
+/// lifted once Slint introduces component-scoped globals.
 export component NodeEditor {
     // === Shared viewport state ===
     in-out property <length> pan-x: 0px;
     in-out property <length> pan-y: 0px;
     in-out property <float> zoom: 1.0;
+
+    // Sync viewport state to global for child components
+    init => {
+        ViewportState.zoom = root.zoom;
+        ViewportState.pan-x = root.pan-x;
+        ViewportState.pan-y = root.pan-y;
+    }
+
+    // === World content size ===
+    /// Size of the world-content container (nodes and links live here).
+    /// Must be large enough to contain all graph content at zoom=1.
+    in property <length> world-content-size: 100000px;
 
     // === Grid properties ===
     in property <length> grid-spacing: 24px;
@@ -113,6 +148,7 @@ export component NodeEditor {
 
     // === Node drag state ===
     out property <bool> is-dragging: root.internal-is-dragging;
+    out property <int> dragged-node-id: root.internal-dragged-node-id;
     out property <length> drag-offset-x: root.internal-drag-offset-x;
     out property <length> drag-offset-y: root.internal-drag-offset-y;
 
@@ -145,6 +181,8 @@ export component NodeEditor {
     // === Box selection modifier configuration ===
     /// Allow box selection on click on empty area (no modifier needed)
     in property <bool> box-selection-on-empty: true;
+    /// Whether link hit-testing is enabled (set to true if compute-link-at is wired)
+    in property <bool> has-link-selection: false;
     /// Modifier key that enables box selection even over links/nodes
     in property <BoxSelectionModifier> box-selection-modifier: BoxSelectionModifier.ctrl;
 
@@ -169,6 +207,7 @@ export component NodeEditor {
     property <length> internal-link-end-y;
 
     property <bool> internal-is-dragging: false;
+    property <int> internal-dragged-node-id: 0;
     property <length> internal-drag-offset-x: 0px;
     property <length> internal-drag-offset-y: 0px;
     property <length> internal-drag-origin-x: 0px;
@@ -178,49 +217,38 @@ export component NodeEditor {
     /// Called when grid needs to be regenerated (on pan/zoom/resize)
     callback request-grid-update();
 
-    /// Compute pin at position, returns pin ID or 0
+    /// Compute pin at position (world coordinates), returns pin ID or 0
     callback compute-pin-at(/* x */ length, /* y */ length) -> int;
 
-    /// Compute link at position, returns link ID or -1
+    /// Compute link at position (world coordinates), returns link ID or -1
     callback compute-link-at(/* x */ length, /* y */ length) -> int;
 
-    /// Compute nodes in selection box, returns array of IDs
+    /// Compute nodes in selection box (world coordinates), returns array of IDs
     callback compute-box-selection(/* x */ length, /* y */ length, /* w */ length, /* h */ length) -> [int];
 
-    /// Compute links in selection box, returns array of IDs
+    /// Compute links in selection box (world coordinates), returns array of IDs
     callback compute-link-box-selection(/* x */ length, /* y */ length, /* w */ length, /* h */ length) -> [int];
-
-    /// Select a node (called on click). Rust handles the selection logic.
-    callback select-node(/* node-id */ int, /* shift-held */ bool);
 
     /// Select a link (called on click). Rust handles the selection logic.
     callback select-link(/* link-id */ int, /* shift-held */ bool);
 
-    /// Clear all selection
-    callback clear-selection();
-
     /// Sync selection IDs to node data (called after box selection)
     callback sync-selection-to-nodes([int]);
 
+    /// Notification callback when node selection changes (for application tracking)
+    callback node-selected(/* node-id */ int, /* shift-held */ bool);
+
+    /// Notification callback when selection is cleared (for application tracking)
+    callback selection-cleared();
+
     /// Sync selection IDs to link data (called after box selection)
     callback sync-selection-to-links([int]);
-
-    /// Compute link preview path
-    callback compute-link-preview-path(/* start-x */ length, /* start-y */ length, /* end-x */ length, /* end-y */ length) -> string;
-
-    /// Compute link path from pin IDs. Used to render links from `links` property.
-    /// Returns SVG path commands string, or empty string if pins not found.
-    /// The version parameter forces re-evaluation when geometry changes (pass geometry-version).
-    /// Zoom and pan are passed directly so the pure callback always uses the exact
-    /// viewport values that Slint is using for node positioning.
-    pure callback compute-link-path(/* start-pin-id */ int, /* end-pin-id */ int, /* version */ int, /* zoom */ float, /* pan-x */ float, /* pan-y */ float) -> string;
 
     // === Callbacks TO Application (events) ===
     callback link-requested(/* start-pin */ int, /* end-pin */ int);
     callback link-cancelled();
     callback link-hovered();
     callback selection-changed();
-    callback viewport-changed();
     callback delete-selected();
     callback add-node-requested();
     callback context-menu-requested();
@@ -235,11 +263,6 @@ export component NodeEditor {
     /// Pin position reporting (for application-side tracking)
     /// Note: node-id and pin-type are passed explicitly so the library doesn't prescribe any pin ID encoding scheme
     callback pin-position-changed(/* pin-id */ int, /* node-id */ int, /* pin-type */ int, /* rel-x */ length, /* rel-y */ length);
-
-    // === Selection Checking (implemented by application) ===
-    // Note: version parameter forces re-evaluation when selection changes (pure callback cache invalidation)
-    pure callback is-selected(/* node-id */ int, /* version */ int) -> bool;
-    pure callback is-link-selected(/* link-id */ int, /* version */ int) -> bool;
 
     // === Selection version counter (for dependency tracking) ===
     // This counter is incremented whenever selection changes, allowing bindings
@@ -256,13 +279,13 @@ export component NodeEditor {
 
     /// Report node rectangle change. Auto-increments geometry-version.
     public function report-node-rect(id: int, x: length, y: length, w: length, h: length) {
-        root.geometry-version += 1;
+        GeometryVersion.version += 1;
         root.node-rect-changed(id, x, y, w, h);
     }
 
     /// Report pin position change. Auto-increments geometry-version.
     public function report-pin-position(pin-id: int, node-id: int, pin-type: int, rel-x: length, rel-y: length) {
-        root.geometry-version += 1;
+        GeometryVersion.version += 1;
         root.pin-position-changed(pin-id, node-id, pin-type, rel-x, rel-y);
     }
 
@@ -282,25 +305,29 @@ export component NodeEditor {
         root.internal-link-start-y = y;
         root.internal-link-end-x = x;
         root.internal-link-end-y = y;
-        root.link-preview-path-commands = root.compute-link-preview-path(x, y, x, y);
+        root.link-preview-path-commands = NodeEditorComputations.compute-link-preview-path(
+            x / 1px, y / 1px, x / 1px, y / 1px, root.zoom, root.bezier-min-offset);
     }
 
     /// Update link end position during creation
     public function update-link-end(x: length, y: length) {
         root.internal-link-end-x = x;
         root.internal-link-end-y = y;
-        root.link-preview-path-commands = root.compute-link-preview-path(
-            root.internal-link-start-x, root.internal-link-start-y, x, y
-        );
+        root.link-preview-path-commands = NodeEditorComputations.compute-link-preview-path(
+            root.internal-link-start-x / 1px, root.internal-link-start-y / 1px,
+            x / 1px, y / 1px, root.zoom, root.bezier-min-offset);
     }
 
     /// Complete link creation
     public function complete-link-creation() {
         if root.internal-is-creating-link {
             // Call compute-pin-at and request link if valid
-            // Note: We call link-requested with the result directly since Slint
-            // doesn't support local variables. The callback checks for pin ID != 0.
-            root.try-complete-link(root.compute-pin-at(root.internal-link-end-x, root.internal-link-end-y));
+            // Note: Convert screen coords to world coords since pin positions are stored in world space
+            // world = (screen - pan) / zoom
+            root.try-complete-link(NodeEditorComputations.compute-pin-at(
+                (root.internal-link-end-x - root.pan-x) / root.zoom / 1px,
+                (root.internal-link-end-y - root.pan-y) / root.zoom / 1px,
+                root.pin-hit-radius / root.zoom / 1px));
             root.internal-is-creating-link = false;
         }
     }
@@ -321,8 +348,7 @@ export component NodeEditor {
     }
 
     /// Apply zoom with pan adjustment - takes calculated new zoom and mouse position graph coords
-    public function apply-zoom-with-adjustment(new-zoom: float, mouse-x: length, mouse-y: length,
-                                        graph-x: float, graph-y: float) {
+    public function apply-zoom-with-adjustment(new-zoom: float, mouse-x: length, mouse-y: length, graph-x: float, graph-y: float) {
         root.zoom = new-zoom;
         root.pan-x = mouse-x - graph-x * new-zoom * 1px;
         root.pan-y = mouse-y - graph-y * new-zoom * 1px;
@@ -342,8 +368,7 @@ export component NodeEditor {
             mouse-x,
             mouse-y,
             (mouse-x - root.pan-x) / root.zoom / 1px,
-            (mouse-y - root.pan-y) / root.zoom / 1px
-        );
+            (mouse-y - root.pan-y) / root.zoom / 1px);
     }
 
     /// Handle link click selection - delegates to Rust via callback
@@ -351,9 +376,31 @@ export component NodeEditor {
         root.select-link(link-id, shift-held);
     }
 
-    /// Handle node click selection - delegates to Rust via callback
-    public function handle-node-click(node-id: int, shift-held: bool) {
-        root.select-node(node-id, shift-held);
+    /// Select a node by ID. If shift-held is false, clears existing selection first.
+    /// For shift-select (adding to selection), the application must handle via node-selected callback.
+    public function select-node(node-id: int, shift-held: bool) {
+        if !shift-held {
+            // Simple single-node selection: clear and set to this node
+            root.selected-node-ids = [node-id];
+            root.selected-link-ids = [];
+            NodeEditorComputations.sync-selection-to-nodes(root.selected-node-ids);
+            root.sync-selection-to-links([]);
+            root.selection-version += 1;
+            root.selection-changed();
+        }
+        // Notify application (for shift-select, app handles adding to selection)
+        root.node-selected(node-id, shift-held);
+    }
+
+    /// Clear all selection
+    public function clear-selection() {
+        root.selected-node-ids = [];
+        root.selected-link-ids = [];
+        NodeEditorComputations.sync-selection-to-nodes([]);
+        root.sync-selection-to-links([]);
+        root.selection-version += 1;
+        root.selection-changed();
+        root.selection-cleared();
     }
 
     /// Start node drag
@@ -363,6 +410,7 @@ export component NodeEditor {
             root.select-node(node-id, false);
         }
         root.internal-is-dragging = true;
+        root.internal-dragged-node-id = node-id;
         root.internal-drag-offset-x = 0px;
         root.internal-drag-offset-y = 0px;
         root.internal-drag-origin-x = world-x;
@@ -384,27 +432,61 @@ export component NodeEditor {
         // intersections regardless of their starting position.
         root.node-drag-ended(
             root.grid-snapping ? root.snap-to-grid((root.internal-drag-origin-x + delta-x) / 1px) - root.internal-drag-origin-x / 1px : delta-x / 1px,
-            root.grid-snapping ? root.snap-to-grid((root.internal-drag-origin-y + delta-y) / 1px) - root.internal-drag-origin-y / 1px : delta-y / 1px
-        );
+            root.grid-snapping ? root.snap-to-grid((root.internal-drag-origin-y + delta-y) / 1px) - root.internal-drag-origin-y / 1px : delta-y / 1px);
 
         // THEN reset visual offset (now report-rect will find model already updated)
         root.internal-is-dragging = false;
+        root.internal-dragged-node-id = 0;
         root.internal-drag-offset-x = 0px;
         root.internal-drag-offset-y = 0px;
     }
 
     // === Trigger updates on viewport changes ===
-    changed pan-x => { request-grid-update(); viewport-changed(); }
-    changed pan-y => { request-grid-update(); viewport-changed(); }
-    changed zoom => { root.geometry-version += 1; request-grid-update(); viewport-changed(); }
-    changed width => { request-grid-update(); }
-    changed height => { request-grid-update(); }
+    changed pan-x => {
+        ViewportState.pan-x = root.pan-x;
+        NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
+    }
+    changed pan-y => {
+        ViewportState.pan-y = root.pan-y;
+        NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
+    }
+    changed zoom => {
+        ViewportState.zoom = root.zoom;
+        GeometryVersion.version += 1;
+        NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
+    }
+    // DragState is synced by BaseNode directly (it initiates drags)
+    changed width => {
+        NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
+    }
+    changed height => {
+        NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
+    }
+    
+    // Watch LinkCreation global for pin-initiated link creation
+    property <int> link-creation-watch: LinkCreation.version;
+    changed link-creation-watch => {
+        if LinkCreation.state == LinkCreationState.started {
+            root.start-link-from-pin(LinkCreation.start-pin-id, LinkCreation.current-x, LinkCreation.current-y);
+        } else if LinkCreation.state == LinkCreationState.updating {
+            root.update-link-end(LinkCreation.current-x, LinkCreation.current-y);
+        } else if LinkCreation.state == LinkCreationState.complete {
+            root.complete-link-creation();
+            LinkCreation.state = LinkCreationState.idle;
+        }
+    }
+    
+    // Watch SelectionRequest global for node-initiated selection
+    property <int> selection-request-watch: SelectionRequest.version;
+    changed selection-request-watch => {
+        root.select-node(SelectionRequest.node-id, SelectionRequest.shift-held);
+    }
 
     /// Call this after initial geometry has been reported to force link path recomputation.
     public function refresh-links() {
-        root.geometry-version += 1;
+        GeometryVersion.version += 1;
         // Also trigger viewport-changed to force a repaint
-        root.viewport-changed();
+        NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
     }
 
     // === Minimap Positioning ===
@@ -433,6 +515,7 @@ export component NodeEditor {
         width: 100%;
         height: 100%;
         background: root.background-color;
+        clip: false;  // Don't clip scaled content
 
         // Grid
         Path {
@@ -452,6 +535,11 @@ export component NodeEditor {
         background-ta := TouchArea {
             width: 100%;
             height: 100%;
+
+            // Cached link hit-test result to avoid redundant compute-link-at calls
+            property <int> link-at-cursor: -1;
+            // Whether a box-selection modifier key is currently held
+            property <bool> modifier-forces-box-select: false;
 
             scroll-event(event) => {
                 if event.modifiers.control {
@@ -477,13 +565,22 @@ export component NodeEditor {
                         root.pan-start-offset-x = root.pan-x;
                         root.pan-start-offset-y = root.pan-y;
                     } else if event.button == PointerEventButton.left {
-                        // Check if box selection should start based on configuration
-                        // Modifier key can force box selection even over links
-                        // Empty area allows box selection if box-selection-on-empty is true
-                        if (root.box-selection-modifier == BoxSelectionModifier.ctrl && event.modifiers.control) ||
-                           (root.box-selection-modifier == BoxSelectionModifier.alt && event.modifiers.alt) ||
-                           (root.box-selection-modifier == BoxSelectionModifier.shift && event.modifiers.shift) ||
-                           (root.box-selection-on-empty && root.compute-link-at(self.mouse-x, self.mouse-y) < 0) {
+                        // Cache link hit-test once per click
+                        link-at-cursor = root.has-link-selection
+                            ? root.compute-link-at(
+                                (self.mouse-x - root.pan-x) / root.zoom,
+                                (self.mouse-y - root.pan-y) / root.zoom)
+                            : -1;
+
+                        // Check if box selection should start:
+                        // - Modifier key forces box selection even over links
+                        // - Empty area allows box selection if box-selection-on-empty is true
+                        modifier-forces-box-select =
+                            (root.box-selection-modifier == BoxSelectionModifier.ctrl && event.modifiers.control)
+                            || (root.box-selection-modifier == BoxSelectionModifier.alt && event.modifiers.alt)
+                            || (root.box-selection-modifier == BoxSelectionModifier.shift && event.modifiers.shift);
+
+                        if modifier-forces-box-select || (root.box-selection-on-empty && link-at-cursor < 0) {
                             // Start box selection
                             root.internal-is-box-selecting = true;
                             root.box-start-x = self.mouse-x;
@@ -495,9 +592,9 @@ export component NodeEditor {
                                 root.selected-link-ids = [];
                                 root.clear-selection();
                             }
-                        } else if root.compute-link-at(self.mouse-x, self.mouse-y) >= 0 {
+                        } else if link-at-cursor >= 0 {
                             // Clicked on a link - select it
-                            root.select-link(root.compute-link-at(self.mouse-x, self.mouse-y), event.modifiers.shift);
+                            root.select-link(link-at-cursor, event.modifiers.shift);
                         }
                     } else if event.button == PointerEventButton.right {
                         root.context-menu-x = self.mouse-x;
@@ -511,17 +608,21 @@ export component NodeEditor {
                     }
                     if root.internal-is-box-selecting && event.button == PointerEventButton.left {
                         root.internal-is-box-selecting = false;
-                        // Compute selected nodes and links
-                        root.selected-node-ids = root.compute-box-selection(
-                            root.selection-x, root.selection-y,
-                            root.selection-width, root.selection-height
-                        );
+                        // Convert selection box from screen to world coordinates for node hit testing
+                        // For nodes: world = (screen - pan) / zoom
+                        root.selected-node-ids = NodeEditorComputations.compute-box-selection(
+                            (root.selection-x - root.pan-x) / root.zoom / 1px,
+                            (root.selection-y - root.pan-y) / root.zoom / 1px,
+                            root.selection-width / root.zoom / 1px,
+                            root.selection-height / root.zoom / 1px);
                         root.selected-link-ids = root.compute-link-box-selection(
-                            root.selection-x, root.selection-y,
-                            root.selection-width, root.selection-height
-                        );
-                        root.sync-selection-to-nodes(root.selected-node-ids);
+                            (root.selection-x - root.pan-x) / root.zoom,
+                            (root.selection-y - root.pan-y) / root.zoom,
+                            root.selection-width / root.zoom,
+                            root.selection-height / root.zoom);
+                        NodeEditorComputations.sync-selection-to-nodes(root.selected-node-ids);
                         root.sync-selection-to-links(root.selected-link-ids);
+                        root.selection-version += 1;
                         root.selection-changed();
                     }
                     if root.internal-is-creating-link && event.button == PointerEventButton.left {
@@ -530,8 +631,8 @@ export component NodeEditor {
                 }
                 if event.kind == PointerEventKind.move {
                     // Link hover detection when not doing other interactions
-                    if !root.internal-is-panning && !root.internal-is-box-selecting && !root.internal-is-creating-link {
-                        root.update-link-hover(root.compute-link-at(self.mouse-x, self.mouse-y));
+                    if root.has-link-selection && !root.internal-is-panning && !root.internal-is-box-selecting && !root.internal-is-creating-link {
+                        root.update-link-hover(root.compute-link-at((self.mouse-x - root.pan-x) / root.zoom, (self.mouse-y - root.pan-y) / root.zoom));
                     }
                 }
             }
@@ -560,19 +661,32 @@ export component NodeEditor {
         }
     }
 
-    // === Layer 2: Links and user children (nodes) ===
+    // === Layer 2: World Content (scaled) ===
+    // Container positioned at pan offset with transform-scale for zoom.
+    // Nodes use pure world coordinates (x: world-x, y: world-y).
+    // After transform: screen = pan + world * zoom ✓
+    world-content := Rectangle {
+        x: root.pan-x;
+        y: root.pan-y;
+        width: root.world-content-size;
+        height: root.world-content-size;
+        transform-origin: { x: 0, y: 0 };
+        transform-scale: root.zoom;
+        background: transparent;
+        clip: false;
 
-    // Render links from `links` property (new API)
-    for link in root.links: Link {
-        path-commands: root.compute-link-path(link.start-pin-id, link.end-pin-id, root.geometry-version, root.zoom, root.pan-x / 1px, root.pan-y / 1px);
-        link-color: link.color;
-        line-width: link.line-width > 0 ? link.line-width * 1px : 2px;
-        selected: root.is-link-selected(link.id, root.selection-version);
-        hovered: root.hovered-link-id == link.id;
+        // Render links from `links` property
+        for link in root.links: Link {
+            path-commands: NodeEditorComputations.compute-link-path(link.start-pin-id, link.end-pin-id, GeometryVersion.version);
+            link-color: link.color;
+            line-width: link.line-width > 0 ? link.line-width * 1px : 2px;
+            selected: NodeEditorComputations.is-link-selected(link.id, root.selection-version);
+            hovered: root.hovered-link-id == link.id;
+        }
+
+        // User-provided children (nodes)
+        @children
     }
-
-    // User-provided children (nodes)
-    @children
 
     // === Layer 3: Overlays ===
 

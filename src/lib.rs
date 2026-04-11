@@ -44,6 +44,15 @@
 //! - [`SelectionManager`] - Manage selection state with O(1) lookups
 //! - [`GraphLogic`] - Helper for managing node graph state
 //!
+//! ## Limitations
+//!
+//! **One NodeEditor per window.** The library uses Slint globals (`ViewportState`,
+//! `DragState`, `GeometryCallbacks`, etc.) for internal communication between
+//! `BaseNode`/`Pin` components and the `NodeEditor`. Since Slint globals are
+//! window-level singletons, only one `NodeEditor` instance per `Window` is
+//! supported. Multiple editors in separate windows work fine. This limitation
+//! will be lifted once Slint introduces component-scoped globals.
+//!
 //! See the [README](https://github.com/slint-ui/slint/tree/master/examples/node-editor/slint-node-editor)
 //! for detailed documentation and examples.
 
@@ -56,6 +65,7 @@ pub mod graph;
 pub mod tracking;
 pub mod links;
 pub mod controller;
+pub mod setup;
 #[cfg(feature = "layout")]
 pub mod layout;
 
@@ -77,5 +87,91 @@ pub use graph::{
 pub use tracking::GeometryTracker;
 pub use links::LinkManager;
 pub use controller::NodeEditorController;
+pub use setup::NodeEditorSetup;
 #[cfg(feature = "layout")]
 pub use layout::{sugiyama_layout, sugiyama_layout_from_cache, Direction, NodePosition, SugiyamaConfig};
+
+/// Wire up all NodeEditor callbacks with a single macro call.
+///
+/// This macro sets up default behavior for geometry tracking, computations, and grid updates.
+/// You can override any callback after calling this macro - the last `.on_*()` call wins.
+///
+/// # Example
+///
+/// ```ignore
+/// use slint_node_editor::{NodeEditorSetup, wire_node_editor};
+///
+/// let setup = NodeEditorSetup::new(|node_id, dx, dy| {
+///     // Update your model
+/// });
+///
+/// wire_node_editor!(window, setup);
+///
+/// // Override specific callbacks if needed:
+/// // window.global::<NodeEditorComputations>().on_compute_pin_at(|x, y, radius| { ... });
+/// ```
+#[macro_export]
+macro_rules! wire_node_editor {
+    ($window:expr, $setup:expr) => {{
+        // Geometry tracking
+        let gc = $window.global::<GeometryCallbacks>();
+        gc.on_report_node_rect($setup.report_node_rect());
+        gc.on_report_pin_position($setup.report_pin_position());
+        gc.on_start_node_drag($setup.start_node_drag());
+        gc.on_end_node_drag($setup.end_node_drag());
+
+        // Computations
+        let computations = $window.global::<NodeEditorComputations>();
+        computations.on_compute_link_path($setup.controller().compute_link_path_callback());
+
+        let ctrl = $setup.controller().clone();
+        computations.on_compute_pin_at(move |x, y, radius| {
+            ctrl.cache().borrow().find_pin_at(x, y, radius)
+        });
+
+        computations.on_compute_link_preview_path(|start_x, start_y, end_x, end_y, zoom, bezier_offset| {
+            $crate::generate_bezier_path(start_x, start_y, end_x, end_y, zoom, bezier_offset).into()
+        });
+
+        let ctrl = $setup.controller().clone();
+        computations.on_compute_box_selection(move |x, y, w, h| {
+            let ids = ctrl.cache().borrow().nodes_in_selection_box(x, y, w, h);
+            ids.as_slice().into()
+        });
+
+        // Selection state tracking
+        let selection_set = $setup.selection();
+
+        let sm_check = selection_set.clone();
+        computations.on_is_node_selected(move |id, _version| sm_check.borrow().contains(&id));
+
+        let sm_update = selection_set.clone();
+        computations.on_sync_selection_to_nodes(move |ids_model| {
+            use slint::Model;
+            let mut set = sm_update.borrow_mut();
+            set.clear();
+            for i in 0..ids_model.row_count() {
+                if let Some(id) = ids_model.row_data(i) {
+                    set.insert(id);
+                }
+            }
+        });
+
+        // Auto grid updates
+        let ctrl = $setup.controller().clone();
+        let w = $window.as_weak();
+        computations.on_viewport_changed(move |zoom, pan_x, pan_y| {
+            ctrl.set_viewport(zoom, pan_x, pan_y);
+            if let Some(w) = w.upgrade() {
+                w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
+            }
+        });
+
+        // Initial grid
+        let ctrl = $setup.controller().clone();
+        let w = $window.as_weak();
+        if let Some(w) = w.upgrade() {
+            w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
+        }
+    }};
+}

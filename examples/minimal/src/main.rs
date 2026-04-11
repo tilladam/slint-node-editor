@@ -1,15 +1,13 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::NodeEditorController;
+use slint_node_editor::{NodeEditorSetup, wire_node_editor};
 use std::rc::Rc;
 
 slint::include_modules!();
 
 fn main() {
     let window = MainWindow::new().unwrap();
-    let ctrl = NodeEditorController::new();
-    let w = window.as_weak();
 
-    // Set up nodes (keep reference for drag updates)
+    // Set up nodes
     let nodes = Rc::new(VecModel::from(vec![
         NodeData { id: 1, title: SharedString::from("Node A"), x: 100.0, y: 100.0 },
         NodeData { id: 2, title: SharedString::from("Node B"), x: 400.0, y: 200.0 },
@@ -27,52 +25,10 @@ fn main() {
         },
     ]))));
 
-    // Core callbacks - controller handles the logic
-    window.on_compute_link_path(ctrl.compute_link_path_callback());
-    window.on_node_drag_started(ctrl.node_drag_started_callback());
-
-    // Geometry tracking - update cache
-    window.on_node_rect_changed({
-        let ctrl = ctrl.clone();
-        move |id, x, y, width, h| {
-            ctrl.handle_node_rect(id, x, y, width, h);
-        }
-    });
-
-    window.on_pin_position_changed({
-        let ctrl = ctrl.clone();
-        move |pid, nid, ptype, x, y| {
-            ctrl.handle_pin_position(pid, nid, ptype, x, y);
-        }
-    });
-
-    // Grid updates
-    window.on_request_grid_update({
-        let ctrl = ctrl.clone();
-        let w = w.clone();
-        move || {
-            if let Some(w) = w.upgrade() {
-                w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
-            }
-        }
-    });
-
-    window.on_update_viewport({
-        let ctrl = ctrl.clone();
-        let w = w.clone();
-        move |z, pan_x, pan_y| {
-            if let Some(w) = w.upgrade() {
-                ctrl.set_zoom(z);
-                w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
-            }
-        }
-    });
-
-    // Node drag - update positions in model
-    window.on_node_drag_ended({
-        let ctrl = ctrl.clone();
-        move |delta_x, delta_y| {
-            let node_id = ctrl.dragged_node_id();
+    // Create setup with model update logic
+    let setup = NodeEditorSetup::new({
+        let nodes = nodes.clone();
+        move |node_id, delta_x, delta_y| {
             for i in 0..nodes.row_count() {
                 if let Some(mut node) = nodes.row_data(i) {
                     if node.id == node_id {
@@ -86,6 +42,8 @@ fn main() {
         }
     });
 
-    window.invoke_request_grid_update();
+    // Wire all callbacks with one macro call
+    wire_node_editor!(window, setup);
+
     window.run().unwrap();
 }
