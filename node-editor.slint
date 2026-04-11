@@ -72,11 +72,18 @@ export enum BoxSelectionModifier {
 ///
 /// Computation-heavy operations are delegated to the application via callbacks.
 ///
+/// NodeEditor inherits FocusScope so it is the keyboard focus surface.
+/// Embedders call `editor.focus()` to focus programmatically; `focus-on-click`
+/// activates on click. **No key bindings are defined** — embedders own the
+/// keymap by wrapping the editor in a parent FocusScope that handles keys.
+/// State like `is-creating-link` and operations like `cancel-link-creation()`
+/// are exposed for embedders to bind as needed.
+///
 /// **Note:** Only one NodeEditor per Window is supported. The library uses Slint
 /// globals for internal communication between BaseNode/Pin and NodeEditor.
 /// Multiple editors in separate windows work fine. This limitation will be
 /// lifted once Slint introduces component-scoped globals.
-export component NodeEditor {
+export component NodeEditor inherits FocusScope {
     // === Shared viewport state ===
     in-out property <length> pan-x: 0px;
     in-out property <length> pan-y: 0px;
@@ -249,11 +256,8 @@ export component NodeEditor {
     callback link-cancelled();
     callback link-hovered();
     callback selection-changed();
-    callback delete-selected();
-    callback add-node-requested();
     callback context-menu-requested();
     callback node-double-clicked(/* node-id */ int);
-    callback navigate-up();
     callback node-drag-started(/* node-id */ int);
     callback node-drag-ended(/* delta-x */ float, /* delta-y */ float);
 
@@ -751,28 +755,4 @@ export component NodeEditor {
         }
     }
 
-    // === Keyboard handling ===
-    FocusScope {
-        width: 100%;
-        height: 100%;
-
-        key-pressed(event) => {
-            if event.text == Key.Delete || event.text == Key.Backspace {
-                root.delete-selected();
-                accept
-            } else if event.text == Key.Escape {
-                if root.internal-is-creating-link {
-                    root.cancel-link-creation();
-                } else {
-                    root.navigate-up();
-                }
-                accept
-            } else if event.modifiers.control && (event.text == "n" || event.text == "N") {
-                root.add-node-requested();
-                accept
-            } else {
-                reject
-            }
-        }
-    }
 }

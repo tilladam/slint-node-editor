@@ -173,7 +173,7 @@ export component MainWindow inherits Window {
     // Note: viewport changes are now handled via NodeEditorComputations global
     callback create-link <=> editor.link-requested;
     callback delete-selected-nodes();  // delete all selected nodes
-    callback add-node <=> editor.add-node-requested;
+    callback add-node();
 
     // Filter node callbacks
     callback filter-type-changed(int, int);  // node-id, new-index
@@ -258,13 +258,35 @@ export component MainWindow inherits Window {
         editor.graph-max-y = graph-max-y * 1px;
     }
 
-    // The pure Slint NodeEditor handles all three layers:
-    // 1. Background with grid
-    // 2. Children (nodes and links) - placed via @children
-    // 3. Overlay for selection box and link preview
-    editor := NodeEditor {
+    // Focus the editor on startup so keyboard shortcuts work immediately.
+    init => { editor.focus(); }
+
+    // App-level keymap. NodeEditor defines no key bindings — embedders own the
+    // keymap by wrapping it in a parent FocusScope.
+    shortcuts := FocusScope {
         width: 100%;
         height: 100%;
+
+        key-pressed(event) => {
+            if (event.text == Key.Delete || event.text == Key.Backspace) {
+                root.delete-selected-nodes();
+                root.delete-selected-links();
+                return accept;
+            }
+            if (event.modifiers.control && (event.text == "n" || event.text == "N")) {
+                root.add-node();
+                return accept;
+            }
+            if (event.text == Key.Escape && editor.is-creating-link) {
+                editor.cancel-link-creation();
+                return accept;
+            }
+            return reject;
+        }
+
+        editor := NodeEditor {
+            width: 100%;
+            height: 100%;
         pan-x <=> root.pan-x;
         pan-y <=> root.pan-y;
         zoom <=> root.zoom;
@@ -297,13 +319,6 @@ export component MainWindow inherits Window {
         }
 
 
-
-        // Selection checking is now handled via NodeEditorComputations global
-
-        delete-selected => {
-            root.delete-selected-nodes();
-            root.delete-selected-links();
-        }
 
         // Nodes - children of NodeEditor
         // BaseNode handles zoom/pan/drag via globals - no manual property forwarding needed!
@@ -339,7 +354,8 @@ export component MainWindow inherits Window {
                 root.filter-reset(id);
             }
         }
-    }
+        } // editor
+    } // shortcuts
 
     // Instructions overlay
     InstructionsOverlay {
