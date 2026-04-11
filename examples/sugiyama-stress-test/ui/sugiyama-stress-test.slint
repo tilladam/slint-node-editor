@@ -67,6 +67,9 @@ export component MainWindow inherits Window {
     in property <[NodeData]> nodes;
     in property <[LinkData]> links <=> editor.links;
     in-out property <string> grid_commands <=> editor.grid-commands;
+    in-out property <float> zoom <=> editor.zoom;
+    in-out property <length> pan-x <=> editor.pan-x;
+    in-out property <length> pan-y <=> editor.pan-y;
 
     out property <float> width_: self.width / 1px;
     out property <float> height_: self.height / 1px;

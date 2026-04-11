@@ -104,8 +104,30 @@ fn main() {
                 }
             }
 
-            // Increment version to trigger link recalculation
+            // Zoom to fit the layout
             if let Some(w) = w.upgrade() {
+                let (mut min_x, mut min_y) = (f32::MAX, f32::MAX);
+                let (mut max_x, mut max_y) = (f32::MIN, f32::MIN);
+                for i in 0..nodes.row_count() {
+                    if let Some(n) = nodes.row_data(i) {
+                        min_x = min_x.min(n.x);
+                        min_y = min_y.min(n.y);
+                        max_x = max_x.max(n.x + 120.0);
+                        max_y = max_y.max(n.y + 60.0);
+                    }
+                }
+                if min_x < max_x {
+                    let margin = 40.0;
+                    let graph_w = (max_x - min_x) + margin * 2.0;
+                    let graph_h = (max_y - min_y) + margin * 2.0;
+                    let viewport_w = w.get_width_();
+                    let viewport_h = w.get_height_() - 40.0; // button bar
+                    let zoom = (viewport_w / graph_w).min(viewport_h / graph_h).clamp(0.1, 3.0);
+                    w.set_zoom(zoom);
+                    w.set_pan_x(-(min_x - margin) * zoom);
+                    w.set_pan_y(-(min_y - margin) * zoom);
+                }
+
                 let geom_ver = w.global::<GeometryVersion>();
                 geom_ver.set_version(geom_ver.get_version() + 1);
             }
