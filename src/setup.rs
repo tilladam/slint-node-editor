@@ -72,7 +72,7 @@ where
         self.selection.clone()
     }
 
-    /// Callback for `GeometryCallbacks.on_report_node_rect`.
+    /// Callback for `NodeEditorInternalCallbacks.on_report_node_rect`.
     pub fn report_node_rect(&self) -> impl Fn(i32, f32, f32, f32, f32) + 'static {
         let ctrl = self.controller.clone();
         move |id, x, y, w, h| {
@@ -80,7 +80,7 @@ where
         }
     }
 
-    /// Callback for `GeometryCallbacks.on_report_pin_position`.
+    /// Callback for `NodeEditorInternalCallbacks.on_report_pin_position`.
     pub fn report_pin_position(&self) -> impl Fn(i32, i32, i32, f32, f32) + 'static {
         let ctrl = self.controller.clone();
         move |pin_id, node_id, pin_type, x, y| {
@@ -88,7 +88,7 @@ where
         }
     }
 
-    /// Callback for `GeometryCallbacks.on_start_node_drag`.
+    /// Callback for `NodeEditorInternalCallbacks.on_start_node_drag`.
     pub fn start_node_drag(&self) -> impl Fn(i32, bool, f32, f32) + 'static {
         let dragged = self.dragged_node_id.clone();
         move |node_id, _, _, _| {
@@ -96,7 +96,7 @@ where
         }
     }
 
-    /// Callback for `GeometryCallbacks.on_end_node_drag`.
+    /// Callback for `NodeEditorInternalCallbacks.on_end_node_drag`.
     /// 
     /// This automatically calls your model-update closure with the dragged node ID.
     /// If the dragged node is part of a multi-node selection, all selected nodes are moved.

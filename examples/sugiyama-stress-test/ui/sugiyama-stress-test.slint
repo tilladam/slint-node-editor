@@ -4,7 +4,7 @@ import {
     Pin,
     PinTypes,
     LinkData,
-    GeometryCallbacks,
+    NodeEditorInternalCallbacks,
     NodeEditorComputations,
     GeometryVersion,
 } from "@slint-node-editor/node-editor.slint";
@@ -16,7 +16,7 @@ export struct NodeData {
     x: float,
     y: float,
 }
-export { LinkData, GeometryCallbacks, NodeEditorComputations, GeometryVersion }
+export { LinkData, NodeEditorInternalCallbacks, NodeEditorComputations, GeometryVersion }
 
 component SimpleNode inherits BaseNode {
     in property <string> title: "Node";

@@ -26,7 +26,7 @@ import {
     NodeStyleDefaults,
     LinkData,
     NodeEditorComputations,
-    GeometryCallbacks,
+    NodeEditorInternalCallbacks,
 } from "@slint-node-editor/node-editor.slint";
 import { PinId } from "pin_encoding.slint";
 import { InstructionsOverlay } from "instructions_overlay.slint";
@@ -40,7 +40,7 @@ export struct NodeData {
 }
 
 // Re-export LinkData and NodeEditorComputations for Rust
-export { LinkData, NodeEditorComputations, GeometryCallbacks }
+export { LinkData, NodeEditorComputations, NodeEditorInternalCallbacks }
 
 // Re-export NodeStyleDefaults for Rust access (as NodeConstants for backward compatibility)
 export global NodeConstants {
@@ -118,7 +118,7 @@ component Node inherits BaseNode {
     }
 
     // Report pin positions after initialization (for newly added nodes)
-    // Pins auto-report via GeometryCallbacks global now
+    // Pins auto-report via NodeEditorInternalCallbacks global now
 
     // Input pin (green) - with drag-to-link support
     input-pin := Pin {

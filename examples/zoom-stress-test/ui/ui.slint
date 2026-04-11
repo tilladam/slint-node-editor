@@ -12,7 +12,7 @@ import {
     Link,
     LinkData,
     NodeEditorComputations,
-    GeometryCallbacks,
+    NodeEditorInternalCallbacks,
 } from "@slint-node-editor/node-editor.slint";
 import { InputNode, InputNodeData } from "input_node.slint";
 import { ControlNode, ControlNodeData } from "control_node.slint";
@@ -20,7 +20,7 @@ import { DisplayNode, DisplayNodeData } from "display_node.slint";
 import { Button } from "std-widgets.slint";
 
 // Re-export for Rust
-export { InputNodeData, ControlNodeData, DisplayNodeData, LinkData, NodeEditorComputations, GeometryCallbacks }
+export { InputNodeData, ControlNodeData, DisplayNodeData, LinkData, NodeEditorComputations, NodeEditorInternalCallbacks }
 
 export component MainWindow inherits Window {
     title: "Zoom Stress Test - Widget Scaling";

@@ -110,7 +110,7 @@ impl MinimalTestHarness {
 
         // Layer tracking on top of the macro-wired callbacks.
         // We re-wire globals callbacks to add tracking, forwarding to the controller.
-        window.global::<GeometryCallbacks>().on_report_node_rect({
+        window.global::<NodeEditorInternalCallbacks>().on_report_node_rect({
             let ctrl = setup.controller().clone();
             let tracker = tracker.clone();
             move |id, x, y, width, h| {
@@ -119,7 +119,7 @@ impl MinimalTestHarness {
             }
         });
 
-        window.global::<GeometryCallbacks>().on_report_pin_position({
+        window.global::<NodeEditorInternalCallbacks>().on_report_pin_position({
             let ctrl = setup.controller().clone();
             let tracker = tracker.clone();
             move |pid, nid, ptype, x, y| {
@@ -141,8 +141,8 @@ impl MinimalTestHarness {
             }
         });
 
-        // Track drag events via GeometryCallbacks (the actual new architecture path)
-        window.global::<GeometryCallbacks>().on_start_node_drag({
+        // Track drag events via NodeEditorInternalCallbacks (the actual new architecture path)
+        window.global::<NodeEditorInternalCallbacks>().on_start_node_drag({
             let setup_start = setup.start_node_drag();
             let tracker = tracker.clone();
             move |node_id, already_selected, wx, wy| {
@@ -151,7 +151,7 @@ impl MinimalTestHarness {
             }
         });
 
-        window.global::<GeometryCallbacks>().on_end_node_drag({
+        window.global::<NodeEditorInternalCallbacks>().on_end_node_drag({
             let setup_end = setup.end_node_drag();
             let tracker = tracker.clone();
             move |delta_x, delta_y| {

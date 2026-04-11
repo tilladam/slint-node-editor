@@ -47,7 +47,7 @@
 //! ## Limitations
 //!
 //! **One NodeEditor per window.** The library uses Slint globals (`ViewportState`,
-//! `DragState`, `GeometryCallbacks`, etc.) for internal communication between
+//! `DragState`, `NodeEditorInternalCallbacks`, etc.) for internal communication between
 //! `BaseNode`/`Pin` components and the `NodeEditor`. Since Slint globals are
 //! window-level singletons, only one `NodeEditor` instance per `Window` is
 //! supported. Multiple editors in separate windows work fine. This limitation
@@ -114,7 +114,7 @@ pub use layout::{sugiyama_layout, sugiyama_layout_from_cache, Direction, NodePos
 macro_rules! wire_node_editor {
     ($window:expr, $setup:expr) => {{
         // Geometry tracking
-        let gc = $window.global::<GeometryCallbacks>();
+        let gc = $window.global::<NodeEditorInternalCallbacks>();
         gc.on_report_node_rect($setup.report_node_rect());
         gc.on_report_pin_position($setup.report_pin_position());
         gc.on_start_node_drag($setup.start_node_drag());

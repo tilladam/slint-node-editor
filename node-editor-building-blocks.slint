@@ -80,10 +80,9 @@ export global SelectionRequest {
     in-out property <bool> shift-held: false;
 }
 
-/// Internal geometry callback registry.
-/// NodeEditor's Rust code wires these up automatically - examples don't touch this!
-/// BaseNode/Pin components call these to report geometry and interactions.
-export global GeometryCallbacks {
+/// Internal callback registry for BaseNode/Pin → Rust communication.
+/// Wired automatically by `wire_node_editor!` — examples don't touch this.
+export global NodeEditorInternalCallbacks {
     /// Report node rectangle (world coordinates)
     callback report-node-rect(/* id */ int, /* x */ length, /* y */ length, /* width */ length, /* height */ length);
     /// Report pin position relative to node
@@ -482,13 +481,6 @@ export component BaseNode inherits Rectangle {
     in property <length> border-width-normal: 1px;
     in property <length> border-width-selected: 2px;
 
-    // === Legacy callbacks — kept for backward compatibility with examples that wire them. ===
-    // New code should use the globals (GeometryCallbacks, SelectionRequest, DragState) instead.
-    callback pin-drag-started(int, length, length);
-    callback pin-drag-moved(int, length, length);
-    callback pin-drag-ended(int, length, length);
-    callback pin-position-changed(/* pin-id */ int, /* node-id */ int, /* pin-type */ int, /* rel-x */ length, /* rel-y */ length);
-
     // === Computed Properties ===
     // World position (for reporting to Rust)
     // For multi-node drag: selected nodes that aren't being directly dragged use global DragState offset
@@ -511,13 +503,13 @@ export component BaseNode inherits Rectangle {
     // Report rect on changes (in WORLD coordinates - without offset)
     init => {
         if (node-id > 0) {
-            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+            NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
 
     changed node-id => {
         if (node-id > 0) {
-            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+            NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
 
@@ -534,24 +526,24 @@ export component BaseNode inherits Rectangle {
     }
     changed node-width => {
         if (node-id > 0) {
-            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+            NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
     changed node-height => {
         if (node-id > 0) {
-            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+            NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
     
     // Watch world-pos-x/y for live link updates during multi-node drag
     changed world-pos-x => {
         if (node-id > 0) {
-            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+            NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
     changed world-pos-y => {
         if (node-id > 0) {
-            GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+            NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
 
@@ -616,7 +608,7 @@ export component BaseNode inherits Rectangle {
                     root.persistent-offset-x += current-drag-offset-x;
                     root.persistent-offset-y += current-drag-offset-y;
                     // End drag using the tracked offset, not recalculated from mouse position
-                    GeometryCallbacks.end-node-drag(current-drag-offset-x, current-drag-offset-y);
+                    NodeEditorInternalCallbacks.end-node-drag(current-drag-offset-x, current-drag-offset-y);
                     is-dragging = false;
                     current-drag-offset-x = 0px;
                     current-drag-offset-y = 0px;
@@ -634,7 +626,7 @@ export component BaseNode inherits Rectangle {
                     }
                     // Double-click detection
                     if root.dbl-click-armed {
-                        GeometryCallbacks.double-click-node(node-id);
+                        NodeEditorInternalCallbacks.double-click-node(node-id);
                         root.dbl-click-armed = false;
                     } else {
                         root.dbl-click-armed = true;
@@ -649,7 +641,7 @@ export component BaseNode inherits Rectangle {
                 if !is-dragging {
                     if abs(screen-mouse-x - start-abs-x) > drag-threshold || abs(screen-mouse-y - start-abs-y) > drag-threshold {
                         is-dragging = true;
-                        GeometryCallbacks.start-node-drag(node-id, selected, world-x, world-y);
+                        NodeEditorInternalCallbacks.start-node-drag(node-id, selected, world-x, world-y);
                         // Set global drag state for multi-node drag
                         DragState.is-dragging = true;
                         DragState.dragged-node-id = node-id;
@@ -659,13 +651,13 @@ export component BaseNode inherits Rectangle {
                     current-drag-offset-x = (screen-mouse-x - start-abs-x) / ViewportState.zoom;
                     current-drag-offset-y = (screen-mouse-y - start-abs-y) / ViewportState.zoom;
                     
-                    GeometryCallbacks.update-node-drag(current-drag-offset-x, current-drag-offset-y);
+                    NodeEditorInternalCallbacks.update-node-drag(current-drag-offset-x, current-drag-offset-y);
                     // Update global drag offset for other selected nodes
                     DragState.drag-offset-x = current-drag-offset-x;
                     DragState.drag-offset-y = current-drag-offset-y;
                     // Update geometry for live link updates
                     GeometryVersion.version += 1;
-                    GeometryCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+                    NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
                 }
             }
         }
@@ -694,13 +686,6 @@ export component Pin inherits Rectangle {
     /// Pin center Y relative to node top-left
     out property <length> center-y: parent-offset-y + self.y + self.height / 2;
 
-    // Legacy callbacks — kept for backward compatibility with examples that wire them.
-    // New code should use the globals (LinkCreation, GeometryCallbacks) instead.
-    callback drag-started(int, length, length);
-    callback drag-moved(int, length, length);
-    callback drag-ended(int, length, length);
-    callback report-position(/* pin-id */ int, /* node-id */ int, /* pin-type */ int, /* rel-x */ length, /* rel-y */ length);
-
     width: base-size;
     height: base-size;
     background: touch.has-hover ? hover-color : base-color;
@@ -709,27 +694,27 @@ export component Pin inherits Rectangle {
     init => {
         if (pin-id > 0) {
             GeometryVersion.version += 1;
-            GeometryCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
+            NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
     changed pin-id => {
         if (pin-id > 0) {
-            GeometryCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
+            NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
     changed center-x => {
         if (pin-id > 0) {
-            GeometryCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
+            NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
     changed center-y => {
         if (pin-id > 0) {
-            GeometryCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
+            NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
     changed refresh-trigger => {
         if (pin-id > 0) {
-            GeometryCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
+            NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
 

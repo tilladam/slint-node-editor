@@ -4135,6 +4135,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sugiyama-stress-test"
+version = "0.1.0"
+dependencies = [
+ "slint",
+ "slint-build",
+ "slint-node-editor",
+]
+
+[[package]]
 name = "svgtypes"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

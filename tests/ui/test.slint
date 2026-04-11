@@ -8,7 +8,7 @@ import {
     PinTypes,
     LinkData,
     ViewportState,
-    GeometryCallbacks,
+    NodeEditorInternalCallbacks,
     NodeEditorComputations,
 } from "@slint-node-editor/node-editor.slint";
 
@@ -20,7 +20,7 @@ export struct NodeData {
 }
 
 // Re-export for Rust
-export { LinkData, GeometryCallbacks, NodeEditorComputations }
+export { LinkData, NodeEditorInternalCallbacks, NodeEditorComputations }
 
 component SimpleNode inherits BaseNode {
     in property <string> title: "Node";

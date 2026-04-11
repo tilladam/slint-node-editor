@@ -5,7 +5,7 @@ import {
     PinTypes,
     LinkData,
     NodeEditorComputations,
-    GeometryCallbacks,
+    NodeEditorInternalCallbacks,
     ViewportState,
 } from "@slint-node-editor/node-editor.slint";
 
@@ -15,7 +15,7 @@ export struct NodeData {
     x: float,
     y: float,
 }
-export { LinkData, NodeEditorComputations, GeometryCallbacks }
+export { LinkData, NodeEditorComputations, NodeEditorInternalCallbacks }
 
 export global DataTypes {
     out property <int> execute: 0;

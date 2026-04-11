@@ -5,7 +5,7 @@ import {
     PinTypes,
     LinkData,
     NodeEditorComputations,
-    GeometryCallbacks,
+    NodeEditorInternalCallbacks,
     ViewportState,
     GeometryVersion,
 } from "@slint-node-editor/node-editor.slint";
@@ -31,7 +31,7 @@ export struct AnimatedLinkData {
 }
 
 // Re-export for Rust
-export { LinkData, NodeEditorComputations, GeometryCallbacks }
+export { LinkData, NodeEditorComputations, NodeEditorInternalCallbacks }
 
 // Custom animated link component with grow effect and sparkles
 component AnimatedLink inherits Rectangle {
