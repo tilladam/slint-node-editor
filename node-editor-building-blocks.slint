@@ -587,12 +587,16 @@ export component BaseNode inherits Rectangle {
         property <length> screen-mouse-x: self.absolute-position.x + self.mouse-x * ViewportState.zoom;
         property <length> screen-mouse-y: self.absolute-position.y + self.mouse-y * ViewportState.zoom;
 
+        // True for the duration of a press whose gesture should not produce
+        // any node behavior (no selection change, no drag, no double-click).
+        // Currently set for Ctrl/Cmd+left-click, which is reserved for
+        // canvas-level box selection.
+        property <bool> press-inert: false;
+
         pointer-event(event) => {
-            // IMPORTANT: Ignore Ctrl+click to allow box selection through nodes
-            if event.button == PointerEventButton.left && event.modifiers.control {
-                return;
-            }
             if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                // Always initialize tracking state — even for inert presses —
+                // so `moved` and `up` never observe stale values.
                 shift-held = event.modifiers.shift;
                 is-dragging = false;
                 start-abs-x = screen-mouse-x;
@@ -600,53 +604,58 @@ export component BaseNode inherits Rectangle {
                 current-drag-offset-x = 0px;
                 current-drag-offset-y = 0px;
                 was-selected-on-press = selected;
+                press-inert = event.modifiers.control;
 
-                // Only select immediately if shift is held (multi-select toggle)
-                // or if node is not already selected
-                if shift-held || !selected {
-                    SelectionRequest.node-id = node-id;
-                    SelectionRequest.shift-held = shift-held;
-                    SelectionRequest.version += 1;
-                }
-                // If node is already selected and shift not held, defer selection
-                // until we know if it's a drag or a click
-            }
-            if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
-                if is-dragging {
-                    // Transfer drag offset to persistent before ending drag
-                    root.persistent-offset-x += current-drag-offset-x;
-                    root.persistent-offset-y += current-drag-offset-y;
-                    // End drag using the tracked offset, not recalculated from mouse position
-                    NodeEditorInternalCallbacks.end-node-drag(current-drag-offset-x, current-drag-offset-y);
-                    is-dragging = false;
-                    current-drag-offset-x = 0px;
-                    current-drag-offset-y = 0px;
-                    // Reset global drag state
-                    DragState.is-dragging = false;
-                    DragState.dragged-node-id = 0;
-                    DragState.drag-offset-x = 0px;
-                    DragState.drag-offset-y = 0px;
-                } else {
-                    // Click without drag - if we deferred selection, do it now
-                    if was-selected-on-press && !shift-held {
+                if !press-inert {
+                    // Only select immediately if shift is held (multi-select toggle)
+                    // or if node is not already selected. Otherwise defer selection
+                    // until release to distinguish click from drag.
+                    if shift-held || !selected {
                         SelectionRequest.node-id = node-id;
                         SelectionRequest.shift-held = shift-held;
                         SelectionRequest.version += 1;
                     }
-                    // Double-click detection
-                    if root.dbl-click-armed {
-                        NodeEditorInternalCallbacks.double-click-node(node-id);
-                        root.dbl-click-armed = false;
+                }
+            }
+            if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                if !press-inert {
+                    if is-dragging {
+                        // Transfer drag offset to persistent before ending drag
+                        root.persistent-offset-x += current-drag-offset-x;
+                        root.persistent-offset-y += current-drag-offset-y;
+                        // End drag using the tracked offset, not recalculated from mouse position
+                        NodeEditorInternalCallbacks.end-node-drag(current-drag-offset-x, current-drag-offset-y);
+                        is-dragging = false;
+                        current-drag-offset-x = 0px;
+                        current-drag-offset-y = 0px;
+                        // Reset global drag state
+                        DragState.is-dragging = false;
+                        DragState.dragged-node-id = 0;
+                        DragState.drag-offset-x = 0px;
+                        DragState.drag-offset-y = 0px;
                     } else {
-                        root.dbl-click-armed = true;
-                        dbl-click-timer.restart();
+                        // Click without drag - if we deferred selection, do it now
+                        if was-selected-on-press && !shift-held {
+                            SelectionRequest.node-id = node-id;
+                            SelectionRequest.shift-held = shift-held;
+                            SelectionRequest.version += 1;
+                        }
+                        // Double-click detection
+                        if root.dbl-click-armed {
+                            NodeEditorInternalCallbacks.double-click-node(node-id);
+                            root.dbl-click-armed = false;
+                        } else {
+                            root.dbl-click-armed = true;
+                            dbl-click-timer.restart();
+                        }
                     }
                 }
+                press-inert = false;
             }
         }
 
         moved => {
-            if self.pressed {
+            if self.pressed && !press-inert {
                 if !is-dragging {
                     if abs(screen-mouse-x - start-abs-x) > drag-threshold || abs(screen-mouse-y - start-abs-y) > drag-threshold {
                         is-dragging = true;
