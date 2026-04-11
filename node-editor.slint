@@ -117,6 +117,8 @@ export component NodeEditor inherits FocusScope {
     // === Zoom constraints ===
     in property <float> min-zoom: 0.1;
     in property <float> max-zoom: 3.0;
+    /// Enable pinch-to-zoom gesture (trackpad/touch)
+    in property <bool> pinch-zoom-enabled: true;
 
     // === LOD (Level of Detail) configuration ===
     /// Zoom threshold above which nodes render full detail (all widgets)
@@ -537,6 +539,32 @@ export component NodeEditor inherits FocusScope {
             viewbox-y: 0;
             viewbox-width: max(self.width / 1px, 1);
             viewbox-height: max(self.height / 1px, 1);
+        }
+
+        // Pinch-to-zoom gesture handler (trackpad/touch)
+        // Placed before TouchArea so it captures gesture events first.
+        // While active, it grabs input and prevents pan/selection.
+        pinch-gesture := ScaleRotateGestureHandler {
+            enabled: root.pinch-zoom-enabled;
+
+            property <float> zoom-at-start: 1.0;
+            property <float> graph-center-x: 0;
+            property <float> graph-center-y: 0;
+
+            started => {
+                zoom-at-start = root.zoom;
+                graph-center-x = (self.center.x - root.pan-x) / root.zoom / 1px;
+                graph-center-y = (self.center.y - root.pan-y) / root.zoom / 1px;
+            }
+
+            updated => {
+                root.apply-zoom-with-adjustment(
+                    clamp(zoom-at-start * self.scale, root.min-zoom, root.max-zoom),
+                    self.center.x,
+                    self.center.y,
+                    graph-center-x,
+                    graph-center-y);
+            }
         }
 
         // Background TouchArea - handles pan, zoom, box selection, link clicks
