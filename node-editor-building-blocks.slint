@@ -454,12 +454,21 @@ export component Link inherits Path {
 /// applies transform-scale for zoom, so nodes just use x: world-x, y: world-y directly.
 ///
 /// Zoom/pan values are accessed from the ViewportState global - examples don't need to pass them.
+///
+/// **Accessibility:** BaseNode defaults to `accessible-label: "Node " + node-id`.
+/// Override this in your node component with the node's title for better screen reader
+/// and MCP introspection support: `accessible-label: title;`
 export component BaseNode inherits Rectangle {
     // === Common Properties ===
     in property <int> node-id;
     in property <bool> selected: false;
     in property <length> world-x;
     in property <length> world-y;
+
+    // === Accessibility ===
+    accessible-role: list-item;
+    accessible-label: "Node " + node-id;
+    accessible-description: selected ? "selected" : "";
     // Persistent position offset (survives drag end until model updates)
     property <length> persistent-offset-x: 0px;
     property <length> persistent-offset-y: 0px;
@@ -669,6 +678,10 @@ export component Pin inherits Rectangle {
     in property <int> pin-id;
     in property <int> node-id;  // Node this pin belongs to (for position reporting)
     in property <int> pin-type;  // Type of pin (input/output/custom)
+
+    // === Accessibility ===
+    accessible-role: button;
+    accessible-label: pin-type == 1 ? "input pin" : pin-type == 2 ? "output pin" : "pin";
     in property <color> base-color: #888888;
     in property <color> hover-color: #aaaaaa;
     in property <length> base-size: 12px;

@@ -32,6 +32,19 @@
 //! - [`Link`] - Bezier curve link component
 //! - [`Minimap`] - Bird's-eye view component
 //!
+//! ## Accessibility
+//!
+//! Library components include accessibility roles for screen readers and MCP
+//! introspection. When creating custom node components, set `accessible-label`
+//! to the node's display title:
+//!
+//! ```slint
+//! component MyNode inherits BaseNode {
+//!     in property <string> title;
+//!     accessible-label: title;  // override default "Node <id>"
+//! }
+//! ```
+//!
 //! ## Rust Helpers
 //!
 //! This crate provides Rust helper functions for common operations:

@@ -21,6 +21,7 @@ export { LinkData, DragState, NodeEditorInternalCallbacks, NodeEditorComputation
 
 component SimpleNode inherits BaseNode {
     in property <string> title: "Node";
+    accessible-label: title;
     // Set node size for BaseNode
     node-width: 250px;
     node-height: 80px;

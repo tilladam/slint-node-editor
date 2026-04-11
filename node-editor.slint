@@ -84,6 +84,10 @@ export enum BoxSelectionModifier {
 /// Multiple editors in separate windows work fine. This limitation will be
 /// lifted once Slint introduces component-scoped globals.
 export component NodeEditor inherits FocusScope {
+    // === Accessibility ===
+    accessible-role: list;
+    accessible-label: "Node Editor";
+
     // === Shared viewport state ===
     in-out property <length> pan-x: 0px;
     in-out property <length> pan-y: 0px;
