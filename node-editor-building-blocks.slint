@@ -509,15 +509,17 @@ export component BaseNode inherits Rectangle {
     background: transparent;
     clip: false;
 
-    // Report rect on changes (in WORLD coordinates - without offset)
+    // Report rect on changes (in WORLD coordinates - without offset).
+    // Guard against node-id == 0 (Slint default before parent binds the real ID).
+    // Negative IDs are valid (e.g. viewport-anchored edge ports).
     init => {
-        if (node-id > 0) {
+        if (node-id != 0) {
             NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
 
     changed node-id => {
-        if (node-id > 0) {
+        if (node-id != 0) {
             NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
@@ -534,24 +536,24 @@ export component BaseNode inherits Rectangle {
         }
     }
     changed node-width => {
-        if (node-id > 0) {
+        if (node-id != 0) {
             NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
     changed node-height => {
-        if (node-id > 0) {
+        if (node-id != 0) {
             NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
-    
+
     // Watch world-pos-x/y for live link updates during multi-node drag
     changed world-pos-x => {
-        if (node-id > 0) {
+        if (node-id != 0) {
             NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
     changed world-pos-y => {
-        if (node-id > 0) {
+        if (node-id != 0) {
             NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
         }
     }
