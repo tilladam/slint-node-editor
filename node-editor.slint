@@ -114,6 +114,16 @@ export component NodeEditor inherits FocusScope {
     // === Grid commands (set by application via callback) ===
     in-out property <string> grid-commands;
 
+    // === Edge fade (screen-space overlays between grid and world content) ===
+    /// Brush for the left edge fade (e.g. a linear-gradient). Transparent = disabled.
+    in property <brush> edge-fade-left: transparent;
+    /// Width of the left edge fade rectangle.
+    in property <length> edge-fade-left-width: 0px;
+    /// Brush for the right edge fade. Transparent = disabled.
+    in property <brush> edge-fade-right: transparent;
+    /// Width of the right edge fade rectangle.
+    in property <length> edge-fade-right-width: 0px;
+
     // === Zoom constraints ===
     in property <float> min-zoom: 0.1;
     in property <float> max-zoom: 3.0;
@@ -695,6 +705,22 @@ export component NodeEditor inherits FocusScope {
             root.hovered-link-id = new-hovered;
             root.link-hovered();
         }
+    }
+
+    // === Edge fades (screen-space, between grid and world content) ===
+    if root.edge-fade-left-width > 0: Rectangle {
+        x: 0;
+        y: 0;
+        width: root.edge-fade-left-width;
+        height: root.height;
+        background: root.edge-fade-left;
+    }
+    if root.edge-fade-right-width > 0: Rectangle {
+        x: root.width - root.edge-fade-right-width;
+        y: 0;
+        width: root.edge-fade-right-width;
+        height: root.height;
+        background: root.edge-fade-right;
     }
 
     // === Layer 2: World Content (scaled) ===
