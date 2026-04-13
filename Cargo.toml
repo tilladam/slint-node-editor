@@ -44,6 +44,7 @@ members = [
     "examples/zoom-stress-test",
     "examples/sugiyama",
     "examples/sugiyama-stress-test",
+    "examples/edge-fade",
 ]
 
 [workspace.dependencies]

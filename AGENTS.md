@@ -26,6 +26,9 @@ cargo run -p animated-links
 # Build and run the pin compatibility example
 cargo run -p pin-compatibility
 
+# Build and run the edge fade demo
+cargo run -p edge-fade
+
 # Build and run the zoom stress test (LOD system demo)
 cargo run -p zoom-stress-test
 

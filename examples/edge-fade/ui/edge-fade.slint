@@ -1,0 +1,107 @@
+import {
+    NodeEditor,
+    BaseNode,
+    Pin,
+    PinTypes,
+    DragState,
+    NodeEditorInternalCallbacks,
+    NodeEditorComputations,
+    LinkData,
+} from "@slint-node-editor/node-editor.slint";
+
+export struct NodeData {
+    id: int,
+    title: string,
+    x: float,
+    y: float,
+    color: color,
+}
+
+// Re-export for Rust
+export { LinkData, DragState, NodeEditorInternalCallbacks, NodeEditorComputations }
+
+component ColorNode inherits BaseNode {
+    in property <string> title: "Node";
+    in property <color> node-color: #333;
+    accessible-label: title;
+
+    node-width: 200px;
+    node-height: 70px;
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: root.selected
+            ? root.node-color.brighter(30%)
+            : root.node-color;
+        border-radius: 8px;
+        border-width: 2px;
+        border-color: root.node-color.brighter(60%);
+        drop-shadow-blur: 6px;
+        drop-shadow-color: root.node-color.transparentize(50%);
+
+        Text {
+            text: root.title;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+        }
+    }
+
+    Pin {
+        x: 0px;
+        y: root.node-height / 2 - self.height / 2;
+        pin-id: root.node-id * 2;
+        node-id: root.node-id;
+        pin-type: PinTypes.input;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
+    }
+
+    Pin {
+        x: root.node-width - self.width;
+        y: root.node-height / 2 - self.height / 2;
+        pin-id: root.node-id * 2 + 1;
+        node-id: root.node-id;
+        pin-type: PinTypes.output;
+        node-screen-x: root.screen-x;
+        node-screen-y: root.screen-y;
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "Edge Fade Demo";
+    width: 900px;
+    height: 600px;
+    background: #1a1a2e;
+
+    in property <[NodeData]> nodes;
+    in property <[LinkData]> links <=> editor.links;
+    in-out property <string> grid_commands <=> editor.grid-commands;
+
+    out property <float> width_: self.width / 1px;
+    out property <float> height_: self.height / 1px;
+
+    editor := NodeEditor {
+        width: 100%;
+        height: 100%;
+        grid-snapping: true;
+
+        // Colorful edge fades — opaque at the edge, transparent towards the center
+        edge-fade-left: @linear-gradient(90deg, #ff0066cc 0%, #8b00ffaa 40%, #00bfff00 100%);
+        edge-fade-left-width: 64px;
+        edge-fade-right: @linear-gradient(270deg, #00bfffcc 0%, #8b00ffaa 40%, #ff006600 100%);
+        edge-fade-right-width: 64px;
+
+        for data in root.nodes: ColorNode {
+            node-id: data.id;
+            title: data.title;
+            node-color: data.color;
+            world-x: data.x * 1px;
+            world-y: data.y * 1px;
+            viewport-width: editor.width;
+            viewport-height: editor.height;
+            selected: NodeEditorComputations.is-node-selected(data.id, editor.selection-version);
+        }
+    }
+}

@@ -1025,6 +1025,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "edge-fade"
+version = "0.1.0"
+dependencies = [
+ "slint",
+ "slint-build",
+ "slint-node-editor",
+]
+
+[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
