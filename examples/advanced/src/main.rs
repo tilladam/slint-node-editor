@@ -5,9 +5,8 @@
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    GraphLogic, LinkModel, MovableNode, NodeEditorSetup, SelectionManager,
-    BasicLinkValidator, NoDuplicatesValidator, CompositeValidator, LinkValidator, ValidationResult,
-    wire_node_editor,
+    wire_node_editor, BasicLinkValidator, CompositeValidator, GraphLogic, LinkModel, LinkValidator,
+    MovableNode, NoDuplicatesValidator, NodeEditorSetup, SelectionManager, ValidationResult,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -197,15 +196,16 @@ fn main() {
     window.set_nodes(ModelRc::from(nodes.clone()));
 
     // Create the filter nodes model
-    let filter_nodes: Rc<VecModel<FilterNodeData>> = Rc::new(VecModel::from(vec![FilterNodeData {
-        id: 100,
-        title: SharedString::from("Filter"),
-        world_x: 408.0,
-        world_y: 384.0,
-        filter_type_index: 0,
-        enabled: true,
-        processed_count: 42,
-    }]));
+    let filter_nodes: Rc<VecModel<FilterNodeData>> =
+        Rc::new(VecModel::from(vec![FilterNodeData {
+            id: 100,
+            title: SharedString::from("Filter"),
+            world_x: 408.0,
+            world_y: 384.0,
+            filter_type_index: 0,
+            enabled: true,
+            processed_count: 42,
+        }]));
     window.set_filter_nodes(ModelRc::from(filter_nodes.clone()));
 
     let next_node_id = Rc::new(RefCell::new(4));
@@ -228,6 +228,7 @@ fn main() {
             end_pin_id: 2001,
             color: link_colors[0],
             line_width: 1.5, // Thin link
+            status: -1,
         },
         LinkData {
             id: 2,
@@ -235,6 +236,7 @@ fn main() {
             end_pin_id: 3001,
             color: link_colors[1],
             line_width: 5.0, // Thick link to demonstrate feature
+            status: -1,
         },
     ]));
     window.set_links(ModelRc::from(links.clone()));
@@ -260,7 +262,9 @@ fn main() {
     });
 
     // Configure controller
-    setup.controller().set_grid_spacing(node_constants.get_grid_spacing());
+    setup
+        .controller()
+        .set_grid_spacing(node_constants.get_grid_spacing());
 
     // Create selection models
     let selected_node_ids: Rc<VecModel<i32>> = Rc::new(VecModel::default());
@@ -270,9 +274,23 @@ fn main() {
 
     // Enable minimap
     window.set_minimap_enabled(true);
-    window.set_minimap_nodes(build_minimap_nodes(&nodes, &filter_nodes, node_width, node_height, filter_width, filter_height));
+    window.set_minimap_nodes(build_minimap_nodes(
+        &nodes,
+        &filter_nodes,
+        node_width,
+        node_height,
+        filter_width,
+        filter_height,
+    ));
 
-    let (min_x, min_y, max_x, max_y) = compute_graph_bounds(&nodes, &filter_nodes, node_width, node_height, filter_width, filter_height);
+    let (min_x, min_y, max_x, max_y) = compute_graph_bounds(
+        &nodes,
+        &filter_nodes,
+        node_width,
+        node_height,
+        filter_width,
+        filter_height,
+    );
     window.set_graph_min_x(min_x);
     window.set_graph_min_y(min_y);
     window.set_graph_max_x(max_x);
@@ -288,11 +306,24 @@ fn main() {
         let links = links.clone();
         let w = window.as_weak();
         move |x, y| {
-            let w = match w.upgrade() { Some(w) => w, None => return -1 };
+            let w = match w.upgrade() {
+                Some(w) => w,
+                None => return -1,
+            };
             let cache = ctrl.cache();
             let cache = cache.borrow();
-            let link_iter = (0..links.row_count()).filter_map(|i| links.row_data(i)).map(|l| (l.id, l.start_pin_id, l.end_pin_id));
-            cache.find_link_at(x as f32, y as f32, link_iter, w.get_link_hover_distance() as f32, w.get_zoom(), w.get_bezier_min_offset(), w.get_link_hit_samples() as usize)
+            let link_iter = (0..links.row_count())
+                .filter_map(|i| links.row_data(i))
+                .map(|l| (l.id, l.start_pin_id, l.end_pin_id));
+            cache.find_link_at(
+                x as f32,
+                y as f32,
+                link_iter,
+                w.get_link_hover_distance() as f32,
+                w.get_zoom(),
+                w.get_bezier_min_offset(),
+                w.get_link_hit_samples() as usize,
+            )
         }
     });
 
@@ -302,18 +333,26 @@ fn main() {
         move |x, y, w, h| {
             let cache = ctrl.cache();
             let cache = cache.borrow();
-            let link_iter = (0..links.row_count()).filter_map(|i| links.row_data(i)).map(|l| (l.id, l.start_pin_id, l.end_pin_id));
-            ModelRc::from(Rc::new(VecModel::from(cache.links_in_selection_box(x as f32, y as f32, w as f32, h as f32, link_iter))))
+            let link_iter = (0..links.row_count())
+                .filter_map(|i| links.row_data(i))
+                .map(|l| (l.id, l.start_pin_id, l.end_pin_id));
+            ModelRc::from(Rc::new(VecModel::from(cache.links_in_selection_box(
+                x as f32, y as f32, w as f32, h as f32, link_iter,
+            ))))
         }
     });
 
     // === Selection Checking Callbacks (now on NodeEditorComputations global) ===
 
     let sm_check = selection_manager.clone();
-    window.global::<NodeEditorComputations>().on_is_node_selected(move |id, _version| sm_check.borrow().contains(id));
+    window
+        .global::<NodeEditorComputations>()
+        .on_is_node_selected(move |id, _version| sm_check.borrow().contains(id));
 
     let lsm_check = link_selection_manager.clone();
-    window.global::<NodeEditorComputations>().on_is_link_selected(move |id, _version| lsm_check.borrow().contains(id));
+    window
+        .global::<NodeEditorComputations>()
+        .on_is_link_selected(move |id, _version| lsm_check.borrow().contains(id));
 
     // === Selection Notification Callbacks ===
     // NodeEditor handles basic selection logic internally. These callbacks allow the app
@@ -374,9 +413,11 @@ fn main() {
 
     // Override global selection sync to use our SelectionManager (NodeEditor increments selection-version)
     let sm_sync = selection_manager.clone();
-    window.global::<NodeEditorComputations>().on_sync_selection_to_nodes(move |ids_model| {
-        sm_sync.borrow_mut().sync_from_model(&ids_model);
-    });
+    window
+        .global::<NodeEditorComputations>()
+        .on_sync_selection_to_nodes(move |ids_model| {
+            sm_sync.borrow_mut().sync_from_model(&ids_model);
+        });
 
     let lsm_sync = link_selection_manager.clone();
     window.on_sync_selection_to_links(move |ids_model| {
@@ -392,29 +433,37 @@ fn main() {
         let color_index = color_index.clone();
         let w = window.as_weak();
         move |start_pin, end_pin| {
-            let w = match w.upgrade() { Some(w) => w, None => return };
+            let w = match w.upgrade() {
+                Some(w) => w,
+                None => return,
+            };
             let cache = ctrl.cache();
             let cache = cache.borrow();
 
-        // Get pin type constants from Slint's PinTypes global
-        let pin_types = PinTypes::get(&w);
-        let output_type = pin_types.get_output();
+            // Get pin type constants from Slint's PinTypes global
+            let pin_types = PinTypes::get(&w);
+            let output_type = pin_types.get_output();
 
-        // Validate link using the new validator framework
-        let validator: CompositeValidator<_, LinkData> = CompositeValidator::new()
-            .with(BasicLinkValidator::new(output_type))
-            .with(NoDuplicatesValidator);
+            // Validate link using the new validator framework
+            let validator: CompositeValidator<_, LinkData> = CompositeValidator::new()
+                .with(BasicLinkValidator::new(output_type))
+                .with(NoDuplicatesValidator);
 
             let links_vec: Vec<LinkData> = links.iter().collect();
             match validator.validate(start_pin, end_pin, &cache, &links_vec) {
-                ValidationResult::Valid => {},
+                ValidationResult::Valid => {}
                 ValidationResult::Invalid(_err) => {
                     // Could log or display error here: eprintln!("Cannot create link: {}", err);
                     return;
                 }
             }
 
-            let (output_pin, input_pin) = match GraphLogic::normalize_link_direction(start_pin, end_pin, &cache, output_type) { Some(p) => p, None => return };
+            let (output_pin, input_pin) =
+                match GraphLogic::normalize_link_direction(start_pin, end_pin, &cache, output_type)
+                {
+                    Some(p) => p,
+                    None => return,
+                };
 
             let id = *next_link_id.borrow();
             *next_link_id.borrow_mut() += 1;
@@ -422,8 +471,20 @@ fn main() {
             *color_index.borrow_mut() = (idx + 1) % link_colors.len();
             let color = link_colors[idx];
 
-            if let Some(_path) = cache.compute_link_path(output_pin, input_pin, w.get_zoom(), w.get_bezier_min_offset()) {
-                let data = LinkData { id, start_pin_id: output_pin, end_pin_id: input_pin, color, line_width: 2.0 };
+            if let Some(_path) = cache.compute_link_path(
+                output_pin,
+                input_pin,
+                w.get_zoom(),
+                w.get_bezier_min_offset(),
+            ) {
+                let data = LinkData {
+                    id,
+                    start_pin_id: output_pin,
+                    end_pin_id: input_pin,
+                    color,
+                    line_width: 2.0,
+                    status: -1,
+                };
                 links.push(data);
             }
         }
@@ -446,16 +507,23 @@ fn main() {
 
             for i in 0..links.row_count() {
                 if let Some(link) = links.row_data(i) {
-                    let start_node = cache.pin_positions.get(&link.start_pin_id).map(|p| p.node_id);
+                    let start_node = cache
+                        .pin_positions
+                        .get(&link.start_pin_id)
+                        .map(|p| p.node_id);
                     let end_node = cache.pin_positions.get(&link.end_pin_id).map(|p| p.node_id);
-                    if start_node.map_or(false, |id| deleted_node_ids.contains(&id)) || end_node.map_or(false, |id| deleted_node_ids.contains(&id)) {
+                    if start_node.map_or(false, |id| deleted_node_ids.contains(&id))
+                        || end_node.map_or(false, |id| deleted_node_ids.contains(&id))
+                    {
                         link_indices_to_remove.push(i);
                     }
                 }
             }
             drop(cache);
 
-            for &i in link_indices_to_remove.iter().rev() { links.remove(i); }
+            for &i in link_indices_to_remove.iter().rev() {
+                links.remove(i);
+            }
         }
     });
 
@@ -466,25 +534,39 @@ fn main() {
         let mut indices_to_remove: Vec<usize> = Vec::new();
         for i in 0..links_for_link_delete.row_count() {
             if let Some(link) = links_for_link_delete.row_data(i) {
-                if lsm.contains(link.id) { indices_to_remove.push(i); }
+                if lsm.contains(link.id) {
+                    indices_to_remove.push(i);
+                }
             }
         }
-        for &i in indices_to_remove.iter().rev() { links_for_link_delete.remove(i); }
+        for &i in indices_to_remove.iter().rev() {
+            links_for_link_delete.remove(i);
+        }
     });
 
     let nodes_for_add = nodes.clone();
     let next_node_id_for_add = next_node_id.clone();
     let window_for_add = window.as_weak();
     window.on_add_node(move || {
-        let w = match window_for_add.upgrade() { Some(w) => w, None => return };
+        let w = match window_for_add.upgrade() {
+            Some(w) => w,
+            None => return,
+        };
         let id = *next_node_id_for_add.borrow();
         *next_node_id_for_add.borrow_mut() += 1;
-        nodes_for_add.push(NodeData { id, title: SharedString::from(format!("Node {}", id)), world_x: w.invoke_snap_to_grid(192.0 + (id as f32 * 48.0) % 384.0), world_y: w.invoke_snap_to_grid(192.0 + (id as f32 * 24.0) % 288.0) });
+        nodes_for_add.push(NodeData {
+            id,
+            title: SharedString::from(format!("Node {}", id)),
+            world_x: w.invoke_snap_to_grid(192.0 + (id as f32 * 48.0) % 384.0),
+            world_y: w.invoke_snap_to_grid(192.0 + (id as f32 * 24.0) % 288.0),
+        });
     });
 
     let filter_nodes_for_type = filter_nodes.clone();
     window.on_filter_type_changed(move |id, idx| {
-        if let Some((i, mut node)) = GraphLogic::find_node_by_id(&filter_nodes_for_type, id, |n| n.id) {
+        if let Some((i, mut node)) =
+            GraphLogic::find_node_by_id(&filter_nodes_for_type, id, |n| n.id)
+        {
             node.filter_type_index = idx;
             filter_nodes_for_type.set_row_data(i, node);
         }
@@ -492,7 +574,9 @@ fn main() {
 
     let filter_nodes_for_enable = filter_nodes.clone();
     window.on_filter_toggle_enabled(move |id| {
-        if let Some((i, mut node)) = GraphLogic::find_node_by_id(&filter_nodes_for_enable, id, |n| n.id) {
+        if let Some((i, mut node)) =
+            GraphLogic::find_node_by_id(&filter_nodes_for_enable, id, |n| n.id)
+        {
             node.enabled = !node.enabled;
             filter_nodes_for_enable.set_row_data(i, node);
         }
@@ -500,7 +584,9 @@ fn main() {
 
     let filter_nodes_for_reset = filter_nodes.clone();
     window.on_filter_reset(move |id| {
-        if let Some((i, mut node)) = GraphLogic::find_node_by_id(&filter_nodes_for_reset, id, |n| n.id) {
+        if let Some((i, mut node)) =
+            GraphLogic::find_node_by_id(&filter_nodes_for_reset, id, |n| n.id)
+        {
             node.processed_count = 0;
             node.filter_type_index = 0;
             node.enabled = true;
@@ -511,5 +597,3 @@ fn main() {
     window.invoke_request_grid_update();
     window.run().unwrap();
 }
-
-

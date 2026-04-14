@@ -116,7 +116,11 @@ fn test_update_viewport_callback_records_values() {
     let harness = MinimalTestHarness::new();
 
     // The harness tracks viewport updates
-    harness.tracker.update_viewport.borrow_mut().push((1.5, 50.0, 25.0));
+    harness
+        .tracker
+        .update_viewport
+        .borrow_mut()
+        .push((1.5, 50.0, 25.0));
 
     let updates = harness.tracker.update_viewport.borrow();
     assert_eq!(updates.len(), 1);
@@ -294,8 +298,8 @@ fn test_no_duplicates_validator() {
 #[test]
 fn test_composite_validator() {
     use slint_node_editor::{
-        BasicLinkValidator, CompositeValidator, LinkValidator, NoDuplicatesValidator,
-        SimpleLink, ValidationResult,
+        BasicLinkValidator, CompositeValidator, LinkValidator, NoDuplicatesValidator, SimpleLink,
+        ValidationResult,
     };
 
     let harness = MinimalTestHarness::new();
@@ -442,6 +446,7 @@ fn test_find_links_connected_to_node() {
                 end_pin_id: 4,   // Node 2 input
                 color: Color::from_argb_u8(255, 100, 180, 255),
                 line_width: 2.0,
+                status: -1,
             },
             LinkData {
                 id: 2,
@@ -449,6 +454,7 @@ fn test_find_links_connected_to_node() {
                 end_pin_id: 6,   // Node 3 input
                 color: Color::from_argb_u8(255, 255, 100, 100),
                 line_width: 2.0,
+                status: -1,
             },
         ],
     );
@@ -456,9 +462,21 @@ fn test_find_links_connected_to_node() {
     setup_test_geometry(&harness);
 
     // Set up pin geometry for node 3
-    harness.ctrl.cache().borrow_mut().update_node_rect(3, 700.0, 100.0, 150.0, 100.0);
-    harness.ctrl.cache().borrow_mut().handle_pin_report(6, 3, 1, 0.0, 50.0);
-    harness.ctrl.cache().borrow_mut().handle_pin_report(7, 3, 2, 150.0, 50.0);
+    harness
+        .ctrl
+        .cache()
+        .borrow_mut()
+        .update_node_rect(3, 700.0, 100.0, 150.0, 100.0);
+    harness
+        .ctrl
+        .cache()
+        .borrow_mut()
+        .handle_pin_report(6, 3, 1, 0.0, 50.0);
+    harness
+        .ctrl
+        .cache()
+        .borrow_mut()
+        .handle_pin_report(7, 3, 2, 150.0, 50.0);
 
     // Find links connected to node 2 (pins 4 and 5)
     let node2_pins = [4, 5];
@@ -489,9 +507,18 @@ fn test_cache_accessible() {
     let cache = harness.ctrl.cache();
     let cache = cache.borrow();
 
-    assert!(cache.node_rects.contains_key(&1), "Node 1 should be in cache");
-    assert!(cache.node_rects.contains_key(&2), "Node 2 should be in cache");
-    assert!(cache.pin_positions.contains_key(&3), "Pin 3 should be in cache");
+    assert!(
+        cache.node_rects.contains_key(&1),
+        "Node 1 should be in cache"
+    );
+    assert!(
+        cache.node_rects.contains_key(&2),
+        "Node 2 should be in cache"
+    );
+    assert!(
+        cache.pin_positions.contains_key(&3),
+        "Pin 3 should be in cache"
+    );
 }
 
 #[test]

@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::{sugiyama_layout, wire_node_editor, Direction, NodeEditorSetup, SugiyamaConfig};
+use slint_node_editor::{
+    sugiyama_layout, wire_node_editor, Direction, NodeEditorSetup, SugiyamaConfig,
+};
 
 slint::include_modules!();
 
@@ -37,26 +39,70 @@ fn main() {
     //   3 ──► 5 ──► 6 ──► 8
     //
     let nodes = Rc::new(VecModel::from(vec![
-        NodeData { id: 1, title: SharedString::from("Input"),     x: 50.0,  y: 50.0 },
-        NodeData { id: 2, title: SharedString::from("Parse"),     x: 50.0,  y: 120.0 },
-        NodeData { id: 3, title: SharedString::from("Validate"),  x: 50.0,  y: 190.0 },
-        NodeData { id: 4, title: SharedString::from("Transform"), x: 50.0,  y: 260.0 },
-        NodeData { id: 5, title: SharedString::from("Filter"),    x: 50.0,  y: 330.0 },
-        NodeData { id: 6, title: SharedString::from("Merge"),     x: 50.0,  y: 400.0 },
-        NodeData { id: 7, title: SharedString::from("Format"),    x: 50.0,  y: 470.0 },
-        NodeData { id: 8, title: SharedString::from("Output"),    x: 50.0,  y: 540.0 },
+        NodeData {
+            id: 1,
+            title: SharedString::from("Input"),
+            x: 50.0,
+            y: 50.0,
+        },
+        NodeData {
+            id: 2,
+            title: SharedString::from("Parse"),
+            x: 50.0,
+            y: 120.0,
+        },
+        NodeData {
+            id: 3,
+            title: SharedString::from("Validate"),
+            x: 50.0,
+            y: 190.0,
+        },
+        NodeData {
+            id: 4,
+            title: SharedString::from("Transform"),
+            x: 50.0,
+            y: 260.0,
+        },
+        NodeData {
+            id: 5,
+            title: SharedString::from("Filter"),
+            x: 50.0,
+            y: 330.0,
+        },
+        NodeData {
+            id: 6,
+            title: SharedString::from("Merge"),
+            x: 50.0,
+            y: 400.0,
+        },
+        NodeData {
+            id: 7,
+            title: SharedString::from("Format"),
+            x: 50.0,
+            y: 470.0,
+        },
+        NodeData {
+            id: 8,
+            title: SharedString::from("Output"),
+            x: 50.0,
+            y: 540.0,
+        },
     ]));
     window.set_nodes(ModelRc::from(nodes.clone()));
 
     // DAG edges as (source_node_id, target_node_id) — single source of truth
     // Pin encoding: input = id*2, output = id*2+1
     let dag_edges: Vec<(i32, i32)> = vec![
-        (1, 2), (1, 3),
-        (2, 4), (2, 5),
+        (1, 2),
+        (1, 3),
+        (2, 4),
+        (2, 5),
         (3, 5),
-        (4, 6), (4, 7),
+        (4, 6),
+        (4, 7),
         (5, 6),
-        (6, 8), (7, 8),
+        (6, 8),
+        (7, 8),
     ];
 
     // Derive LinkData from dag_edges so they can't drift out of sync
@@ -67,9 +113,10 @@ fn main() {
         .map(|(i, &(src, dst))| LinkData {
             id: (i + 1) as i32,
             start_pin_id: src * 2 + 1, // output pin of source
-            end_pin_id: dst * 2,        // input pin of target
+            end_pin_id: dst * 2,       // input pin of target
             color: link_color,
             line_width: 2.0,
+            status: -1,
         })
         .collect();
     window.set_links(ModelRc::from(Rc::new(VecModel::from(link_data))));
@@ -122,7 +169,9 @@ fn main() {
                     let graph_h = (max_y - min_y) + margin * 2.0;
                     let viewport_w = w.get_width_();
                     let viewport_h = w.get_height_() - 40.0; // button bar
-                    let zoom = (viewport_w / graph_w).min(viewport_h / graph_h).clamp(0.1, 3.0);
+                    let zoom = (viewport_w / graph_w)
+                        .min(viewport_h / graph_h)
+                        .clamp(0.1, 3.0);
                     w.set_zoom(zoom);
                     w.set_pan_x(-(min_x - margin) * zoom);
                     w.set_pan_y(-(min_y - margin) * zoom);

@@ -1,5 +1,5 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::{NodeEditorSetup, wire_node_editor};
+use slint_node_editor::{wire_node_editor, NodeEditorSetup};
 use std::rc::Rc;
 
 slint::include_modules!();
@@ -49,38 +49,43 @@ fn main() {
     window.set_links(ModelRc::from(Rc::new(VecModel::from(vec![
         LinkData {
             id: 1,
-            start_pin_id: 3, // Node 1 output
-            end_pin_id: 4,   // Node 2 input
+            start_pin_id: 3,                                // Node 1 output
+            end_pin_id: 4,                                  // Node 2 input
             color: Color::from_argb_u8(255, 244, 143, 177), // pink
             line_width: 2.5,
+            status: -1,
         },
         LinkData {
             id: 2,
-            start_pin_id: 3, // Node 1 output
-            end_pin_id: 6,   // Node 3 input
+            start_pin_id: 3,                                // Node 1 output
+            end_pin_id: 6,                                  // Node 3 input
             color: Color::from_argb_u8(255, 128, 203, 196), // teal light
             line_width: 2.5,
+            status: -1,
         },
         LinkData {
             id: 3,
-            start_pin_id: 5, // Node 2 output
-            end_pin_id: 8,   // Node 4 input
+            start_pin_id: 5,                                // Node 2 output
+            end_pin_id: 8,                                  // Node 4 input
             color: Color::from_argb_u8(255, 206, 147, 216), // purple light
             line_width: 2.5,
+            status: -1,
         },
         LinkData {
             id: 4,
-            start_pin_id: 7, // Node 3 output
-            end_pin_id: 8,   // Node 4 input
+            start_pin_id: 7,                                // Node 3 output
+            end_pin_id: 8,                                  // Node 4 input
             color: Color::from_argb_u8(255, 100, 221, 221), // cyan
             line_width: 2.5,
+            status: -1,
         },
         LinkData {
             id: 5,
-            start_pin_id: 7, // Node 3 output
-            end_pin_id: 10,  // Node 5 input
+            start_pin_id: 7,                               // Node 3 output
+            end_pin_id: 10,                                // Node 5 input
             color: Color::from_argb_u8(255, 255, 213, 79), // amber light
             line_width: 2.5,
+            status: -1,
         },
     ]))));
 

@@ -6,7 +6,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::{sugiyama_layout, wire_node_editor, Direction, NodeEditorSetup, SugiyamaConfig};
+use slint_node_editor::{
+    sugiyama_layout, wire_node_editor, Direction, NodeEditorSetup, SugiyamaConfig,
+};
 
 slint::include_modules!();
 
@@ -70,6 +72,7 @@ fn main() {
             end_pin_id: dst * 2,
             color: link_color,
             line_width: 2.0,
+            status: -1,
         })
         .collect();
     window.set_links(ModelRc::from(Rc::new(VecModel::from(link_data))));
@@ -121,7 +124,9 @@ fn main() {
                     let graph_h = (max_y - min_y) + margin * 2.0;
                     let viewport_w = w.get_width_();
                     let viewport_h = w.get_height_() - 40.0;
-                    let zoom = (viewport_w / graph_w).min(viewport_h / graph_h).clamp(0.1, 3.0);
+                    let zoom = (viewport_w / graph_w)
+                        .min(viewport_h / graph_h)
+                        .clamp(0.1, 3.0);
                     w.set_zoom(zoom);
                     w.set_pan_x(-(min_x - margin) * zoom);
                     w.set_pan_y(-(min_y - margin) * zoom);

@@ -36,8 +36,14 @@ fn test_link_preview_path_generation() {
     let path = slint_node_editor::generate_bezier_path(100.0, 100.0, 200.0, 150.0, 1.0, 50.0);
 
     // Should be a valid SVG path starting with M (move) and containing C (cubic bezier)
-    assert!(path.starts_with("M "), "Path should start with move command");
-    assert!(path.contains(" C "), "Path should contain cubic bezier command");
+    assert!(
+        path.starts_with("M "),
+        "Path should start with move command"
+    );
+    assert!(
+        path.contains(" C "),
+        "Path should contain cubic bezier command"
+    );
 }
 
 #[test]
@@ -72,7 +78,11 @@ fn test_find_pin_at_position() {
     setup_test_geometry(&harness);
 
     // Node 1 output pin is at (100+150, 100+50) = (250, 150)
-    let pin_id = harness.ctrl.cache().borrow().find_pin_at(250.0, 150.0, 10.0);
+    let pin_id = harness
+        .ctrl
+        .cache()
+        .borrow()
+        .find_pin_at(250.0, 150.0, 10.0);
 
     assert_eq!(pin_id, 3, "Should find Node 1 output pin");
 }
@@ -160,6 +170,7 @@ fn test_add_new_link_to_model() {
         end_pin_id: 6,   // Node 3 input
         color: Color::from_argb_u8(255, 255, 128, 0),
         line_width: 2.0,
+        status: -1,
     });
 
     assert_eq!(harness.links.row_count(), 1);
@@ -182,6 +193,7 @@ fn test_multiple_links_supported() {
         end_pin_id: 2,   // Node 1 input
         color: Color::from_argb_u8(255, 0, 255, 128),
         line_width: 2.0,
+        status: -1,
     });
 
     assert_eq!(harness.links.row_count(), 2);

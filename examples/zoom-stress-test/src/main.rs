@@ -3,7 +3,7 @@
 // Tests widget scaling behavior at various zoom levels with three complex nodes.
 
 use slint::{Color, ModelRc, SharedString, VecModel};
-use slint_node_editor::{NodeEditorSetup, wire_node_editor};
+use slint_node_editor::{wire_node_editor, NodeEditorSetup};
 use std::rc::Rc;
 
 slint::include_modules!();
@@ -23,8 +23,8 @@ fn main() {
     }]));
 
     // Create control nodes model
-    let control_nodes: Rc<VecModel<ControlNodeData>> = Rc::new(VecModel::from(vec![
-        ControlNodeData {
+    let control_nodes: Rc<VecModel<ControlNodeData>> =
+        Rc::new(VecModel::from(vec![ControlNodeData {
             id: 2,
             title: SharedString::from("Control"),
             world_x: 200.0,
@@ -33,12 +33,11 @@ fn main() {
             check_b: false,
             switch_value: true,
             slider_value: 0.65,
-        },
-    ]));
+        }]));
 
     // Create display nodes model
-    let display_nodes: Rc<VecModel<DisplayNodeData>> = Rc::new(VecModel::from(vec![
-        DisplayNodeData {
+    let display_nodes: Rc<VecModel<DisplayNodeData>> =
+        Rc::new(VecModel::from(vec![DisplayNodeData {
             id: 3,
             title: SharedString::from("Display"),
             world_x: 600.0,
@@ -49,8 +48,7 @@ fn main() {
             color_g: 0.6,
             color_b: 0.9,
             is_loading: true,
-        },
-    ]));
+        }]));
 
     // Create links model (connecting the nodes)
     // Pin IDs: node_id * 10 for input, node_id * 10 + 1 for output
@@ -62,6 +60,7 @@ fn main() {
             end_pin_id: 20,   // Control node input
             color: Color::from_argb_u8(255, 100, 200, 100),
             line_width: 2.0,
+            status: -1,
         },
         // Link from Input output (pin 11) to Display input (pin 30)
         LinkData {
@@ -70,6 +69,7 @@ fn main() {
             end_pin_id: 30,   // Display node input
             color: Color::from_argb_u8(255, 100, 150, 255),
             line_width: 2.0,
+            status: -1,
         },
     ]));
 

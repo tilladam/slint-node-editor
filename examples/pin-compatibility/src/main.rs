@@ -15,8 +15,8 @@
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    BasicLinkValidator, CompositeValidator, GeometryCache, LinkModel, LinkValidator,
-    NodeEditorSetup, SimpleNodeGeometry, ValidationError, ValidationResult, wire_node_editor,
+    wire_node_editor, BasicLinkValidator, CompositeValidator, GeometryCache, LinkModel,
+    LinkValidator, NodeEditorSetup, SimpleNodeGeometry, ValidationError, ValidationResult,
 };
 use std::rc::Rc;
 
@@ -263,6 +263,7 @@ fn main() {
                         end_pin_id: input_pin,
                         color: get_link_color(output_pin),
                         line_width: 2.5,
+                        status: -1,
                     };
 
                     println!(
@@ -275,26 +276,24 @@ fn main() {
                     links.push(link);
                     next_link_id.set(next_link_id.get() + 1);
                 }
-                ValidationResult::Invalid(err) => {
-                    match &err {
-                        ValidationError::TypeMismatch { expected, found } => {
-                            println!(
-                                "Cannot connect: {} is not compatible with {}",
-                                type_name(*found),
-                                type_name(*expected)
-                            );
-                        }
-                        ValidationError::SameNode => {
-                            println!("Cannot connect: pins are on the same node");
-                        }
-                        ValidationError::IncompatibleDirection => {
-                            println!("Cannot connect: need one input and one output");
-                        }
-                        _ => {
-                            println!("Cannot create link: {:?}", err);
-                        }
+                ValidationResult::Invalid(err) => match &err {
+                    ValidationError::TypeMismatch { expected, found } => {
+                        println!(
+                            "Cannot connect: {} is not compatible with {}",
+                            type_name(*found),
+                            type_name(*expected)
+                        );
                     }
-                }
+                    ValidationError::SameNode => {
+                        println!("Cannot connect: pins are on the same node");
+                    }
+                    ValidationError::IncompatibleDirection => {
+                        println!("Cannot connect: need one input and one output");
+                    }
+                    _ => {
+                        println!("Cannot create link: {:?}", err);
+                    }
+                },
             }
         }
     });

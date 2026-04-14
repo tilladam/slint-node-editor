@@ -1,7 +1,7 @@
-use crate::state::GeometryCache;
 use crate::hit_test::{NodeGeometry, SimpleNodeGeometry};
 use crate::selection::SelectionManager;
-use slint::{Color, VecModel, Model};
+use crate::state::GeometryCache;
+use slint::{Color, Model, VecModel};
 use std::fmt;
 
 /// Trait for link data to support graph topology and rendering operations.
@@ -36,13 +36,20 @@ pub trait LinkModel {
     fn start_pin_id(&self) -> i32;
     /// Pin ID where the link ends (typically an input pin)
     fn end_pin_id(&self) -> i32;
-    /// Color for rendering the link (default: white)
+    /// Color for rendering the link (default: white).
+    /// Used as fallback when `status()` returns 0 (no status).
     fn color(&self) -> Color {
         Color::from_rgb_u8(255, 255, 255)
     }
     /// Line width in pixels for rendering the link (default: 2.0)
     fn line_width(&self) -> f32 {
         2.0
+    }
+    /// Computation status for the link (default: -1 = no status, use color field).
+    /// When >= 0, the Slint side resolves the color from `LinkStatusColors`.
+    /// Standard values: -1=none, 0=idle, 1=running, 2=succeeded, 3=failed.
+    fn status(&self) -> i32 {
+        -1
     }
 }
 
@@ -57,27 +64,60 @@ pub struct SimpleLink {
     pub end_pin_id: i32,
     pub color: Color,
     pub line_width: f32,
+    pub status: i32,
 }
 
 impl SimpleLink {
     /// Create a new link with the specified endpoints, color, and line width.
     pub fn new(id: i32, start_pin_id: i32, end_pin_id: i32, color: Color) -> Self {
-        Self { id, start_pin_id, end_pin_id, color, line_width: 2.0 }
+        Self {
+            id,
+            start_pin_id,
+            end_pin_id,
+            color,
+            line_width: 2.0,
+            status: -1,
+        }
     }
 
     /// Create a new link with custom line width.
-    pub fn with_line_width(id: i32, start_pin_id: i32, end_pin_id: i32, color: Color, line_width: f32) -> Self {
-        Self { id, start_pin_id, end_pin_id, color, line_width }
+    pub fn with_line_width(
+        id: i32,
+        start_pin_id: i32,
+        end_pin_id: i32,
+        color: Color,
+        line_width: f32,
+    ) -> Self {
+        Self {
+            id,
+            start_pin_id,
+            end_pin_id,
+            color,
+            line_width,
+            status: -1,
+        }
     }
-
 }
 
 impl LinkModel for SimpleLink {
-    fn id(&self) -> i32 { self.id }
-    fn start_pin_id(&self) -> i32 { self.start_pin_id }
-    fn end_pin_id(&self) -> i32 { self.end_pin_id }
-    fn color(&self) -> Color { self.color }
-    fn line_width(&self) -> f32 { self.line_width }
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn start_pin_id(&self) -> i32 {
+        self.start_pin_id
+    }
+    fn end_pin_id(&self) -> i32 {
+        self.end_pin_id
+    }
+    fn color(&self) -> Color {
+        self.color
+    }
+    fn line_width(&self) -> f32 {
+        self.line_width
+    }
+    fn status(&self) -> i32 {
+        self.status
+    }
 }
 
 /// Trait for nodes that can be moved (dragged) in the editor.
@@ -112,8 +152,14 @@ impl GraphLogic {
     {
         links
             .filter(|link| {
-                let start_node = cache.pin_positions.get(&link.start_pin_id()).map(|p| p.node_id);
-                let end_node = cache.pin_positions.get(&link.end_pin_id()).map(|p| p.node_id);
+                let start_node = cache
+                    .pin_positions
+                    .get(&link.start_pin_id())
+                    .map(|p| p.node_id);
+                let end_node = cache
+                    .pin_positions
+                    .get(&link.end_pin_id())
+                    .map(|p| p.node_id);
 
                 start_node == Some(node_id) || end_node == Some(node_id)
             })
@@ -121,22 +167,21 @@ impl GraphLogic {
             .collect()
     }
 
-
     /// Normalize a link so (start, end) is always (Output, Input)
-    /// 
+    ///
     /// Returns (output_pin_id, input_pin_id)
     pub fn normalize_link_direction<N>(
-        pin_a: i32, 
-        pin_b: i32, 
+        pin_a: i32,
+        pin_b: i32,
         cache: &GeometryCache<N>,
-        output_type: i32
-    ) -> Option<(i32, i32)> 
+        output_type: i32,
+    ) -> Option<(i32, i32)>
     where
         N: NodeGeometry + Copy,
     {
         let pos_a = cache.pin_positions.get(&pin_a)?;
         // We assume validity was checked, but check existence
-        
+
         if pos_a.pin_type == output_type {
             Some((pin_a, pin_b))
         } else {
@@ -173,18 +218,14 @@ impl GraphLogic {
     /// * `start_pin` - Start pin ID
     /// * `end_pin` - End pin ID
     /// * `links` - Iterator over existing links
-    pub fn duplicate_link_exists<I, L>(
-        start_pin: i32,
-        end_pin: i32,
-        links: I,
-    ) -> bool
+    pub fn duplicate_link_exists<I, L>(start_pin: i32, end_pin: i32, links: I) -> bool
     where
         I: IntoIterator<Item = L>,
         L: LinkModel,
     {
-        links.into_iter().any(|link| {
-            link.start_pin_id() == start_pin && link.end_pin_id() == end_pin
-        })
+        links
+            .into_iter()
+            .any(|link| link.start_pin_id() == start_pin && link.end_pin_id() == end_pin)
     }
 
     /// Find a node by ID in a VecModel using a predicate function
@@ -205,11 +246,7 @@ impl GraphLogic {
     ///     |n| n.id,
     /// ).unwrap();
     /// ```
-    pub fn find_node_by_id<T, F>(
-        model: &VecModel<T>,
-        id: i32,
-        predicate: F,
-    ) -> Option<(usize, T)>
+    pub fn find_node_by_id<T, F>(model: &VecModel<T>, id: i32, predicate: F) -> Option<(usize, T)>
     where
         T: Clone + 'static,
         F: Fn(&T) -> i32,
@@ -638,10 +675,7 @@ mod tests {
         let links: Vec<TestLink> = vec![];
 
         let result = validator.validate(1001, 1002, &cache, &links);
-        assert_eq!(
-            result,
-            ValidationResult::Invalid(ValidationError::SameNode)
-        );
+        assert_eq!(result, ValidationResult::Invalid(ValidationError::SameNode));
     }
 
     #[test]
@@ -919,8 +953,16 @@ mod tests {
     fn test_find_links_connected_to_node_by_start() {
         let cache = setup_cache();
         let links = vec![
-            TestLink { id: 1, start: 1001, end: 2001 },
-            TestLink { id: 2, start: 2001, end: 1001 },
+            TestLink {
+                id: 1,
+                start: 1001,
+                end: 2001,
+            },
+            TestLink {
+                id: 2,
+                start: 2001,
+                end: 1001,
+            },
         ];
 
         // Node 1 owns pin 1001 - link 1 starts from it, link 2 ends at it
@@ -932,7 +974,11 @@ mod tests {
     #[test]
     fn test_find_links_connected_to_node_no_connections() {
         let cache = setup_cache();
-        let links = vec![TestLink { id: 1, start: 1001, end: 2001 }];
+        let links = vec![TestLink {
+            id: 1,
+            start: 1001,
+            end: 2001,
+        }];
 
         // Node 999 doesn't exist - no links connected
         let connected = GraphLogic::find_links_connected_to_node(999, links.into_iter(), &cache);
@@ -963,9 +1009,21 @@ mod tests {
         );
 
         let links = vec![
-            TestLink { id: 1, start: 1001, end: 2001 },
-            TestLink { id: 2, start: 2001, end: 1002 },
-            TestLink { id: 3, start: 2001, end: 2002 }, // Not connected to node 1
+            TestLink {
+                id: 1,
+                start: 1001,
+                end: 2001,
+            },
+            TestLink {
+                id: 2,
+                start: 2001,
+                end: 1002,
+            },
+            TestLink {
+                id: 3,
+                start: 2001,
+                end: 2002,
+            }, // Not connected to node 1
         ];
 
         let connected = GraphLogic::find_links_connected_to_node(1, links.into_iter(), &cache);
@@ -1007,13 +1065,21 @@ mod tests {
 
     #[test]
     fn test_duplicate_link_exists_true() {
-        let links = vec![TestLink { id: 1, start: 1001, end: 2001 }];
+        let links = vec![TestLink {
+            id: 1,
+            start: 1001,
+            end: 2001,
+        }];
         assert!(GraphLogic::duplicate_link_exists(1001, 2001, links));
     }
 
     #[test]
     fn test_duplicate_link_exists_false() {
-        let links = vec![TestLink { id: 1, start: 1001, end: 2001 }];
+        let links = vec![TestLink {
+            id: 1,
+            start: 1001,
+            end: 2001,
+        }];
         assert!(!GraphLogic::duplicate_link_exists(1001, 2002, links));
     }
 
@@ -1025,7 +1091,11 @@ mod tests {
 
     #[test]
     fn test_duplicate_link_exists_direction_matters() {
-        let links = vec![TestLink { id: 1, start: 1001, end: 2001 }];
+        let links = vec![TestLink {
+            id: 1,
+            start: 1001,
+            end: 2001,
+        }];
         // Reversed direction - not a duplicate
         assert!(!GraphLogic::duplicate_link_exists(2001, 1001, links));
     }
@@ -1043,9 +1113,18 @@ mod tests {
         }
 
         let model = std::rc::Rc::new(VecModel::from(vec![
-            TestNode { id: 1, name: "Node 1".to_string() },
-            TestNode { id: 2, name: "Node 2".to_string() },
-            TestNode { id: 3, name: "Node 3".to_string() },
+            TestNode {
+                id: 1,
+                name: "Node 1".to_string(),
+            },
+            TestNode {
+                id: 2,
+                name: "Node 2".to_string(),
+            },
+            TestNode {
+                id: 3,
+                name: "Node 3".to_string(),
+            },
         ]));
 
         let result = GraphLogic::find_node_by_id(&model, 2, |n| n.id);
@@ -1059,12 +1138,11 @@ mod tests {
     #[test]
     fn test_find_node_by_id_not_found() {
         #[derive(Clone)]
-        struct TestNode { id: i32 }
+        struct TestNode {
+            id: i32,
+        }
 
-        let model = std::rc::Rc::new(VecModel::from(vec![
-            TestNode { id: 1 },
-            TestNode { id: 2 },
-        ]));
+        let model = std::rc::Rc::new(VecModel::from(vec![TestNode { id: 1 }, TestNode { id: 2 }]));
 
         let result = GraphLogic::find_node_by_id(&model, 999, |n| n.id);
         assert!(result.is_none());
@@ -1073,7 +1151,9 @@ mod tests {
     #[test]
     fn test_find_node_by_id_empty_model() {
         #[derive(Clone)]
-        struct TestNode { id: i32 }
+        struct TestNode {
+            id: i32,
+        }
 
         let model = std::rc::Rc::new(VecModel::<TestNode>::default());
 
@@ -1084,7 +1164,10 @@ mod tests {
     #[test]
     fn test_find_node_by_id_first_match() {
         #[derive(Clone)]
-        struct TestNode { id: i32, value: i32 }
+        struct TestNode {
+            id: i32,
+            value: i32,
+        }
 
         // Two nodes with same id - should return first
         let model = std::rc::Rc::new(VecModel::from(vec![
@@ -1113,17 +1196,39 @@ mod tests {
         }
 
         impl MovableNode for TestMovableNode {
-            fn id(&self) -> i32 { self.id }
-            fn x(&self) -> f32 { self.x }
-            fn y(&self) -> f32 { self.y }
-            fn set_x(&mut self, x: f32) { self.x = x; }
-            fn set_y(&mut self, y: f32) { self.y = y; }
+            fn id(&self) -> i32 {
+                self.id
+            }
+            fn x(&self) -> f32 {
+                self.x
+            }
+            fn y(&self) -> f32 {
+                self.y
+            }
+            fn set_x(&mut self, x: f32) {
+                self.x = x;
+            }
+            fn set_y(&mut self, y: f32) {
+                self.y = y;
+            }
         }
 
         let model = std::rc::Rc::new(VecModel::from(vec![
-            TestMovableNode { id: 1, x: 0.0, y: 0.0 },
-            TestMovableNode { id: 2, x: 100.0, y: 100.0 },
-            TestMovableNode { id: 3, x: 200.0, y: 200.0 },
+            TestMovableNode {
+                id: 1,
+                x: 0.0,
+                y: 0.0,
+            },
+            TestMovableNode {
+                id: 2,
+                x: 100.0,
+                y: 100.0,
+            },
+            TestMovableNode {
+                id: 3,
+                x: 200.0,
+                y: 200.0,
+            },
         ]));
 
         let mut selection = crate::selection::SelectionManager::new();
@@ -1157,16 +1262,28 @@ mod tests {
         }
 
         impl MovableNode for TestMovableNode {
-            fn id(&self) -> i32 { self.id }
-            fn x(&self) -> f32 { self.x }
-            fn y(&self) -> f32 { self.y }
-            fn set_x(&mut self, x: f32) { self.x = x; }
-            fn set_y(&mut self, y: f32) { self.y = y; }
+            fn id(&self) -> i32 {
+                self.id
+            }
+            fn x(&self) -> f32 {
+                self.x
+            }
+            fn y(&self) -> f32 {
+                self.y
+            }
+            fn set_x(&mut self, x: f32) {
+                self.x = x;
+            }
+            fn set_y(&mut self, y: f32) {
+                self.y = y;
+            }
         }
 
-        let model = std::rc::Rc::new(VecModel::from(vec![
-            TestMovableNode { id: 1, x: 50.0, y: 50.0 },
-        ]));
+        let model = std::rc::Rc::new(VecModel::from(vec![TestMovableNode {
+            id: 1,
+            x: 50.0,
+            y: 50.0,
+        }]));
 
         let selection = crate::selection::SelectionManager::new(); // Empty
 
@@ -1188,16 +1305,28 @@ mod tests {
         }
 
         impl MovableNode for TestMovableNode {
-            fn id(&self) -> i32 { self.id }
-            fn x(&self) -> f32 { self.x }
-            fn y(&self) -> f32 { self.y }
-            fn set_x(&mut self, x: f32) { self.x = x; }
-            fn set_y(&mut self, y: f32) { self.y = y; }
+            fn id(&self) -> i32 {
+                self.id
+            }
+            fn x(&self) -> f32 {
+                self.x
+            }
+            fn y(&self) -> f32 {
+                self.y
+            }
+            fn set_x(&mut self, x: f32) {
+                self.x = x;
+            }
+            fn set_y(&mut self, y: f32) {
+                self.y = y;
+            }
         }
 
-        let model = std::rc::Rc::new(VecModel::from(vec![
-            TestMovableNode { id: 1, x: 100.0, y: 100.0 },
-        ]));
+        let model = std::rc::Rc::new(VecModel::from(vec![TestMovableNode {
+            id: 1,
+            x: 100.0,
+            y: 100.0,
+        }]));
 
         let mut selection = crate::selection::SelectionManager::new();
         selection.handle_interaction(1, false);

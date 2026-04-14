@@ -250,6 +250,37 @@ export enum MinimapPosition {
     bottom-right,
 }
 
+/// Standard link status constants for computation graphs.
+/// Applications can use these or define their own status values.
+/// Status < 0 means "no status" — the link uses its `color` field directly.
+/// Note: Slint struct fields default to 0 (= idle). Applications that use
+/// explicit colors instead of statuses must set `status: LinkStatus.none` (-1).
+export global LinkStatus {
+    /// No status — link uses its color field directly.
+    out property <int> none: -1;
+    /// Not yet computed / idle.
+    out property <int> idle: 0;
+    /// Computation in progress.
+    out property <int> running: 1;
+    /// Computation completed successfully.
+    out property <int> succeeded: 2;
+    /// Computation completed with an error.
+    out property <int> failed: 3;
+}
+
+/// Colors for the built-in link statuses.
+/// Override these properties to customize status colors.
+export global LinkStatusColors {
+    /// Color for idle links (status == 1). Default: gray.
+    in-out property <color> idle: #888888;
+    /// Color for running links (status == 2). Default: yellow.
+    in-out property <color> running: #e8b830;
+    /// Color for succeeded links (status == 3). Default: green.
+    in-out property <color> succeeded: #50c878;
+    /// Color for failed links (status == 4). Default: red.
+    in-out property <color> failed: #e05050;
+}
+
 /// Logical link data (what the application provides)
 export struct LinkData {
     id: int,
@@ -258,6 +289,9 @@ export struct LinkData {
     color: color,
     /// Line width in pixels (default: 2.0 if not specified)
     line-width: float,
+    /// Computation status (-1 = no status, use color field; >= 0 = use status color).
+    /// Default (0) maps to idle. Set to LinkStatus.none (-1) to use the color field.
+    status: int,
 }
 
 /// Minimap component for bird's-eye view of the node graph.

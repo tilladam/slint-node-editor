@@ -51,12 +51,18 @@ struct ConcreteModelSyncer<P, F> {
 impl<P, F> ModelSyncer for ConcreteModelSyncer<P, F>
 where
     P: Clone + 'static,
-    F: Fn(i32, SharedString, slint::Color, f32) -> P,
+    F: Fn(i32, SharedString, slint::Color, f32, i32) -> P,
 {
     fn sync(&self, paths: &[LinkPathData]) {
         // Update existing rows or add new ones
         for (i, path) in paths.iter().enumerate() {
-            let item = (self.constructor)(path.id, SharedString::from(path.path_commands.as_str()), path.color, path.line_width);
+            let item = (self.constructor)(
+                path.id,
+                SharedString::from(path.path_commands.as_str()),
+                path.color,
+                path.line_width,
+                path.status,
+            );
             if i < self.model.row_count() {
                 self.model.set_row_data(i, item);
             } else {
@@ -87,7 +93,7 @@ where
 ///
 /// // Bind once - auto-syncs on every update_paths call
 /// let model = Rc::new(VecModel::<LinkPath>::default());
-/// links.bind_model(model.clone(), |id, path, color| LinkPath { id, path_commands: path, color });
+/// links.bind_model(model.clone(), |id, path, color, line_width, status| LinkPath { id, path_commands: path, color, line_width, status });
 /// window.set_link_paths(ModelRc::from(model));
 ///
 /// // Now just call update_paths - model syncs automatically
@@ -120,6 +126,7 @@ struct LinkPathData {
     path_commands: String,
     color: slint::Color,
     line_width: f32,
+    status: i32,
 }
 
 impl<L, N> LinkManager<L, N>
@@ -151,11 +158,11 @@ where
     /// # Arguments
     ///
     /// * `model` - The VecModel to sync to
-    /// * `constructor` - Function to create path items from (id, path_commands, color, line_width)
+    /// * `constructor` - Function to create path items from (id, path_commands, color, line_width, status)
     pub fn bind_model<P, F>(&mut self, model: Rc<VecModel<P>>, constructor: F)
     where
         P: Clone + 'static,
-        F: Fn(i32, SharedString, slint::Color, f32) -> P + 'static,
+        F: Fn(i32, SharedString, slint::Color, f32, i32) -> P + 'static,
     {
         self.syncer = Some(Box::new(ConcreteModelSyncer { model, constructor }));
     }
@@ -237,6 +244,7 @@ where
                     path_commands: path,
                     color: link.color(),
                     line_width: link.line_width(),
+                    status: link.status(),
                 });
             }
         }
@@ -274,12 +282,16 @@ mod tests {
         let cache = Rc::new(RefCell::new(GeometryCache::new()));
 
         // Add two nodes
-        cache.borrow_mut().update_node_rect(1, 0.0, 0.0, 100.0, 50.0);
-        cache.borrow_mut().update_node_rect(2, 200.0, 100.0, 100.0, 50.0);
+        cache
+            .borrow_mut()
+            .update_node_rect(1, 0.0, 0.0, 100.0, 50.0);
+        cache
+            .borrow_mut()
+            .update_node_rect(2, 200.0, 100.0, 100.0, 50.0);
 
         // Add pins (output on node 1, input on node 2)
         cache.borrow_mut().handle_pin_report(3, 1, 2, 100.0, 25.0); // Node 1 output
-        cache.borrow_mut().handle_pin_report(4, 2, 1, 0.0, 25.0);   // Node 2 input
+        cache.borrow_mut().handle_pin_report(4, 2, 1, 0.0, 25.0); // Node 2 input
 
         cache
     }
@@ -407,10 +419,18 @@ mod tests {
         }
 
         impl LinkModel for MyLink {
-            fn id(&self) -> i32 { self.id }
-            fn start_pin_id(&self) -> i32 { self.from }
-            fn end_pin_id(&self) -> i32 { self.to }
-            fn color(&self) -> Color { Color::from_rgb_u8(128, 128, 128) }
+            fn id(&self) -> i32 {
+                self.id
+            }
+            fn start_pin_id(&self) -> i32 {
+                self.from
+            }
+            fn end_pin_id(&self) -> i32 {
+                self.to
+            }
+            fn color(&self) -> Color {
+                Color::from_rgb_u8(128, 128, 128)
+            }
         }
 
         let cache = setup_cache();

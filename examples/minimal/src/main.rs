@@ -1,5 +1,5 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::{NodeEditorSetup, wire_node_editor};
+use slint_node_editor::{wire_node_editor, NodeEditorSetup};
 use std::rc::Rc;
 
 slint::include_modules!();
@@ -9,21 +9,30 @@ fn main() {
 
     // Set up nodes
     let nodes = Rc::new(VecModel::from(vec![
-        NodeData { id: 1, title: SharedString::from("Node A"), x: 100.0, y: 100.0 },
-        NodeData { id: 2, title: SharedString::from("Node B"), x: 400.0, y: 200.0 },
+        NodeData {
+            id: 1,
+            title: SharedString::from("Node A"),
+            x: 100.0,
+            y: 100.0,
+        },
+        NodeData {
+            id: 2,
+            title: SharedString::from("Node B"),
+            x: 400.0,
+            y: 200.0,
+        },
     ]));
     window.set_nodes(ModelRc::from(nodes.clone()));
 
     // Set up links
-    window.set_links(ModelRc::from(Rc::new(VecModel::from(vec![
-        LinkData {
-            id: 1,
-            start_pin_id: 3, // Node 1 output (node_id * 2 + 1)
-            end_pin_id: 4,   // Node 2 input (node_id * 2)
-            color: Color::from_argb_u8(255, 100, 180, 255),
-            line_width: 2.0,
-        },
-    ]))));
+    window.set_links(ModelRc::from(Rc::new(VecModel::from(vec![LinkData {
+        id: 1,
+        start_pin_id: 3, // Node 1 output (node_id * 2 + 1)
+        end_pin_id: 4,   // Node 2 input (node_id * 2)
+        color: Color::from_argb_u8(255, 100, 180, 255),
+        line_width: 2.0,
+        status: -1,
+    }]))));
 
     // Create setup with model update logic
     let setup = NodeEditorSetup::new({

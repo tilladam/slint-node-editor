@@ -44,12 +44,14 @@ import {
     MinimapNode,
     MinimapPosition,
     LinkData,
+    LinkStatus,
+    LinkStatusColors,
     Minimap,
     Link,
     BaseNode,
     Pin,
 } from "node-editor-building-blocks.slint";
-export { PinTypes, ViewportState, DragState, GeometryVersion, NodeEditorInternalCallbacks, LinkCreationState, LinkCreation, SelectionRequest, NodeEditorComputations, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, Minimap, Link, BaseNode, Pin }
+export { PinTypes, ViewportState, DragState, GeometryVersion, NodeEditorInternalCallbacks, LinkCreationState, LinkCreation, SelectionRequest, NodeEditorComputations, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, LinkStatus, LinkStatusColors, Minimap, Link, BaseNode, Pin }
 
 /// Modifier key for triggering box selection over nodes/links
 export enum BoxSelectionModifier {
@@ -740,7 +742,11 @@ export component NodeEditor inherits FocusScope {
         // Render links from `links` property
         for link in root.links: Link {
             path-commands: NodeEditorComputations.compute-link-path(link.start-pin-id, link.end-pin-id, GeometryVersion.version);
-            link-color: link.color;
+            link-color: link.status == LinkStatus.running ? LinkStatusColors.running
+                      : link.status == LinkStatus.succeeded ? LinkStatusColors.succeeded
+                      : link.status == LinkStatus.failed ? LinkStatusColors.failed
+                      : link.status == LinkStatus.idle ? LinkStatusColors.idle
+                      : link.color;  // status < 0 (LinkStatus.none): use explicit color
             line-width: link.line-width > 0 ? link.line-width * 1px : 2px;
             selected: NodeEditorComputations.is-link-selected(link.id, root.selection-version);
             hovered: root.hovered-link-id == link.id;

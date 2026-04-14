@@ -140,6 +140,7 @@ fn test_delete_removes_selected_links_from_model() {
                 end_pin_id: 4,
                 color: Color::from_argb_u8(255, 100, 180, 255),
                 line_width: 2.0,
+                status: -1,
             },
             LinkData {
                 id: 2,
@@ -147,6 +148,7 @@ fn test_delete_removes_selected_links_from_model() {
                 end_pin_id: 2,
                 color: Color::from_argb_u8(255, 255, 100, 100),
                 line_width: 2.0,
+                status: -1,
             },
         ],
     );
@@ -166,7 +168,10 @@ fn test_delete_removes_selected_links_from_model() {
 
     assert_eq!(harness.links.row_count(), 1);
     let remaining = harness.links.row_data(0).unwrap();
-    assert_eq!(remaining.id, 2, "Link 1 should have been deleted, link 2 remains");
+    assert_eq!(
+        remaining.id, 2,
+        "Link 1 should have been deleted, link 2 remains"
+    );
 }
 
 #[test]
@@ -195,6 +200,7 @@ fn test_deleting_node_should_also_remove_connected_links() {
             end_pin_id: 4,   // Node 2 input
             color: Color::from_argb_u8(255, 100, 180, 255),
             line_width: 2.0,
+            status: -1,
         }],
     );
 
@@ -232,7 +238,11 @@ fn test_deleting_node_should_also_remove_connected_links() {
     }
 
     assert_eq!(harness.nodes.row_count(), 1, "One node should remain");
-    assert_eq!(harness.links.row_count(), 0, "Link should be removed with node");
+    assert_eq!(
+        harness.links.row_count(),
+        0,
+        "Link should be removed with node"
+    );
 }
 
 #[test]
