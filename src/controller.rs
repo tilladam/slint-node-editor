@@ -405,22 +405,15 @@ impl NodeEditorController {
             .nodes_in_selection_box(world_x, world_y, world_w, world_h)
     }
 
-    /// Find all links that have at least one endpoint inside the given screen-space selection box.
-    ///
-    /// Converts the box and link endpoints to world space for comparison.
-    pub fn links_in_selection_box_screen(
+    /// Find all links that have at least one endpoint inside the given world-space selection box.
+    pub fn links_in_selection_box_world(
         &self,
-        sx: f32,
-        sy: f32,
-        sw: f32,
-        sh: f32,
+        world_x: f32,
+        world_y: f32,
+        world_w: f32,
+        world_h: f32,
     ) -> Vec<i32> {
         let s = self.state.borrow();
-        let z = s.safe_zoom();
-        let world_x = (sx - s.pan_x) / z;
-        let world_y = (sy - s.pan_y) / z;
-        let world_w = sw / z;
-        let world_h = sh / z;
         let cache = self.cache.borrow();
 
         // Compute world-space link endpoints: node_world + pin_rel
@@ -446,6 +439,27 @@ impl NodeEditorController {
             world_h,
             link_geometries,
         )
+    }
+
+    /// Find all links that have at least one endpoint inside the given screen-space selection box.
+    ///
+    /// Converts the box from screen→world and delegates to [`links_in_selection_box_world`](Self::links_in_selection_box_world).
+    pub fn links_in_selection_box_screen(
+        &self,
+        sx: f32,
+        sy: f32,
+        sw: f32,
+        sh: f32,
+    ) -> Vec<i32> {
+        let s = self.state.borrow();
+        let z = s.safe_zoom();
+        let world_x = (sx - s.pan_x) / z;
+        let world_y = (sy - s.pan_y) / z;
+        let world_w = sw / z;
+        let world_h = sh / z;
+        drop(s);
+
+        self.links_in_selection_box_world(world_x, world_y, world_w, world_h)
     }
 }
 
