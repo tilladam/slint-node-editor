@@ -315,7 +315,10 @@ impl NodeEditorController {
     /// Returns the link ID, or -1 if no link is within `hover_distance`.
     /// Internally converts world-space cache data to screen space for accurate
     /// bezier hit testing that matches the rendered curves.
-    pub fn find_link_at_screen(
+    /// Find the link closest to the given world-space position.
+    ///
+    /// Returns the link ID, or -1 if no link is within `hover_distance`.
+    pub fn find_link_at_world(
         &self,
         mouse_x: f32,
         mouse_y: f32,
@@ -325,8 +328,6 @@ impl NodeEditorController {
     ) -> i32 {
         let s = self.state.borrow();
         let zoom = s.safe_zoom();
-        let pan_x = s.pan_x;
-        let pan_y = s.pan_y;
         let cache = self.cache.borrow();
 
         let link_geometries = s.links.iter().filter_map(|(&id, &(start_pin, end_pin))| {
@@ -335,13 +336,12 @@ impl NodeEditorController {
             let start_rect = cache.node_rects.get(&start_pos.node_id)?.rect();
             let end_rect = cache.node_rects.get(&end_pos.node_id)?.rect();
 
-            // World→screen: (node_world + pin_rel) * zoom + pan
             Some(SimpleLinkGeometry {
                 id,
-                start_x: (start_rect.0 + start_pos.rel_x) * zoom + pan_x,
-                start_y: (start_rect.1 + start_pos.rel_y) * zoom + pan_y,
-                end_x: (end_rect.0 + end_pos.rel_x) * zoom + pan_x,
-                end_y: (end_rect.1 + end_pos.rel_y) * zoom + pan_y,
+                start_x: start_rect.0 + start_pos.rel_x,
+                start_y: start_rect.1 + start_pos.rel_y,
+                end_x: end_rect.0 + end_pos.rel_x,
+                end_y: end_rect.1 + end_pos.rel_y,
             })
         });
 
@@ -354,6 +354,29 @@ impl NodeEditorController {
             bezier_min_offset,
             hit_samples,
         )
+    }
+
+    /// Find the link closest to the given screen-space position.
+    ///
+    /// Returns the link ID, or -1 if no link is within `hover_distance`.
+    /// Converts screen→world and delegates to [`find_link_at_world`](Self::find_link_at_world).
+    pub fn find_link_at_screen(
+        &self,
+        mouse_x: f32,
+        mouse_y: f32,
+        hover_distance: f32,
+        bezier_min_offset: f32,
+        hit_samples: usize,
+    ) -> i32 {
+        let s = self.state.borrow();
+        let zoom = s.safe_zoom();
+        let pan_x = s.pan_x;
+        let pan_y = s.pan_y;
+        drop(s);
+
+        let world_x = (mouse_x - pan_x) / zoom;
+        let world_y = (mouse_y - pan_y) / zoom;
+        self.find_link_at_world(world_x, world_y, hover_distance, bezier_min_offset, hit_samples)
     }
 
     /// Find the pin closest to the given screen-space position.
