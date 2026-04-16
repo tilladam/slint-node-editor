@@ -349,23 +349,33 @@ export component Minimap inherits Rectangle {
     property <length> drag-threshold: 3px;
 
     // === Coordinate Transformation ===
-    property <length> graph-width: max(root.graph-max-x - root.graph-min-x, 1px);
-    property <length> graph-height: max(root.graph-max-y - root.graph-min-y, 1px);
-    property <length> available-width: root.minimap-width - 2 * root.minimap-padding;
-    property <length> available-height: root.minimap-height - 2 * root.minimap-padding;
-    property <float> scale: min(
-        root.available-width / root.graph-width,
-        root.available-height / root.graph-height);
-
-    // === Viewport in Graph Coordinates ===
+    // Visible region in graph/world coordinates.
+    // Derived from screen = pan + world * zoom, inverted at screen origin (0,0).
     property <length> visible-min-x: -root.viewport-x / root.viewport-zoom;
     property <length> visible-min-y: -root.viewport-y / root.viewport-zoom;
     property <length> visible-max-x: root.visible-min-x + (root.viewport-width / root.viewport-zoom);
     property <length> visible-max-y: root.visible-min-y + (root.viewport-height / root.viewport-zoom);
 
+    // Minimap content = union(graph bounds, visible viewport). Using the union
+    // guarantees the viewport indicator always fits inside the minimap: when
+    // the viewport is zoomed out past the graph, the minimap "zooms out" so
+    // both the graph and the viewport are visible.
+    property <length> content-min-x: min(root.graph-min-x, root.visible-min-x);
+    property <length> content-min-y: min(root.graph-min-y, root.visible-min-y);
+    property <length> content-max-x: max(root.graph-max-x, root.visible-max-x);
+    property <length> content-max-y: max(root.graph-max-y, root.visible-max-y);
+    property <length> content-width: max(root.content-max-x - root.content-min-x, 1px);
+    property <length> content-height: max(root.content-max-y - root.content-min-y, 1px);
+
+    property <length> available-width: root.minimap-width - 2 * root.minimap-padding;
+    property <length> available-height: root.minimap-height - 2 * root.minimap-padding;
+    property <float> scale: min(
+        root.available-width / root.content-width,
+        root.available-height / root.content-height);
+
     // === Viewport Indicator in Minimap Coordinates ===
-    property <length> viewport-indicator-x: root.minimap-padding + (root.visible-min-x - root.graph-min-x) * root.scale;
-    property <length> viewport-indicator-y: root.minimap-padding + (root.visible-min-y - root.graph-min-y) * root.scale;
+    property <length> viewport-indicator-x: root.minimap-padding + (root.visible-min-x - root.content-min-x) * root.scale;
+    property <length> viewport-indicator-y: root.minimap-padding + (root.visible-min-y - root.content-min-y) * root.scale;
     property <length> viewport-indicator-width: (root.visible-max-x - root.visible-min-x) * root.scale;
     property <length> viewport-indicator-height: (root.visible-max-y - root.visible-min-y) * root.scale;
 
@@ -381,8 +391,8 @@ export component Minimap inherits Rectangle {
     property <string> computed-path: root.compute-nodes-path(
         root.path-version,
         root.scale,
-        root.minimap-padding / 1px - (root.graph-min-x / 1px) * root.scale,
-        root.minimap-padding / 1px - (root.graph-min-y / 1px) * root.scale);
+        root.minimap-padding / 1px - (root.content-min-x / 1px) * root.scale,
+        root.minimap-padding / 1px - (root.content-min-y / 1px) * root.scale);
 
     // Use computed path, or nodes-path if provided externally
     property <string> effective-path: root.nodes-path != "" ? root.nodes-path : root.computed-path;
@@ -400,8 +410,8 @@ export component Minimap inherits Rectangle {
     // Fallback: individual rectangles (used when no path callback is set)
     if root.effective-path == "": Rectangle {
         for node in root.nodes: Rectangle {
-            x: root.minimap-padding + (node.x - root.graph-min-x) * root.scale;
-            y: root.minimap-padding + (node.y - root.graph-min-y) * root.scale;
+            x: root.minimap-padding + (node.x - root.content-min-x) * root.scale;
+            y: root.minimap-padding + (node.y - root.content-min-y) * root.scale;
             width: node.width * root.scale;
             height: node.height * root.scale;
             background: node.color.alpha > 0 ? node.color : root.minimap-node-color;
@@ -436,8 +446,8 @@ export component Minimap inherits Rectangle {
                 if !root.internal-is-panning {
                     // Treat as click: center viewport
                     root.navigate-to(
-                        root.graph-min-x + ((self.mouse-x - root.minimap-padding) / root.scale),
-                        root.graph-min-y + ((self.mouse-y - root.minimap-padding) / root.scale));
+                        root.content-min-x + ((self.mouse-x - root.minimap-padding) / root.scale),
+                        root.content-min-y + ((self.mouse-y - root.minimap-padding) / root.scale));
                 }
                 root.internal-is-panning = false;
             }
