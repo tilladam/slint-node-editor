@@ -212,6 +212,7 @@ export component NodeEditor inherits FocusScope {
     in property <BoxSelectionModifier> box-selection-modifier: BoxSelectionModifier.ctrl;
 
     // === Internal state ===
+    property <bool> internal-is-context-menu-dragging: false;
     property <bool> internal-is-panning: false;
     property <length> pan-start-mouse-x;
     property <length> pan-start-mouse-y;
@@ -275,6 +276,8 @@ export component NodeEditor inherits FocusScope {
     callback link-hovered();
     callback selection-changed();
     callback context-menu-requested();
+    callback context-menu-dragged(/* x */ length, /* y */ length);
+    callback context-menu-released(/* x */ length, /* y */ length);
     callback node-double-clicked(/* node-id */ int);
     callback node-drag-started(/* node-id */ int);
     callback node-drag-ended(/* delta-x */ float, /* delta-y */ float);
@@ -647,10 +650,15 @@ export component NodeEditor inherits FocusScope {
                     } else if event.button == PointerEventButton.right {
                         root.context-menu-x = self.mouse-x;
                         root.context-menu-y = self.mouse-y;
+                        root.internal-is-context-menu-dragging = true;
                         root.context-menu-requested();
                     }
                 }
                 if event.kind == PointerEventKind.up {
+                    if root.internal-is-context-menu-dragging && event.button == PointerEventButton.right {
+                        root.internal-is-context-menu-dragging = false;
+                        root.context-menu-released(self.mouse-x, self.mouse-y);
+                    }
                     if root.internal-is-panning && event.button == PointerEventButton.middle {
                         root.internal-is-panning = false;
                     }
@@ -678,6 +686,9 @@ export component NodeEditor inherits FocusScope {
                     }
                 }
                 if event.kind == PointerEventKind.move {
+                    if root.internal-is-context-menu-dragging {
+                        root.context-menu-dragged(self.mouse-x, self.mouse-y);
+                    }
                     // Link hover detection when not doing other interactions
                     if root.has-link-selection && !root.internal-is-panning && !root.internal-is-box-selecting && !root.internal-is-creating-link {
                         root.update-link-hover(root.compute-link-at((self.mouse-x - root.pan-x) / root.zoom, (self.mouse-y - root.pan-y) / root.zoom));
