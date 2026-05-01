@@ -272,6 +272,7 @@ export component NodeEditor inherits FocusScope {
 
     // === Callbacks TO Application (events) ===
     callback link-requested(/* start-pin */ int, /* end-pin */ int);
+    callback link-dropped(/* start-pin */ int, /* world-x */ float, /* world-y */ float);
     callback link-cancelled();
     callback link-hovered();
     callback selection-changed();
@@ -361,6 +362,11 @@ export component NodeEditor inherits FocusScope {
     function try-complete-link(end-pin: int) {
         if end-pin != 0 {
             root.link-requested(root.internal-link-start-pin, end-pin);
+        } else {
+            root.link-dropped(
+                root.internal-link-start-pin,
+                (root.internal-link-end-x - root.pan-x) / root.zoom / 1px,
+                (root.internal-link-end-y - root.pan-y) / root.zoom / 1px);
         }
     }
 
