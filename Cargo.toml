@@ -22,17 +22,17 @@ include = [
 ]
 
 [dependencies]
-slint = { version = "1.16", default-features = false, features = ["std", "compat-1-2"] }
+slint = { git = "https://github.com/slint-ui/slint", default-features = false, features = ["std", "compat-1-2"] }
 rust-sugiyama = { version = "0.4", optional = true }
 
 [features]
 layout = ["rust-sugiyama"]
 
 [dev-dependencies]
-i-slint-backend-testing = "1.16"
+i-slint-backend-testing = { git = "https://github.com/slint-ui/slint" }
 
 [build-dependencies]
-slint-build = "1.16"
+slint-build = { git = "https://github.com/slint-ui/slint" }
 
 [workspace]
 members = [
@@ -48,6 +48,6 @@ members = [
 ]
 
 [workspace.dependencies]
-slint = { version = "1.16", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-skia"] }
-slint-build = "1.16"
+slint = { git = "https://github.com/slint-ui/slint", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-skia"] }
+slint-build = { git = "https://github.com/slint-ui/slint" }
 slint-node-editor = { path = "." }
