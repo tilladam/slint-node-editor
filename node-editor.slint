@@ -469,10 +469,12 @@ export component NodeEditor inherits FocusScope {
     // === Trigger updates on viewport changes ===
     changed pan-x => {
         ViewportState.pan-x = root.pan-x;
+        GeometryVersion.version += 1;
         NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
     }
     changed pan-y => {
         ViewportState.pan-y = root.pan-y;
+        GeometryVersion.version += 1;
         NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
     }
     changed zoom => {

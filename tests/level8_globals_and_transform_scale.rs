@@ -240,6 +240,34 @@ fn test_screen_path_applies_zoom_and_pan() {
     assert!(screen.starts_with("M 550 400"), "Screen path should start at (550,400): {}", screen);
 }
 
+#[test]
+fn test_pan_x_increments_geometry_version() {
+    let harness = MinimalTestHarness::new();
+    let initial_version = harness.window.get_geometry_version();
+
+    harness.window.set_pan_x(25.0);
+    harness.pump_events();
+
+    assert!(
+        harness.window.get_geometry_version() > initial_version,
+        "pan-x changes must invalidate geometry-dependent link path bindings"
+    );
+}
+
+#[test]
+fn test_pan_y_increments_geometry_version() {
+    let harness = MinimalTestHarness::new();
+    let initial_version = harness.window.get_geometry_version();
+
+    harness.window.set_pan_y(25.0);
+    harness.pump_events();
+
+    assert!(
+        harness.window.get_geometry_version() > initial_version,
+        "pan-y changes must invalidate geometry-dependent link path bindings"
+    );
+}
+
 // ============================================================================
 // Box selection coordinate conversion
 // ============================================================================

@@ -8,6 +8,7 @@ import {
     PinTypes,
     LinkData,
     ViewportState,
+    GeometryVersion,
     NodeEditorInternalCallbacks,
     NodeEditorComputations,
 } from "@slint-node-editor/node-editor.slint";
@@ -20,7 +21,7 @@ export struct NodeData {
 }
 
 // Re-export for Rust
-export { LinkData, NodeEditorInternalCallbacks, NodeEditorComputations }
+export { LinkData, GeometryVersion, NodeEditorInternalCallbacks, NodeEditorComputations }
 
 component SimpleNode inherits BaseNode {
     in property <string> title: "Node";
@@ -82,6 +83,9 @@ export component MainWindow inherits Window {
     in-out property <[int]> selected-node-ids <=> editor.selected-node-ids;
     in-out property <[int]> selected-link-ids <=> editor.selected-link-ids;
     in-out property <int> selection-version <=> editor.selection-version;
+    in-out property <length> pan-x <=> editor.pan-x;
+    in-out property <length> pan-y <=> editor.pan-y;
+    in property <int> geometry-version: GeometryVersion.version;
 
     // Core callbacks to Rust
     callback request-grid-update <=> editor.request-grid-update;
