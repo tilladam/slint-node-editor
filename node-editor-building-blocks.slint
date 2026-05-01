@@ -397,12 +397,19 @@ export component Minimap inherits Rectangle {
     // Use computed path, or nodes-path if provided externally
     property <string> effective-path: root.nodes-path != "" ? root.nodes-path : root.computed-path;
 
-    // Path-based rendering (optimized - single element for all nodes)
+    // Path-based rendering (optimized - single element for all nodes).
+    // The viewbox locks path-command coordinates to logical pixels in the
+    // minimap's local space; without it, Slint auto-fits the bounding box
+    // of the commands to the element size, stretching node rectangles.
     if root.effective-path != "": Path {
         x: 0;
         y: 0;
         width: root.minimap-width;
         height: root.minimap-height;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: max(self.width / 1px, 1);
+        viewbox-height: max(self.height / 1px, 1);
         commands: root.effective-path;
         fill: root.minimap-node-color;
     }
