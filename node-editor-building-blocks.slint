@@ -774,16 +774,19 @@ export component Pin inherits Rectangle {
     }
     changed pin-id => {
         if (pin-id > 0) {
+            GeometryVersion.version += 1;
             NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
     changed center-x => {
         if (pin-id > 0) {
+            GeometryVersion.version += 1;
             NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
     changed center-y => {
         if (pin-id > 0) {
+            GeometryVersion.version += 1;
             NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
