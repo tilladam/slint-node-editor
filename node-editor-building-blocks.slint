@@ -80,6 +80,20 @@ export global SelectionRequest {
     in-out property <bool> shift-held: false;
 }
 
+/// Hover state - updated by BaseNode, consumed by NodeEditor.
+/// Mirrors the node-selection flow: BaseNode writes the hovered node's ID here
+/// on pointer enter/exit and NodeEditor exposes it as `hovered-node-id`.
+/// Hover is *state* (not a command), so no version counter is needed — the
+/// editor binds directly to this property.
+///
+/// Sentinel: `0` means "no node hovered", matching BaseNode's `node-id == 0`
+/// = not-a-node convention (note: negative IDs are valid node IDs, so `-1`
+/// would be ambiguous here — unlike the link-hover API).
+export global HoverState {
+    /// The node ID currently under the pointer, or 0 if none.
+    in-out property <int> hovered-node-id: 0;
+}
+
 /// Internal callback registry for BaseNode/Pin → Rust communication.
 /// Wired automatically by `wire_node_editor!` — examples don't touch this.
 export global NodeEditorInternalCallbacks {
@@ -606,6 +620,26 @@ export component BaseNode inherits Rectangle {
     changed world-pos-y => {
         if (node-id != 0) {
             NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+        }
+    }
+
+    // === Hover ===
+    // Exposed so subclasses can react to hover directly (e.g. show pills/badges),
+    // and aggregated to NodeEditor.hovered-node-id via the HoverState global.
+    // drag-area owns pointer events for the whole node, so its has-hover is the
+    // authoritative hover signal (a subclass can't layer its own TouchArea
+    // without swallowing selection/drag).
+    out property <bool> hovered: drag-area.has-hover;
+    changed hovered => {
+        // Guard against node-id == 0 (unbound) — same convention as geometry reporting.
+        if (node-id != 0) {
+            if (self.hovered) {
+                HoverState.hovered-node-id = node-id;
+            } else if (HoverState.hovered-node-id == node-id) {
+                // Only clear if we're still the reported node; if the pointer moved
+                // straight onto another node that already claimed the slot, leave it.
+                HoverState.hovered-node-id = 0;
+            }
         }
     }
 

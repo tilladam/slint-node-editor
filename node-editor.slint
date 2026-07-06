@@ -39,6 +39,7 @@ import {
     LinkCreationState,
     LinkCreation,
     SelectionRequest,
+    HoverState,
     NodeEditorComputations,
     NodeStyleDefaults,
     MinimapNode,
@@ -51,7 +52,7 @@ import {
     BaseNode,
     Pin,
 } from "node-editor-building-blocks.slint";
-export { PinTypes, ViewportState, DragState, GeometryVersion, NodeEditorInternalCallbacks, LinkCreationState, LinkCreation, SelectionRequest, NodeEditorComputations, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, LinkStatus, LinkStatusColors, Minimap, Link, BaseNode, Pin }
+export { PinTypes, ViewportState, DragState, GeometryVersion, NodeEditorInternalCallbacks, LinkCreationState, LinkCreation, SelectionRequest, HoverState, NodeEditorComputations, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, LinkStatus, LinkStatusColors, Minimap, Link, BaseNode, Pin }
 
 /// Modifier key for triggering box selection over nodes/links
 export enum BoxSelectionModifier {
@@ -180,6 +181,17 @@ export component NodeEditor inherits FocusScope {
     // === Hovered link ===
     out property <int> hovered-link-id: -1;
     in property <length> link-hover-distance: 8px;
+
+    // === Hovered node ===
+    // ID of the node currently under the pointer, or 0 if none. Aggregated from
+    // BaseNode via the HoverState global (nodes are consumer-instantiated, so this
+    // can't be wired in a library-side delegate the way hovered-link-id is).
+    // Note: sentinel is 0 (not -1) — negative node IDs are valid, see BaseNode.
+    out property <int> hovered-node-id: HoverState.hovered-node-id;
+    callback node-hovered();
+    changed hovered-node-id => {
+        root.node-hovered();
+    }
 
     // === Minimap configuration ===
     in property <bool> minimap-enabled: false;
@@ -601,8 +613,15 @@ export component NodeEditor inherits FocusScope {
             property <bool> modifier-forces-box-select: false;
 
             scroll-event(event) => {
-                if event.modifiers.control {
-                    // Ctrl+scroll: Zoom centered on mouse position
+                // Ctrl (or ⌘ on macOS) + scroll zooms, centered on the mouse — but
+                // only for a vertical-only gesture. A trackpad pinch/zoom arrives as
+                // an emulated Ctrl+scroll with delta-x ≈ 0, whereas a two-finger pan
+                // carries a real horizontal component. So a meaningful delta-x means
+                // "pan" regardless of the (possibly stale) Ctrl flag: macOS can swallow
+                // the Ctrl key-up on some hotkeys (e.g. Ctrl+Shift+Cmd+4 screenshots),
+                // which would otherwise leave the canvas stuck in zoom-only mode.
+                if (event.modifiers.control || event.modifiers.meta) && abs(event.delta-x) < 1px {
+                    // Ctrl/⌘+scroll: Zoom centered on mouse position
                     // Use delta-y for zoom (positive = zoom in, negative = zoom out)
                     // Scale factor: each "click" of scroll changes zoom by ~10%
                     root.handle-scroll-zoom(event.delta-y, self.mouse-x, self.mouse-y);
