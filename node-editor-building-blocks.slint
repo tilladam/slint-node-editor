@@ -806,21 +806,36 @@ export component Pin inherits Rectangle {
             NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
+    // Bump the geometry version so links re-route when a pin settles to a new
+    // position (e.g. a card resizing to its real size after a relayout). But NOT
+    // while a node is being dragged: consumers that report live world-space pin
+    // centres get a center-x/center-y change every drag frame, and each bump
+    // re-evaluates ALL link paths (every link is a world-sized Path) — doing that
+    // per frame makes dragging crawl on a software renderer. During a drag the
+    // dragged node's own move already repaints it; edges snap to the dropped
+    // position via the end-of-drag bump. report-pin-position still fires so the
+    // consumer's pin cache stays current for that release bump.
     changed pin-id => {
         if (pin-id > 0) {
-            GeometryVersion.version += 1;
+            if (!DragState.is-dragging) {
+                GeometryVersion.version += 1;
+            }
             NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
     changed center-x => {
         if (pin-id > 0) {
-            GeometryVersion.version += 1;
+            if (!DragState.is-dragging) {
+                GeometryVersion.version += 1;
+            }
             NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
     changed center-y => {
         if (pin-id > 0) {
-            GeometryVersion.version += 1;
+            if (!DragState.is-dragging) {
+                GeometryVersion.version += 1;
+            }
             NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
         }
     }
