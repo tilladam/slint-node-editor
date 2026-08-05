@@ -248,12 +248,17 @@ macro_rules! wire_selection {
     }};
 
     ($window:expr, $setup:expr, $nodes:expr, $links:expr) => {{
-        // Nodes and links are selected exclusively: picking one drops the other.
+        // A plain click is exclusive across kinds — picking a node drops the
+        // links and vice versa. Shift means "add to what I have", so it leaves
+        // the other kind standing: the same mixed selection a shift-marquee
+        // builds, which is also what a delete then acts on.
         $window.on_node_selected({
             let nodes = $nodes.clone();
             let links = $links.clone();
             move |node_id, shift| {
-                $crate::selection::clear_selection(&links, |l| &mut l.selected);
+                if !shift {
+                    $crate::selection::clear_selection(&links, |l| &mut l.selected);
+                }
                 $crate::selection::apply_click(
                     &nodes,
                     |n| n.id,
@@ -268,7 +273,9 @@ macro_rules! wire_selection {
             let nodes = $nodes.clone();
             let links = $links.clone();
             move |link_id, shift| {
-                $crate::selection::clear_selection(&nodes, |n| &mut n.selected);
+                if !shift {
+                    $crate::selection::clear_selection(&nodes, |n| &mut n.selected);
+                }
                 $crate::selection::apply_click(
                     &links,
                     |l| l.id,

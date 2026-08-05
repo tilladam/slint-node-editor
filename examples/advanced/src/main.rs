@@ -383,8 +383,12 @@ fn main() {
         let set_nodes = set_node_selection.clone();
         let set_links = set_link_selection.clone();
         move |node_id, shift| {
-            // Nodes and links are selected exclusively in this example
-            set_links(&[]);
+            // A plain click is exclusive across kinds; shift adds to what's
+            // there, so it leaves the other kind alone (same as the marquee
+            // below, and as `wire_selection!`'s two-model arm).
+            if !shift {
+                set_links(&[]);
+            }
             set_nodes(&selection::resolve_click(&current(), node_id, shift));
         }
     });
@@ -394,7 +398,9 @@ fn main() {
         let set_nodes = set_node_selection.clone();
         let set_links = set_link_selection.clone();
         move |link_id, shift| {
-            set_nodes(&[]);
+            if !shift {
+                set_nodes(&[]);
+            }
             set_links(&selection::resolve_click(&current(), link_id, shift));
         }
     });

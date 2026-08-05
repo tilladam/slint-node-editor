@@ -262,7 +262,7 @@ fn selecting_a_link_drops_the_node_selection() {
 
     assert!(
         harness.selected_node_ids().is_empty(),
-        "nodes and links are selected exclusively"
+        "a plain click is exclusive across kinds"
     );
     assert_eq!(harness.selected_link_ids(), vec![1]);
 }
@@ -276,6 +276,35 @@ fn selecting_a_node_drops_the_link_selection() {
 
     assert!(harness.selected_link_ids().is_empty());
     assert_eq!(harness.selected_node_ids(), vec![1]);
+}
+
+/// Shift means "add to what I have", and that holds across kinds: a
+/// shift-click reaches into the other model only to leave it alone. A
+/// shift-marquee already builds mixed selections, and a delete acts on the
+/// mixed set — a shift-click that silently dropped half of it would be the
+/// odd one out.
+#[test]
+fn shift_click_builds_a_mixed_node_and_link_selection() {
+    let harness = MinimalTestHarness::new();
+
+    harness.window.invoke_select_link(1, false);
+    harness.window.invoke_node_selected(1, true);
+
+    assert_eq!(harness.selected_node_ids(), vec![1]);
+    assert_eq!(
+        harness.selected_link_ids(),
+        vec![1],
+        "shift must not drop the other kind"
+    );
+
+    // And the mirror: shift-clicking a link keeps the selected nodes.
+    harness.window.invoke_node_selected(2, true);
+    harness.window.invoke_select_link(1, true);
+    assert_eq!(harness.selected_node_ids(), vec![1, 2]);
+    assert!(
+        harness.selected_link_ids().is_empty(),
+        "shift toggles within the clicked kind — link 1 was selected, so it drops"
+    );
 }
 
 #[test]
