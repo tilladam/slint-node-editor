@@ -5,8 +5,9 @@
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    wire_node_editor, BasicLinkValidator, CompositeValidator, GraphLogic, LinkModel, LinkValidator,
-    MovableNode, NoDuplicatesValidator, NodeEditorSetup, SelectionManager, ValidationResult,
+    project_selection, wire_node_editor, BasicLinkValidator, CompositeValidator, GraphLogic,
+    LinkModel, LinkValidator, MovableNode, NoDuplicatesValidator, NodeEditorSetup, SelectionManager,
+    ValidationResult,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -179,18 +180,21 @@ fn main() {
             title: SharedString::from("Input"),
             world_x: 144.0,
             world_y: 264.0,
+            selected: false,
         },
         NodeData {
             id: 2,
             title: SharedString::from("Process"),
             world_x: 408.0,
             world_y: 216.0,
+            selected: false,
         },
         NodeData {
             id: 3,
             title: SharedString::from("Output"),
             world_x: 648.0,
             world_y: 264.0,
+            selected: false,
         },
     ]));
     window.set_nodes(ModelRc::from(nodes.clone()));
@@ -205,6 +209,7 @@ fn main() {
             filter_type_index: 0,
             enabled: true,
             processed_count: 42,
+            selected: false,
         }]));
     window.set_filter_nodes(ModelRc::from(filter_nodes.clone()));
 
@@ -229,6 +234,7 @@ fn main() {
             color: link_colors[0],
             line_width: 1.5, // Thin link
             status: -1,
+            selected: false,
         },
         LinkData {
             id: 2,
@@ -237,6 +243,7 @@ fn main() {
             color: link_colors[1],
             line_width: 5.0, // Thick link to demonstrate feature
             status: -1,
+            selected: false,
         },
     ]));
     window.set_links(ModelRc::from(links.clone()));
@@ -265,12 +272,6 @@ fn main() {
     setup
         .controller()
         .set_grid_spacing(node_constants.get_grid_spacing());
-
-    // Create selection models
-    let selected_node_ids: Rc<VecModel<i32>> = Rc::new(VecModel::default());
-    let selected_link_ids: Rc<VecModel<i32>> = Rc::new(VecModel::default());
-    window.set_selected_node_ids(ModelRc::from(selected_node_ids.clone()));
-    window.set_selected_link_ids(ModelRc::from(selected_link_ids.clone()));
 
     // Enable minimap
     window.set_minimap_enabled(true);
@@ -327,101 +328,106 @@ fn main() {
         }
     });
 
-    window.on_compute_link_box_selection({
+    // === Selection ===
+    // The editor reports gestures and renders the `selected` flag it finds on
+    // the rows; node and link selection live here, and every write to them ends
+    // in this one projection.
+
+    let project_selection_into_rows: Rc<dyn Fn()> = {
+        let nodes = nodes.clone();
+        let filter_nodes = filter_nodes.clone();
+        let links = links.clone();
+        let sm = selection_manager.clone();
+        let lsm = link_selection_manager.clone();
+        Rc::new(move || {
+            let sm = sm.borrow();
+            project_selection(
+                &nodes,
+                |node| sm.contains(node.id),
+                |node| node.selected,
+                |node, selected| node.selected = selected,
+            );
+            project_selection(
+                &filter_nodes,
+                |node| sm.contains(node.id),
+                |node| node.selected,
+                |node, selected| node.selected = selected,
+            );
+            let lsm = lsm.borrow();
+            project_selection(
+                &links,
+                |link| lsm.contains(link.id),
+                |link| link.selected,
+                |link, selected| link.selected = selected,
+            );
+        })
+    };
+
+    window.on_node_selected({
+        let sm = selection_manager.clone();
+        let lsm = link_selection_manager.clone();
+        let project = project_selection_into_rows.clone();
+        move |node_id, shift| {
+            // Nodes and links are selected exclusively in this example
+            lsm.borrow_mut().clear();
+            sm.borrow_mut().handle_interaction(node_id, shift);
+            project();
+        }
+    });
+
+    window.on_select_link({
+        let sm = selection_manager.clone();
+        let lsm = link_selection_manager.clone();
+        let project = project_selection_into_rows.clone();
+        move |link_id, shift| {
+            sm.borrow_mut().clear();
+            let mut lsm = lsm.borrow_mut();
+            if link_id >= 0 {
+                lsm.handle_interaction(link_id, shift);
+            } else {
+                lsm.clear();
+            }
+            drop(lsm);
+            project();
+        }
+    });
+
+    window.on_selection_cleared({
+        let sm = selection_manager.clone();
+        let lsm = link_selection_manager.clone();
+        let project = project_selection_into_rows.clone();
+        move || {
+            sm.borrow_mut().clear();
+            lsm.borrow_mut().clear();
+            project();
+        }
+    });
+
+    window.on_box_selection_committed({
         let ctrl = setup.controller().clone();
         let links = links.clone();
-        move |x, y, w, h| {
+        let sm = selection_manager.clone();
+        let lsm = link_selection_manager.clone();
+        let project = project_selection_into_rows.clone();
+        move |x, y, w, h, shift| {
             let cache = ctrl.cache();
             let cache = cache.borrow();
+            let hit_nodes = cache.nodes_in_selection_box(x, y, w, h);
             let link_iter = (0..links.row_count())
                 .filter_map(|i| links.row_data(i))
                 .map(|l| (l.id, l.start_pin_id, l.end_pin_id));
-            ModelRc::from(Rc::new(VecModel::from(cache.links_in_selection_box(
-                x as f32, y as f32, w as f32, h as f32, link_iter,
-            ))))
-        }
-    });
+            let hit_links = cache.links_in_selection_box(x, y, w, h, link_iter);
+            drop(cache);
 
-    // === Selection Checking Callbacks (now on NodeEditorComputations global) ===
-
-    let sm_check = selection_manager.clone();
-    window
-        .global::<NodeEditorComputations>()
-        .on_is_node_selected(move |id, _version| sm_check.borrow().contains(id));
-
-    let lsm_check = link_selection_manager.clone();
-    window
-        .global::<NodeEditorComputations>()
-        .on_is_link_selected(move |id, _version| lsm_check.borrow().contains(id));
-
-    // === Selection Notification Callbacks ===
-    // NodeEditor handles basic selection logic internally. These callbacks allow the app
-    // to perform additional actions (like clearing link selection when a node is selected).
-
-    let sl_ids = selected_link_ids.clone();
-    let lsm_select = link_selection_manager.clone();
-    let sm_for_shift = selection_manager.clone();
-    let sn_ids_shift = selected_node_ids.clone();
-    let window_for_node_selected = window.as_weak();
-    window.on_node_selected(move |node_id, shift| {
-        // Clear link selection when a node is selected
-        lsm_select.borrow_mut().clear();
-        lsm_select.borrow().sync_to_model(&*sl_ids);
-
-        if shift {
-            // For shift-select, NodeEditor doesn't modify selection, app must handle it
-            let mut sm = sm_for_shift.borrow_mut();
-            sm.handle_interaction(node_id, true);
-            sm.sync_to_model(&*sn_ids_shift);
-            if let Some(w) = window_for_node_selected.upgrade() {
-                w.set_selection_version(w.get_selection_version() + 1);
+            if shift {
+                sm.borrow_mut().extend_selection(hit_nodes);
+                lsm.borrow_mut().extend_selection(hit_links);
+            } else {
+                sm.borrow_mut().replace_selection(hit_nodes);
+                lsm.borrow_mut().replace_selection(hit_links);
             }
+            project();
         }
-        // For non-shift, NodeEditor already updated selection and version
-    });
-
-    let sn_ids_l = selected_node_ids.clone();
-    let sl_ids_l = selected_link_ids.clone();
-    let sm_select_l = selection_manager.clone();
-    let lsm_select_l = link_selection_manager.clone();
-    let window_for_select_link = window.as_weak();
-    window.on_select_link(move |link_id, shift| {
-        sm_select_l.borrow_mut().clear();
-        sm_select_l.borrow().sync_to_model(&*sn_ids_l);
-
-        let mut lsm = lsm_select_l.borrow_mut();
-        if link_id >= 0 {
-            lsm.handle_interaction(link_id, shift);
-        } else {
-            lsm.clear();
-        }
-        lsm.sync_to_model(&*sl_ids_l);
-
-        if let Some(w) = window_for_select_link.upgrade() {
-            w.set_selection_version(w.get_selection_version() + 1);
-            w.invoke_selection_changed();
-        }
-    });
-
-    let sl_ids_c = selected_link_ids.clone();
-    let lsm_clear = link_selection_manager.clone();
-    window.on_selection_cleared(move || {
-        // NodeEditor already cleared node selection, just clear link selection
-        lsm_clear.borrow_mut().clear();
-        lsm_clear.borrow().sync_to_model(&*sl_ids_c);
-    });
-
-    // Override global selection sync to use our SelectionManager (NodeEditor increments selection-version)
-    let sm_sync = selection_manager.clone();
-    window
-        .global::<NodeEditorComputations>()
-        .on_sync_selection_to_nodes(move |ids_model| {
-            sm_sync.borrow_mut().sync_from_model(&ids_model);
-        });
-
-    let lsm_sync = link_selection_manager.clone();
-    window.on_sync_selection_to_links(move |ids_model| {
-        lsm_sync.borrow_mut().sync_from_model(&ids_model);
     });
 
     // === Event Callbacks ===
@@ -484,6 +490,7 @@ fn main() {
                     color,
                     line_width: 2.0,
                     status: -1,
+                    selected: false,
                 };
                 links.push(data);
             }
@@ -559,6 +566,7 @@ fn main() {
             title: SharedString::from(format!("Node {}", id)),
             world_x: w.invoke_snap_to_grid(192.0 + (id as f32 * 48.0) % 384.0),
             world_y: w.invoke_snap_to_grid(192.0 + (id as f32 * 24.0) % 288.0),
+            selected: false,
         });
     });
 

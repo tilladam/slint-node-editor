@@ -264,6 +264,7 @@ fn main() {
                         color: get_link_color(output_pin),
                         line_width: 2.5,
                         status: -1,
+                        selected: false,
                     };
 
                     println!(

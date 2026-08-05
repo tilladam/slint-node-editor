@@ -204,10 +204,9 @@ in property <float> bezier-min-offset: 50.0;   // Min horizontal offset for curv
 in property <bool> minimap-enabled: false;
 in property <MinimapPosition> minimap-position: bottom-right;
 
-// Selection
-in-out property <[int]> selected-node-ids;      // Selected nodes
-in-out property <[int]> selected-link-ids;      // Selected links
-in-out property <int> selection-version: 0;     // Version counter for selection (forces binding re-eval)
+// Selection lives in the application — see "Callbacks (Selection)" below.
+// The editor stores none of it; `selected` is per-row data on your node models
+// and on LinkData.
 
 // Geometry & Rendering
 in-out property <string> grid-commands;         // SVG path for grid (set via request-grid-update)
@@ -253,12 +252,6 @@ callback compute-pin-at(x: length, y: length) -> int;
 /// Compute which link is at screen position (x, y)
 callback compute-link-at(x: length, y: length) -> int;
 
-/// Find all nodes in a selection box (world coordinates)
-callback compute-box-selection(x: length, y: length, w: length, h: length) -> [int];
-
-/// Find all links in a selection box (world coordinates)
-callback compute-link-box-selection(x: length, y: length, w: length, h: length) -> [int];
-
 /// Generate SVG path for link preview (during drag-to-link)
 callback compute-link-preview-path(
     start-x: length, start-y: length,
@@ -276,28 +269,43 @@ callback request-grid-update();
 
 **Callbacks (Selection):**
 
-```slint
-/// User clicked a node
-callback select-node(node-id: int, shift-held: bool);
+The editor keeps **no selection state**. It reports gestures; your application
+decides what they mean, stores the result, and projects it back into the
+`selected` field of your node rows and of `LinkData`. Apply these
+**synchronously** inside the callback — the drag and click logic reads the
+resulting `selected` flags within the same event.
 
-/// User clicked a link
+```slint
+/// A node was clicked (or dragged while unselected):
+/// replace the selection with it, or toggle it when shift-held
+callback node-selected(node-id: int, shift-held: bool);
+
+/// A link was clicked — same semantics
 callback select-link(link-id: int, shift-held: bool);
 
-/// User clicked background (clear selection)
-callback clear-selection();
+/// The background was clicked: drop the whole selection
+callback selection-cleared();
 
-/// Sync selection state to all nodes (after box selection)
-callback sync-selection-to-nodes(node-ids: [int]);
-
-/// Sync selection state to all links (after box selection)
-callback sync-selection-to-links(link-ids: [int]);
-
-/// Pure callback: Is this node selected? (Used for reactive binding)
-pure callback is-selected(node-id: int, version: int) -> bool;
-
-/// Pure callback: Is this link selected?
-pure callback is-link-selected(link-id: int, version: int) -> bool;
+/// A marquee was released over this world-coordinate rectangle:
+/// hit-test it and select the hits, extending the selection when shift-held
+callback box-selection-committed(x: length, y: length, w: length, h: length, shift-held: bool);
 ```
+
+On the Rust side, `SelectionManager` holds the selection, `project_selection`
+writes it into the model rows, and `wire_node_selection!` connects the two for
+the common case (one node model with `id` and `selected` fields):
+
+```rust
+let selection = Rc::new(RefCell::new(SelectionManager::new()));
+let setup = NodeEditorSetup::new(|id, dx, dy| { /* … */ })
+    .with_selection(selection.clone());   // multi-node drag
+
+wire_node_editor!(window, setup);
+wire_node_selection!(window, setup, selection, nodes);
+```
+
+Applications with several node models, link selection, or their own gesture
+semantics wire the four callbacks by hand — see the `advanced` example.
 
 **Callbacks (Events):**
 
@@ -373,7 +381,7 @@ Base component for creating custom nodes. Provides drag handling and selection.
 in property <int> node-id;             // Unique node ID
 in property <length> world-x;          // X position in graph space
 in property <length> world-y;          // Y position in graph space
-in property <bool> selected: false;    // Selection state
+in property <bool> selected: false;    // Selection state — bind it from your model row
 in property <float> zoom;              // Required for view calculation
 in property <length> pan-x;            // Required for view calculation
 in property <length> pan-y;            // Required for view calculation

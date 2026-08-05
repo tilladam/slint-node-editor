@@ -1,5 +1,6 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::{wire_node_editor, NodeEditorSetup};
+use slint_node_editor::{wire_node_editor, wire_node_selection, NodeEditorSetup, SelectionManager};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 slint::include_modules!();
@@ -14,6 +15,7 @@ fn main() {
             x: 80.0,
             y: 80.0,
             color: Color::from_argb_u8(255, 229, 57, 53), // red
+            selected: false,
         },
         NodeData {
             id: 2,
@@ -21,6 +23,7 @@ fn main() {
             x: 380.0,
             y: 60.0,
             color: Color::from_argb_u8(255, 156, 39, 176), // purple
+            selected: false,
         },
         NodeData {
             id: 3,
@@ -28,6 +31,7 @@ fn main() {
             x: 380.0,
             y: 220.0,
             color: Color::from_argb_u8(255, 0, 137, 123), // teal
+            selected: false,
         },
         NodeData {
             id: 4,
@@ -35,6 +39,7 @@ fn main() {
             x: 680.0,
             y: 140.0,
             color: Color::from_argb_u8(255, 30, 136, 229), // blue
+            selected: false,
         },
         NodeData {
             id: 5,
@@ -42,6 +47,7 @@ fn main() {
             x: 680.0,
             y: 320.0,
             color: Color::from_argb_u8(255, 255, 179, 0), // amber
+            selected: false,
         },
     ]));
     window.set_nodes(ModelRc::from(nodes.clone()));
@@ -54,6 +60,7 @@ fn main() {
             color: Color::from_argb_u8(255, 244, 143, 177), // pink
             line_width: 2.5,
             status: -1,
+            selected: false,
         },
         LinkData {
             id: 2,
@@ -62,6 +69,7 @@ fn main() {
             color: Color::from_argb_u8(255, 128, 203, 196), // teal light
             line_width: 2.5,
             status: -1,
+            selected: false,
         },
         LinkData {
             id: 3,
@@ -70,6 +78,7 @@ fn main() {
             color: Color::from_argb_u8(255, 206, 147, 216), // purple light
             line_width: 2.5,
             status: -1,
+            selected: false,
         },
         LinkData {
             id: 4,
@@ -78,6 +87,7 @@ fn main() {
             color: Color::from_argb_u8(255, 100, 221, 221), // cyan
             line_width: 2.5,
             status: -1,
+            selected: false,
         },
         LinkData {
             id: 5,
@@ -86,8 +96,11 @@ fn main() {
             color: Color::from_argb_u8(255, 255, 213, 79), // amber light
             line_width: 2.5,
             status: -1,
+            selected: false,
         },
     ]))));
+
+    let selection = Rc::new(RefCell::new(SelectionManager::new()));
 
     let setup = NodeEditorSetup::new({
         let nodes = nodes.clone();
@@ -103,9 +116,11 @@ fn main() {
                 }
             }
         }
-    });
+    })
+    .with_selection(selection.clone());
 
     wire_node_editor!(window, setup);
+    wire_node_selection!(window, setup, selection, nodes);
 
     window.run().unwrap();
 }

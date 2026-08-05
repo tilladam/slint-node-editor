@@ -82,10 +82,18 @@ VecModel<FilterNodeData> // Complex nodes
 VecModel<LinkData>       // Logical connections
 ```
 
-**Selection State**:
-- **Source of Truth**: `selected_node_ids` and `selected_link_ids` (VecModels shared with Slint).
-- **Performance Cache**: Rust maintains `HashSet<i32>` caches (`selection_set`, `link_selection_set`) for O(1) lookups.
-- **View Binding**: UI components bind `selected` property to the `is-node-selected` callback (reactive via `selection-version`).
+**Selection State**: the editor holds none — it emits intents (`node-selected`,
+`select-link`, `selection-cleared`, `box-selection-committed`) and renders the
+`selected` field of the rows.
+- **Source of Truth**: the application's `SelectionManager`s (`selection_manager`
+  for nodes, `link_selection_manager` for links).
+- **View Binding**: `selected` is per-row model data; after every write to a
+  `SelectionManager`, `project_selection` writes the flags into the rows and
+  Slint's per-row notification re-renders. A missed projection is a stale
+  highlight, so keep one projection function with enumerable callers.
+- **Timing**: intents must be applied *synchronously* inside the callback — the
+  library's click/drag logic reads back the resulting `selected` flags in the
+  same event (e.g. `was-selected-on-press`, multi-node drag visuals).
 
 ## Library Helpers
 

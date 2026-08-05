@@ -55,6 +55,7 @@
 //! - [`find_link_at`] - Hit-test links at screen coordinates
 //! - [`GeometryCache`] - Cache node and pin geometry for fast lookups
 //! - [`SelectionManager`] - Manage selection state with O(1) lookups
+//! - [`project_selection`] - Project that selection into per-row model data
 //! - [`GraphLogic`] - Helper for managing node graph state
 //!
 //! ## Limitations
@@ -90,7 +91,7 @@ pub use hit_test::{
 pub use grid::generate_grid_commands;
 pub use path::{generate_bezier_path, generate_partial_bezier_path};
 pub use state::{GeometryCache, StoredPin};
-pub use selection::SelectionManager;
+pub use selection::{project_selection, SelectionManager};
 pub use graph::{
     GraphLogic, LinkModel, MovableNode, SimpleLink,
     // Link validation framework
@@ -146,30 +147,6 @@ macro_rules! wire_node_editor {
             $crate::generate_bezier_path(start_x, start_y, end_x, end_y, zoom, bezier_offset).into()
         });
 
-        let ctrl = $setup.controller().clone();
-        computations.on_compute_box_selection(move |x, y, w, h| {
-            let ids = ctrl.cache().borrow().nodes_in_selection_box(x, y, w, h);
-            ids.as_slice().into()
-        });
-
-        // Selection state tracking
-        let selection_set = $setup.selection();
-
-        let sm_check = selection_set.clone();
-        computations.on_is_node_selected(move |id, _version| sm_check.borrow().contains(&id));
-
-        let sm_update = selection_set.clone();
-        computations.on_sync_selection_to_nodes(move |ids_model| {
-            use slint::Model;
-            let mut set = sm_update.borrow_mut();
-            set.clear();
-            for i in 0..ids_model.row_count() {
-                if let Some(id) = ids_model.row_data(i) {
-                    set.insert(id);
-                }
-            }
-        });
-
         // Auto grid updates
         let ctrl = $setup.controller().clone();
         let w = $window.as_weak();
@@ -186,5 +163,87 @@ macro_rules! wire_node_editor {
         if let Some(w) = w.upgrade() {
             w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
         }
+    }};
+}
+
+/// Wire the editor's selection intents to an application-owned selection.
+///
+/// The editor holds no selection state: it reports gestures (`node-selected`,
+/// `selection-cleared`, `box-selection-committed`) and renders whatever
+/// `selected` flag it finds on the node rows. This macro closes that loop for
+/// the common case — one node model whose rows have `id` and `selected` fields:
+/// it applies each gesture to `$selection` and projects the result back into
+/// `$nodes`.
+///
+/// Applications with several node models, link selection, or non-standard
+/// gesture semantics wire the three callbacks themselves (see the `advanced`
+/// example) — the pieces are [`SelectionManager`] and [`project_selection`].
+///
+/// # Example
+///
+/// ```ignore
+/// let selection = Rc::new(RefCell::new(SelectionManager::new()));
+/// let setup = NodeEditorSetup::new(|id, dx, dy| { /* … */ })
+///     .with_selection(selection.clone());
+///
+/// wire_node_editor!(window, setup);
+/// wire_node_selection!(window, setup, selection, nodes);
+/// ```
+#[macro_export]
+macro_rules! wire_node_selection {
+    ($window:expr, $setup:expr, $selection:expr, $nodes:expr) => {{
+        // Every selection write goes through here — a missed projection is a
+        // stale highlight.
+        let project: std::rc::Rc<dyn Fn()> = {
+            let nodes = $nodes.clone();
+            let selection = $selection.clone();
+            std::rc::Rc::new(move || {
+                let selection = selection.borrow();
+                $crate::project_selection(
+                    &nodes,
+                    |node| selection.contains(node.id),
+                    |node| node.selected,
+                    |node, selected| node.selected = selected,
+                );
+            })
+        };
+
+        $window.on_node_selected({
+            let selection = $selection.clone();
+            let project = project.clone();
+            move |node_id, shift_held| {
+                selection
+                    .borrow_mut()
+                    .handle_interaction(node_id, shift_held);
+                project();
+            }
+        });
+
+        $window.on_selection_cleared({
+            let selection = $selection.clone();
+            let project = project.clone();
+            move || {
+                selection.borrow_mut().clear();
+                project();
+            }
+        });
+
+        $window.on_box_selection_committed({
+            let selection = $selection.clone();
+            let ctrl = $setup.controller().clone();
+            let project = project.clone();
+            move |x, y, w, h, shift_held| {
+                let hits = ctrl.cache().borrow().nodes_in_selection_box(x, y, w, h);
+                {
+                    let mut selection = selection.borrow_mut();
+                    if shift_held {
+                        selection.extend_selection(hits);
+                    } else {
+                        selection.replace_selection(hits);
+                    }
+                }
+                project();
+            }
+        });
     }};
 }

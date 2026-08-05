@@ -11,7 +11,7 @@ use slint::{
     Color, ComponentHandle, LogicalPosition, Model, ModelRc, SharedString, VecModel,
 };
 use slint_node_editor::{
-    wire_node_editor, NodeEditorController, NodeEditorSetup, SelectionManager,
+    wire_node_editor, wire_node_selection, NodeEditorController, NodeEditorSetup, SelectionManager,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -58,12 +58,14 @@ impl MinimalTestHarness {
                     title: SharedString::from("Node A"),
                     x: 100.0,
                     y: 100.0,
+                    selected: false,
                 },
                 NodeData {
                     id: 2,
                     title: SharedString::from("Node B"),
                     x: 400.0,
                     y: 200.0,
+                    selected: false,
                 },
             ],
             vec![LinkData {
@@ -73,6 +75,7 @@ impl MinimalTestHarness {
                 color: Color::from_argb_u8(255, 100, 180, 255),
                 line_width: 2.0,
                 status: -1,
+                selected: false,
             }],
         )
     }
@@ -108,8 +111,10 @@ impl MinimalTestHarness {
                     }
                 }
             }
-        });
+        })
+        .with_selection(selection.clone());
         wire_node_editor!(window, setup);
+        wire_node_selection!(window, setup, selection, nodes);
 
         // Layer tracking on top of the macro-wired callbacks.
         // We re-wire globals callbacks to add tracking, forwarding to the controller.
@@ -208,14 +213,6 @@ impl MinimalTestHarness {
             }
         });
 
-        // Selection changed callback
-        window.on_selection_changed({
-            let tracker = tracker.clone();
-            move || {
-                *tracker.selection_changed.borrow_mut() += 1;
-            }
-        });
-
         // Context menu requested callback
         window.on_context_menu_requested({
             let tracker = tracker.clone();
@@ -223,52 +220,6 @@ impl MinimalTestHarness {
                 *tracker.context_menu_requested.borrow_mut() += 1;
             }
         });
-
-        // Selection notifications — shift-select is handled by app, non-shift by NodeEditor
-        window.on_node_selected({
-            let selection = selection.clone();
-            let w = w.clone();
-            move |node_id, shift_held| {
-                if shift_held {
-                    let mut sel = selection.borrow_mut();
-                    sel.handle_interaction(node_id, true);
-                    if let Some(w) = w.upgrade() {
-                        let ids: Vec<i32> = sel.iter().cloned().collect();
-                        w.set_selected_node_ids(ModelRc::from(Rc::new(VecModel::from(ids))));
-                        w.set_selection_version(w.get_selection_version() + 1);
-                    }
-                }
-                // Non-shift: synced via sync-selection-to-nodes callback
-            }
-        });
-
-        window.on_selection_cleared(move || {
-            // NodeEditor already cleared selection and synced via globals
-        });
-
-        // Override is-node-selected and sync-selection-to-nodes to use our SelectionManager
-        // (overrides the defaults wired by wire_node_editor!)
-        window
-            .global::<NodeEditorComputations>()
-            .on_is_node_selected({
-                let selection = selection.clone();
-                move |node_id, _version| selection.borrow().contains(node_id)
-            });
-
-        window
-            .global::<NodeEditorComputations>()
-            .on_sync_selection_to_nodes({
-                let selection = selection.clone();
-                move |ids: ModelRc<i32>| {
-                    let mut sel = selection.borrow_mut();
-                    sel.clear();
-                    for i in 0..ids.row_count() {
-                        if let Some(id) = ids.row_data(i) {
-                            sel.handle_interaction(id, true);
-                        }
-                    }
-                }
-            });
 
         // Compute callbacks — link-at needs the links model for hit testing
         window.on_compute_link_at({

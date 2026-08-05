@@ -1,10 +1,11 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    sugiyama_layout, wire_node_editor, Direction, NodeEditorSetup, SugiyamaConfig,
+    sugiyama_layout, wire_node_editor, wire_node_selection, Direction, NodeEditorSetup,
+    SelectionManager, SugiyamaConfig,
 };
 
 slint::include_modules!();
@@ -44,48 +45,56 @@ fn main() {
             title: SharedString::from("Input"),
             x: 50.0,
             y: 50.0,
+            selected: false,
         },
         NodeData {
             id: 2,
             title: SharedString::from("Parse"),
             x: 50.0,
             y: 120.0,
+            selected: false,
         },
         NodeData {
             id: 3,
             title: SharedString::from("Validate"),
             x: 50.0,
             y: 190.0,
+            selected: false,
         },
         NodeData {
             id: 4,
             title: SharedString::from("Transform"),
             x: 50.0,
             y: 260.0,
+            selected: false,
         },
         NodeData {
             id: 5,
             title: SharedString::from("Filter"),
             x: 50.0,
             y: 330.0,
+            selected: false,
         },
         NodeData {
             id: 6,
             title: SharedString::from("Merge"),
             x: 50.0,
             y: 400.0,
+            selected: false,
         },
         NodeData {
             id: 7,
             title: SharedString::from("Format"),
             x: 50.0,
             y: 470.0,
+            selected: false,
         },
         NodeData {
             id: 8,
             title: SharedString::from("Output"),
             x: 50.0,
             y: 540.0,
+            selected: false,
         },
     ]));
     window.set_nodes(ModelRc::from(nodes.clone()));
@@ -117,6 +126,7 @@ fn main() {
             color: link_color,
             line_width: 2.0,
             status: -1,
+            selected: false,
         })
         .collect();
     window.set_links(ModelRc::from(Rc::new(VecModel::from(link_data))));
@@ -204,6 +214,8 @@ fn main() {
         }
     });
 
+    let selection = Rc::new(RefCell::new(SelectionManager::new()));
+
     // Create setup with model update logic
     let setup = NodeEditorSetup::new({
         let nodes = nodes.clone();
@@ -219,10 +231,12 @@ fn main() {
                 }
             }
         }
-    });
+    })
+    .with_selection(selection.clone());
 
     // Wire all callbacks with one macro call
     wire_node_editor!(window, setup);
+    wire_node_selection!(window, setup, selection, nodes);
 
     window.run().unwrap();
 }

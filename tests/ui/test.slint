@@ -18,6 +18,8 @@ export struct NodeData {
     title: string,
     x: float,
     y: float,
+    /// Projected from the application's selection (the editor holds none)
+    selected: bool,
 }
 
 // Re-export for Rust
@@ -79,10 +81,6 @@ export component MainWindow inherits Window {
     out property <float> width_: self.width / 1px;
     out property <float> height_: self.height / 1px;
 
-    // Selection state (exposed for tests)
-    in-out property <[int]> selected-node-ids <=> editor.selected-node-ids;
-    in-out property <[int]> selected-link-ids <=> editor.selected-link-ids;
-    in-out property <int> selection-version <=> editor.selection-version;
     in-out property <length> pan-x <=> editor.pan-x;
     in-out property <length> pan-y <=> editor.pan-y;
     in property <int> geometry-version: GeometryVersion.version;
@@ -95,19 +93,17 @@ export component MainWindow inherits Window {
     // Additional callbacks for testing
     callback link-requested <=> editor.link-requested;
     callback link-cancelled <=> editor.link-cancelled;
-    callback selection-changed <=> editor.selection-changed;
     callback context-menu-requested <=> editor.context-menu-requested;
 
-    // Selection callbacks (node-selected and selection-cleared are notifications)
+    // Selection intents — pure gesture reports, applied application-side
     callback node-selected <=> editor.node-selected;
     callback select-link <=> editor.select-link;
     callback selection-cleared <=> editor.selection-cleared;
-    callback sync-selection-to-links <=> editor.sync-selection-to-links;
+    callback box-selection-committed <=> editor.box-selection-committed;
 
     // Compute callbacks (tests use globals instead of these)
     callback compute-pin-at <=> editor.compute-pin-at;
     callback compute-link-at <=> editor.compute-link-at;
-    callback compute-link-box-selection <=> editor.compute-link-box-selection;
 
     // Function to refresh links after geometry is reported
     public function refresh-links() {
@@ -125,6 +121,7 @@ export component MainWindow inherits Window {
             world-y: data.y * 1px;
             viewport-width: editor.width;
             viewport-height: editor.height;
+            selected: data.selected;
         }
     }
 }

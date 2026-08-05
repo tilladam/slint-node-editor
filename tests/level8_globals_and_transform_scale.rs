@@ -8,7 +8,7 @@ mod common;
 
 use common::harness::MinimalTestHarness;
 use slint_node_editor::{
-    GeometryCache, NodeEditorSetup, SimpleNodeGeometry,
+    GeometryCache, NodeEditorSetup, SelectionManager, SimpleNodeGeometry,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -57,18 +57,15 @@ fn test_setup_multi_node_drag_moves_all_selected() {
     let moved: Rc<RefCell<Vec<(i32, f32, f32)>>> = Rc::new(RefCell::new(Vec::new()));
     let moved_clone = moved.clone();
 
+    // Nodes 1, 2, 3 are selected — selection is the application's, the setup
+    // just gets a handle to it
+    let selection = Rc::new(RefCell::new(SelectionManager::new()));
+    selection.borrow_mut().replace_selection(vec![1, 2, 3]);
+
     let setup = NodeEditorSetup::new(move |id, dx, dy| {
         moved_clone.borrow_mut().push((id, dx, dy));
-    });
-
-    // Add nodes 1, 2, 3 to selection
-    {
-        let sel_rc = setup.selection();
-        let mut sel = sel_rc.borrow_mut();
-        sel.insert(1);
-        sel.insert(2);
-        sel.insert(3);
-    }
+    })
+    .with_selection(selection);
 
     // Drag node 2 (which is in the selection)
     let start = setup.start_node_drag();
@@ -96,17 +93,14 @@ fn test_setup_drag_unselected_node_moves_only_that_node() {
     let moved: Rc<RefCell<Vec<(i32, f32, f32)>>> = Rc::new(RefCell::new(Vec::new()));
     let moved_clone = moved.clone();
 
+    // Select nodes 1 and 2
+    let selection = Rc::new(RefCell::new(SelectionManager::new()));
+    selection.borrow_mut().replace_selection(vec![1, 2]);
+
     let setup = NodeEditorSetup::new(move |id, dx, dy| {
         moved_clone.borrow_mut().push((id, dx, dy));
-    });
-
-    // Select nodes 1 and 2
-    {
-        let sel_rc = setup.selection();
-        let mut sel = sel_rc.borrow_mut();
-        sel.insert(1);
-        sel.insert(2);
-    }
+    })
+    .with_selection(selection);
 
     // Drag node 5 (NOT in selection)
     let start = setup.start_node_drag();
@@ -126,16 +120,14 @@ fn test_setup_single_selected_node_drag_moves_only_that_node() {
     let moved: Rc<RefCell<Vec<(i32, f32, f32)>>> = Rc::new(RefCell::new(Vec::new()));
     let moved_clone = moved.clone();
 
+    // Select only node 1
+    let selection = Rc::new(RefCell::new(SelectionManager::new()));
+    selection.borrow_mut().replace_selection(vec![1]);
+
     let setup = NodeEditorSetup::new(move |id, dx, dy| {
         moved_clone.borrow_mut().push((id, dx, dy));
-    });
-
-    // Select only node 1
-    {
-        let sel_rc = setup.selection();
-        let mut sel = sel_rc.borrow_mut();
-        sel.insert(1);
-    }
+    })
+    .with_selection(selection);
 
     // Drag node 1 (single selection, not multi)
     let start = setup.start_node_drag();

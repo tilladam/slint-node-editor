@@ -149,13 +149,14 @@ export component NodeEditor inherits FocusScope {
     in property <[LinkData]> links: [];
 
     // === Selection state ===
+    // The editor holds NO selection state: `selected` is per-row data on the
+    // application's node/link models, and every gesture below is a pure intent.
+    // Only the marquee rectangle — a transient gesture overlay — lives here.
     out property <bool> is-selecting: root.internal-is-box-selecting;
     out property <length> selection-x: min(root.box-start-x, root.box-current-x);
     out property <length> selection-y: min(root.box-start-y, root.box-current-y);
     out property <length> selection-width: abs(root.box-current-x - root.box-start-x);
     out property <length> selection-height: abs(root.box-current-y - root.box-start-y);
-    in-out property <[int]> selected-node-ids: [];
-    in-out property <[int]> selected-link-ids: [];
 
     // === Link creation state ===
     out property <bool> is-creating-link: root.internal-is-creating-link;
@@ -261,33 +262,32 @@ export component NodeEditor inherits FocusScope {
     /// Compute link at position (world coordinates), returns link ID or -1
     callback compute-link-at(/* x */ length, /* y */ length) -> int;
 
-    /// Compute nodes in selection box (world coordinates), returns array of IDs
-    callback compute-box-selection(/* x */ length, /* y */ length, /* w */ length, /* h */ length) -> [int];
+    // === Selection intents (the application owns the selection) ===
+    // Each of these reports a gesture; none of them changes any state here.
+    // Apply them synchronously — the gesture logic below reads back the
+    // resulting `selected` flags within the same event.
 
-    /// Compute links in selection box (world coordinates), returns array of IDs
-    callback compute-link-box-selection(/* x */ length, /* y */ length, /* w */ length, /* h */ length) -> [int];
-
-    /// Select a link (called on click). Rust handles the selection logic.
-    callback select-link(/* link-id */ int, /* shift-held */ bool);
-
-    /// Sync selection IDs to node data (called after box selection)
-    callback sync-selection-to-nodes([int]);
-
-    /// Notification callback when node selection changes (for application tracking)
+    /// A node was clicked (or dragged from unselected). Click-replace semantics
+    /// unless `shift-held`, in which case the node toggles.
     callback node-selected(/* node-id */ int, /* shift-held */ bool);
 
-    /// Notification callback when selection is cleared (for application tracking)
+    /// A link was clicked. Same semantics as `node-selected`.
+    callback select-link(/* link-id */ int, /* shift-held */ bool);
+
+    /// The background was clicked: the whole selection should be dropped.
     callback selection-cleared();
 
-    /// Sync selection IDs to link data (called after box selection)
-    callback sync-selection-to-links([int]);
+    /// A marquee was released over the given world-coordinate rectangle.
+    /// The application hit-tests it (`nodes_in_selection_box` /
+    /// `links_in_selection_box`) and selects what it finds — extending the
+    /// existing selection when `shift-held`, replacing it otherwise.
+    callback box-selection-committed(/* x */ length, /* y */ length, /* w */ length, /* h */ length, /* shift-held */ bool);
 
     // === Callbacks TO Application (events) ===
     callback link-requested(/* start-pin */ int, /* end-pin */ int);
     callback link-dropped(/* start-pin */ int, /* world-x */ float, /* world-y */ float);
     callback link-cancelled();
     callback link-hovered();
-    callback selection-changed();
     callback context-menu-requested();
     callback context-menu-dragged(/* x */ length, /* y */ length);
     callback context-menu-released(/* x */ length, /* y */ length);
@@ -301,11 +301,6 @@ export component NodeEditor inherits FocusScope {
     /// Pin position reporting (for application-side tracking)
     /// Note: node-id and pin-type are passed explicitly so the library doesn't prescribe any pin ID encoding scheme
     callback pin-position-changed(/* pin-id */ int, /* node-id */ int, /* pin-type */ int, /* rel-x */ length, /* rel-y */ length);
-
-    // === Selection version counter (for dependency tracking) ===
-    // This counter is incremented whenever selection changes, allowing bindings
-    // that reference it to be re-evaluated when selection changes.
-    in-out property <int> selection-version: 0;
 
     // === Geometry version counter (for link path invalidation) ===
     // Increment this when node/pin positions change to force link path recomputation.
@@ -414,35 +409,14 @@ export component NodeEditor inherits FocusScope {
             (mouse-y - root.pan-y) / root.zoom / 1px);
     }
 
-    /// Handle link click selection - delegates to Rust via callback
-    function handle-link-click(link-id: int, shift-held: bool) {
-        root.select-link(link-id, shift-held);
-    }
-
-    /// Select a node by ID. If shift-held is false, clears existing selection first.
-    /// For shift-select (adding to selection), the application must handle via node-selected callback.
+    /// Report a click on a node. The application resolves the gesture against
+    /// its own selection state; nothing is decided here.
     public function select-node(node-id: int, shift-held: bool) {
-        if !shift-held {
-            // Simple single-node selection: clear and set to this node
-            root.selected-node-ids = [node-id];
-            root.selected-link-ids = [];
-            NodeEditorComputations.sync-selection-to-nodes(root.selected-node-ids);
-            root.sync-selection-to-links([]);
-            root.selection-version += 1;
-            root.selection-changed();
-        }
-        // Notify application (for shift-select, app handles adding to selection)
         root.node-selected(node-id, shift-held);
     }
 
-    /// Clear all selection
+    /// Report that the whole selection should be dropped.
     public function clear-selection() {
-        root.selected-node-ids = [];
-        root.selected-link-ids = [];
-        NodeEditorComputations.sync-selection-to-nodes([]);
-        root.sync-selection-to-links([]);
-        root.selection-version += 1;
-        root.selection-changed();
         root.selection-cleared();
     }
 
@@ -611,6 +585,9 @@ export component NodeEditor inherits FocusScope {
             property <int> link-at-cursor: -1;
             // Whether a box-selection modifier key is currently held
             property <bool> modifier-forces-box-select: false;
+            // Shift state captured at marquee start — the release event that
+            // commits the box carries no modifiers of its own.
+            property <bool> box-select-extends: false;
 
             scroll-event(event) => {
                 // Ctrl (or ⌘ on macOS) + scroll zooms, centered on the mouse — but
@@ -661,13 +638,13 @@ export component NodeEditor inherits FocusScope {
                         if modifier-forces-box-select || (root.box-selection-on-empty && link-at-cursor < 0) {
                             // Start box selection
                             root.internal-is-box-selecting = true;
+                            box-select-extends = event.modifiers.shift;
                             root.box-start-x = self.mouse-x;
                             root.box-start-y = self.mouse-y;
                             root.box-current-x = self.mouse-x;
                             root.box-current-y = self.mouse-y;
                             // Clear existing selection unless shift held
                             if !event.modifiers.shift {
-                                root.selected-link-ids = [];
                                 root.clear-selection();
                             }
                         } else if link-at-cursor >= 0 {
@@ -691,22 +668,14 @@ export component NodeEditor inherits FocusScope {
                     }
                     if root.internal-is-box-selecting && event.button == PointerEventButton.left {
                         root.internal-is-box-selecting = false;
-                        // Convert selection box from screen to world coordinates for node hit testing
-                        // For nodes: world = (screen - pan) / zoom
-                        root.selected-node-ids = NodeEditorComputations.compute-box-selection(
-                            (root.selection-x - root.pan-x) / root.zoom / 1px,
-                            (root.selection-y - root.pan-y) / root.zoom / 1px,
-                            root.selection-width / root.zoom / 1px,
-                            root.selection-height / root.zoom / 1px);
-                        root.selected-link-ids = root.compute-link-box-selection(
+                        // Report the marquee in world coordinates (world = (screen - pan) / zoom);
+                        // the application hit-tests it and owns what gets selected.
+                        root.box-selection-committed(
                             (root.selection-x - root.pan-x) / root.zoom,
                             (root.selection-y - root.pan-y) / root.zoom,
                             root.selection-width / root.zoom,
-                            root.selection-height / root.zoom);
-                        NodeEditorComputations.sync-selection-to-nodes(root.selected-node-ids);
-                        root.sync-selection-to-links(root.selected-link-ids);
-                        root.selection-version += 1;
-                        root.selection-changed();
+                            root.selection-height / root.zoom,
+                            box-select-extends);
                     }
                     if root.internal-is-creating-link && event.button == PointerEventButton.left {
                         root.complete-link-creation();
@@ -786,7 +755,7 @@ export component NodeEditor inherits FocusScope {
                       : link.status == LinkStatus.idle ? LinkStatusColors.idle
                       : link.color;  // status < 0 (LinkStatus.none): use explicit color
             line-width: link.line-width > 0 ? link.line-width * 1px : 2px;
-            selected: NodeEditorComputations.is-link-selected(link.id, root.selection-version);
+            selected: link.selected;
             hovered: root.hovered-link-id == link.id;
         }
 

@@ -29,6 +29,8 @@ export struct FilterNodeData {
     filter-type-index: int,
     enabled: bool,
     processed-count: int,
+    /// Selection lives in the application; it projects the flag into this row.
+    selected: bool,
 }
 
 // Filter node control pin

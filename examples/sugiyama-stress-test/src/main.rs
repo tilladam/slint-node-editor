@@ -1,13 +1,14 @@
 //! Stress test: 2500 nodes (50x50 grid) with ~4900 edges.
 //! Run with: cargo run -p sugiyama-stress-test
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    sugiyama_layout, wire_node_editor, Direction, NodeEditorSetup, SugiyamaConfig,
+    sugiyama_layout, wire_node_editor, wire_node_selection, Direction, NodeEditorSetup,
+    SelectionManager, SugiyamaConfig,
 };
 
 slint::include_modules!();
@@ -42,6 +43,7 @@ fn main() {
                 title: SharedString::from(format!("{},{}", row, col)),
                 x: (col * 140) as f32 + 50.0,
                 y: (row * 80) as f32 + 50.0,
+                selected: false,
             });
         }
     }
@@ -73,6 +75,7 @@ fn main() {
             color: link_color,
             line_width: 2.0,
             status: -1,
+            selected: false,
         })
         .collect();
     window.set_links(ModelRc::from(Rc::new(VecModel::from(link_data))));
@@ -157,6 +160,8 @@ fn main() {
         }
     });
 
+    let selection = Rc::new(RefCell::new(SelectionManager::new()));
+
     let setup = NodeEditorSetup::new({
         let nodes = nodes.clone();
         move |node_id, delta_x, delta_y| {
@@ -171,8 +176,10 @@ fn main() {
                 }
             }
         }
-    });
+    })
+    .with_selection(selection.clone());
 
     wire_node_editor!(window, setup);
+    wire_node_selection!(window, setup, selection, nodes);
     window.run().unwrap();
 }

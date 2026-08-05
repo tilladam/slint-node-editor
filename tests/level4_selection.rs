@@ -6,7 +6,7 @@
 mod common;
 
 use common::harness::MinimalTestHarness;
-use slint::{Model, SharedString};
+use slint::SharedString;
 
 /// Helper to set up geometry in the cache for testing.
 fn setup_test_geometry(harness: &MinimalTestHarness) {
@@ -264,45 +264,83 @@ fn test_replace_selection_for_box() {
 }
 
 // ============================================================================
-// Selection Manager Sync Tests
+// Intent → SSOT → model-row projection
+//
+// The editor reports gestures and renders the `selected` flag it finds on the
+// rows; these drive the intents and assert the rows followed.
 // ============================================================================
 
 #[test]
-fn test_sync_to_model() {
-    use slint::VecModel;
-    use std::rc::Rc;
-
+fn test_node_selected_intent_marks_the_row() {
     let harness = MinimalTestHarness::new();
 
-    let sel = harness.selection.borrow_mut();
-    drop(sel);
+    harness.window.invoke_node_selected(1, false);
 
-    harness.selection.borrow_mut().replace_selection(vec![1, 2]);
-
-    let model = Rc::new(VecModel::<i32>::default());
-    harness.selection.borrow().sync_to_model(&model);
-
-    assert_eq!(model.row_count(), 2);
+    assert!(harness.selection.borrow().contains(1));
+    assert!(harness.node_data(1).unwrap().selected, "row 1 selected");
+    assert!(!harness.node_data(2).unwrap().selected, "row 2 untouched");
 }
 
 #[test]
-fn test_sync_from_model() {
-    use slint::VecModel;
-    use std::rc::Rc;
-
+fn test_shift_intent_extends_then_toggles_the_rows() {
     let harness = MinimalTestHarness::new();
 
-    let model = Rc::new(VecModel::from(vec![3, 4, 5]));
+    harness.window.invoke_node_selected(1, false);
+    harness.window.invoke_node_selected(2, true);
+
+    assert!(harness.node_data(1).unwrap().selected);
+    assert!(harness.node_data(2).unwrap().selected);
+
+    // Shift on an already-selected node toggles it back off
+    harness.window.invoke_node_selected(1, true);
+
+    assert!(!harness.node_data(1).unwrap().selected);
+    assert!(harness.node_data(2).unwrap().selected);
+}
+
+#[test]
+fn test_selection_cleared_intent_clears_the_rows() {
+    let harness = MinimalTestHarness::new();
+
+    harness.window.invoke_node_selected(1, false);
+    harness.window.invoke_node_selected(2, true);
+
+    harness.window.invoke_selection_cleared();
+
+    assert!(harness.selection.borrow().is_empty());
+    assert!(!harness.node_data(1).unwrap().selected);
+    assert!(!harness.node_data(2).unwrap().selected);
+}
+
+#[test]
+fn test_box_commit_replaces_the_selection() {
+    let harness = MinimalTestHarness::new();
+    setup_test_geometry(&harness);
+
+    harness.window.invoke_node_selected(2, false);
+
+    // A marquee over node 1 only — without shift it replaces node 2's selection
+    harness
+        .window
+        .invoke_box_selection_committed(50.0, 50.0, 200.0, 200.0, false);
+
+    assert!(harness.node_data(1).unwrap().selected);
+    assert!(!harness.node_data(2).unwrap().selected);
+}
+
+#[test]
+fn test_box_commit_with_shift_extends_the_selection() {
+    let harness = MinimalTestHarness::new();
+    setup_test_geometry(&harness);
+
+    harness.window.invoke_node_selected(2, false);
 
     harness
-        .selection
-        .borrow_mut()
-        .sync_from_model(model.as_ref());
+        .window
+        .invoke_box_selection_committed(50.0, 50.0, 200.0, 200.0, true);
 
-    assert!(harness.selection.borrow().contains(3));
-    assert!(harness.selection.borrow().contains(4));
-    assert!(harness.selection.borrow().contains(5));
-    assert_eq!(harness.selection.borrow().len(), 3);
+    assert!(harness.node_data(1).unwrap().selected);
+    assert!(harness.node_data(2).unwrap().selected, "kept by shift");
 }
 
 // ============================================================================
@@ -372,6 +410,7 @@ fn test_selection_with_many_nodes() {
             title: SharedString::from(format!("Node {}", i)),
             x: (i as f32) * 150.0,
             y: 100.0,
+            selected: false,
         })
         .collect();
 
@@ -394,18 +433,3 @@ fn test_selection_with_many_nodes() {
     assert!(sel.contains(3));
 }
 
-// ============================================================================
-// Selection Changed Callback Tests
-// ============================================================================
-
-#[test]
-fn test_selection_changed_callback_tracking() {
-    let harness = MinimalTestHarness::new();
-
-    assert_eq!(*harness.tracker.selection_changed.borrow(), 0);
-
-    // Simulate selection changed being called
-    *harness.tracker.selection_changed.borrow_mut() += 1;
-
-    assert_eq!(*harness.tracker.selection_changed.borrow(), 1);
-}

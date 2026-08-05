@@ -68,18 +68,21 @@ fn test_delete_removes_selected_nodes_from_model() {
                 title: SharedString::from("A"),
                 x: 100.0,
                 y: 100.0,
+                selected: false,
             },
             NodeData {
                 id: 2,
                 title: SharedString::from("B"),
                 x: 400.0,
                 y: 200.0,
+                selected: false,
             },
             NodeData {
                 id: 3,
                 title: SharedString::from("C"),
                 x: 700.0,
                 y: 100.0,
+                selected: false,
             },
         ],
         vec![],
@@ -125,12 +128,14 @@ fn test_delete_removes_selected_links_from_model() {
                 title: SharedString::from("A"),
                 x: 100.0,
                 y: 100.0,
+                selected: false,
             },
             common::harness::NodeData {
                 id: 2,
                 title: SharedString::from("B"),
                 x: 400.0,
                 y: 200.0,
+                selected: false,
             },
         ],
         vec![
@@ -141,6 +146,7 @@ fn test_delete_removes_selected_links_from_model() {
                 color: Color::from_argb_u8(255, 100, 180, 255),
                 line_width: 2.0,
                 status: -1,
+                selected: false,
             },
             LinkData {
                 id: 2,
@@ -149,6 +155,7 @@ fn test_delete_removes_selected_links_from_model() {
                 color: Color::from_argb_u8(255, 255, 100, 100),
                 line_width: 2.0,
                 status: -1,
+                selected: false,
             },
         ],
     );
@@ -186,12 +193,14 @@ fn test_deleting_node_should_also_remove_connected_links() {
                 title: SharedString::from("A"),
                 x: 100.0,
                 y: 100.0,
+                selected: false,
             },
             NodeData {
                 id: 2,
                 title: SharedString::from("B"),
                 x: 400.0,
                 y: 200.0,
+                selected: false,
             },
         ],
         vec![LinkData {
@@ -201,6 +210,7 @@ fn test_deleting_node_should_also_remove_connected_links() {
             color: Color::from_argb_u8(255, 100, 180, 255),
             line_width: 2.0,
             status: -1,
+            selected: false,
         }],
     );
 
@@ -273,18 +283,21 @@ fn test_delete_multiple_selected_nodes() {
                 title: SharedString::from("A"),
                 x: 100.0,
                 y: 100.0,
+                selected: false,
             },
             NodeData {
                 id: 2,
                 title: SharedString::from("B"),
                 x: 400.0,
                 y: 200.0,
+                selected: false,
             },
             NodeData {
                 id: 3,
                 title: SharedString::from("C"),
                 x: 700.0,
                 y: 100.0,
+                selected: false,
             },
         ],
         vec![],

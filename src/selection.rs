@@ -1,6 +1,37 @@
 use std::collections::HashSet;
 use slint::{VecModel, Model};
 
+/// Project a selection into a model's per-row `selected` flag.
+///
+/// The editor holds no selection state — rendering reads `selected` as model
+/// data — so every write to the application's selection must be followed by a
+/// projection into the rows. Only rows whose flag actually changes are written
+/// back, so untouched rows don't re-render.
+///
+/// ```ignore
+/// project_selection(
+///     &nodes,
+///     |n| selection.contains(n.id),   // wanted
+///     |n| n.selected,                 // current
+///     |n, v| n.selected = v);         // apply
+/// ```
+pub fn project_selection<T: Clone + 'static>(
+    model: &VecModel<T>,
+    wanted: impl Fn(&T) -> bool,
+    current: impl Fn(&T) -> bool,
+    mut apply: impl FnMut(&mut T, bool),
+) {
+    for i in 0..model.row_count() {
+        let Some(row) = model.row_data(i) else { continue };
+        let want = wanted(&row);
+        if current(&row) != want {
+            let mut row = row;
+            apply(&mut row, want);
+            model.set_row_data(i, row);
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct SelectionManager {
     selected: HashSet<i32>,
@@ -44,6 +75,17 @@ impl SelectionManager {
         self.selected.extend(ids);
     }
 
+    /// Add a set of IDs to the current selection, leaving the rest in place
+    ///
+    /// Box selection with shift held; unlike [`Self::handle_interaction`] an
+    /// already-selected ID stays selected instead of toggling off.
+    pub fn extend_selection<I>(&mut self, ids: I)
+    where
+        I: IntoIterator<Item = i32>,
+    {
+        self.selected.extend(ids);
+    }
+
     /// Check if an ID is selected
     pub fn contains(&self, id: i32) -> bool {
         self.selected.contains(&id)
@@ -52,27 +94,6 @@ impl SelectionManager {
     /// Get an iterator over the selected IDs
     pub fn iter(&self) -> std::collections::hash_set::Iter<'_, i32> {
         self.selected.iter()
-    }
-
-    /// Sync the internal selection set to a Slint VecModel
-    pub fn sync_to_model(&self, model: &VecModel<i32>) {
-        // Clear by removing from the back to avoid O(n²) shifting
-        while model.row_count() > 0 {
-            model.remove(model.row_count() - 1);
-        }
-        for &id in &self.selected {
-            model.push(id);
-        }
-    }
-
-    /// Sync the internal selection set from any Slint Model (e.g. after box selection)
-    pub fn sync_from_model(&mut self, model: &dyn Model<Data = i32>) {
-        self.selected.clear();
-        for i in 0..model.row_count() {
-            if let Some(id) = model.row_data(i) {
-                self.selected.insert(id);
-            }
-        }
     }
 
     /// Get the number of selected items
@@ -294,6 +315,20 @@ mod tests {
     }
 
     #[test]
+    fn test_extend_selection_keeps_previous_and_reselects() {
+        let mut selection = SelectionManager::new();
+        selection.replace_selection(vec![1, 2]);
+
+        selection.extend_selection(vec![2, 3]);
+
+        assert_eq!(selection.len(), 3);
+        assert!(selection.contains(1));
+        // Already-selected IDs stay selected — extend never toggles
+        assert!(selection.contains(2));
+        assert!(selection.contains(3));
+    }
+
+    #[test]
     fn test_replace_selection_idempotent() {
         let mut selection = SelectionManager::new();
         selection.replace_selection(vec![1, 2, 3]);
@@ -327,108 +362,86 @@ mod tests {
     }
 
     // ========================================================================
-    // sync_to_model() - Export to VecModel
+    // project_selection() - SSOT → per-row model data
     // ========================================================================
 
-    #[test]
-    fn test_sync_to_model_populates_empty_model() {
-        let mut selection = SelectionManager::new();
-        selection.replace_selection(vec![1, 2, 3]);
+    #[derive(Clone, PartialEq, Debug)]
+    struct Row {
+        id: i32,
+        selected: bool,
+    }
 
-        let model: Rc<VecModel<i32>> = Rc::new(VecModel::default());
-        selection.sync_to_model(&model);
+    fn rows(ids: &[i32]) -> Rc<VecModel<Row>> {
+        Rc::new(VecModel::from(
+            ids.iter()
+                .map(|&id| Row {
+                    id,
+                    selected: false,
+                })
+                .collect::<Vec<_>>(),
+        ))
+    }
 
-        assert_eq!(model.row_count(), 3);
+    fn project(model: &VecModel<Row>, selection: &SelectionManager) {
+        project_selection(
+            model,
+            |r| selection.contains(r.id),
+            |r| r.selected,
+            |r, v| r.selected = v,
+        );
     }
 
     #[test]
-    fn test_sync_to_model_clears_existing_data() {
+    fn test_project_selection_marks_selected_rows() {
+        let mut selection = SelectionManager::new();
+        selection.replace_selection(vec![2]);
+
+        let model = rows(&[1, 2, 3]);
+        project(&model, &selection);
+
+        let flags: Vec<bool> = (0..model.row_count())
+            .filter_map(|i| model.row_data(i))
+            .map(|r| r.selected)
+            .collect();
+        assert_eq!(flags, vec![false, true, false]);
+    }
+
+    #[test]
+    fn test_project_selection_clears_stale_flags() {
         let mut selection = SelectionManager::new();
         selection.replace_selection(vec![1]);
 
-        let model: Rc<VecModel<i32>> = Rc::new(VecModel::from(vec![10, 20, 30]));
-        selection.sync_to_model(&model);
+        let model = rows(&[1, 2]);
+        project(&model, &selection);
 
-        assert_eq!(model.row_count(), 1);
-        // The old values should be gone
-        let values: Vec<i32> = (0..model.row_count())
-            .filter_map(|i| model.row_data(i))
-            .collect();
-        assert!(values.contains(&1));
-        assert!(!values.contains(&10));
+        selection.replace_selection(vec![2]);
+        project(&model, &selection);
+
+        assert!(!model.row_data(0).unwrap().selected);
+        assert!(model.row_data(1).unwrap().selected);
     }
 
     #[test]
-    fn test_sync_to_model_empty_selection() {
-        let selection = SelectionManager::new();
-
-        let model: Rc<VecModel<i32>> = Rc::new(VecModel::from(vec![1, 2, 3]));
-        selection.sync_to_model(&model);
-
-        assert_eq!(model.row_count(), 0);
-    }
-
-    // ========================================================================
-    // sync_from_model() - Import from Model
-    // ========================================================================
-
-    #[test]
-    fn test_sync_from_model_imports_items() {
+    fn test_project_selection_only_writes_changed_rows() {
         let mut selection = SelectionManager::new();
-        let model: Rc<VecModel<i32>> = Rc::new(VecModel::from(vec![1, 2, 3]));
+        selection.replace_selection(vec![1]);
 
-        selection.sync_from_model(model.as_ref());
+        let model = rows(&[1, 2]);
+        project(&model, &selection);
 
-        assert!(selection.contains(1));
-        assert!(selection.contains(2));
-        assert!(selection.contains(3));
-        assert_eq!(selection.len(), 3);
-    }
-
-    #[test]
-    fn test_sync_from_model_clears_existing() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(10, false);
-
-        let model: Rc<VecModel<i32>> = Rc::new(VecModel::from(vec![1, 2]));
-        selection.sync_from_model(model.as_ref());
-
-        assert!(!selection.contains(10));
-        assert!(selection.contains(1));
-        assert!(selection.contains(2));
-    }
-
-    #[test]
-    fn test_sync_from_model_empty_model() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(1, false);
-
-        let model: Rc<VecModel<i32>> = Rc::new(VecModel::default());
-        selection.sync_from_model(model.as_ref());
-
-        assert!(selection.is_empty());
-    }
-
-    // ========================================================================
-    // Round-trip: sync_to_model then sync_from_model
-    // ========================================================================
-
-    #[test]
-    fn test_sync_roundtrip_preserves_selection() {
-        let mut selection1 = SelectionManager::new();
-        selection1.replace_selection(vec![1, 2, 3]);
-
-        let model: Rc<VecModel<i32>> = Rc::new(VecModel::default());
-        selection1.sync_to_model(&model);
-
-        let mut selection2 = SelectionManager::new();
-        selection2.sync_from_model(model.as_ref());
-
-        // Both should have the same items
-        assert!(selection2.contains(1));
-        assert!(selection2.contains(2));
-        assert!(selection2.contains(3));
-        assert_eq!(selection2.len(), 3);
+        // A second projection of the same selection must be a no-op — track it
+        // by counting rows the projection would rewrite.
+        let mut rewritten = 0;
+        project_selection(
+            &model,
+            |r| selection.contains(r.id),
+            |r| r.selected,
+            |r, v| {
+                rewritten += 1;
+                r.selected = v;
+            },
+        );
+        assert_eq!(rewritten, 0);
     }
 
     // ========================================================================

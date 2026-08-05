@@ -135,16 +135,6 @@ export global NodeEditorComputations {
         /* pan-x */ float,
         /* pan-y */ float);
 
-    /// Check if a node is selected
-    pure callback is-node-selected(
-        /* node-id */ int,
-        /* selection-version */ int) -> bool;
-
-    /// Check if a link is selected
-    pure callback is-link-selected(
-        /* link-id */ int,
-        /* selection-version */ int) -> bool;
-
     /// Compute pin ID at screen coordinates (for hit testing)
     pure callback compute-pin-at(
         /* x */ float,
@@ -159,16 +149,6 @@ export global NodeEditorComputations {
         /* end-y */ float,
         /* zoom */ float,
         /* bezier-offset */ float) -> string;
-
-    /// Compute node IDs in selection box (for rubber-band selection)
-    pure callback compute-box-selection(
-        /* x */ float,
-        /* y */ float,
-        /* width */ float,
-        /* height */ float) -> [int];
-
-    /// Sync selection state to Rust (called when selection changes)
-    callback sync-selection-to-nodes(/* node-ids */ [int]);
 }
 
 /// Optional layout helpers for common node structures.
@@ -301,6 +281,9 @@ export struct LinkData {
     start-pin-id: int,
     end-pin-id: int,
     color: color,
+    /// Whether this link is selected — the application owns selection state and
+    /// projects it into this field (the editor never writes it).
+    selected: bool,
     /// Line width in pixels (default: 2.0 if not specified)
     line-width: float,
     /// Computation status (-1 = no status, use color field; >= 0 = use status color).

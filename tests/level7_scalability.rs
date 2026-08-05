@@ -8,7 +8,7 @@
 //! Debug mode is 10-50x slower and timing assertions will be skipped.
 
 use slint_node_editor::{
-    find_link_at, find_pin_at, nodes_in_selection_box,
+    find_link_at, find_pin_at, nodes_in_selection_box, project_selection,
     generate_bezier_path, GeometryCache, GraphLogic, SelectionManager,
     SimpleNodeGeometry, LinkModel,
 };
@@ -108,11 +108,8 @@ mod thresholds {
     /// Maximum time for selection replace with 10K items
     pub const SELECTION_REPLACE_10K: Duration = Duration::from_millis(50);
 
-    /// Maximum time for sync_to_model with 1K items
-    pub const SELECTION_SYNC_TO_1K: Duration = Duration::from_millis(30);
-
-    /// Maximum time for sync_from_model with 1K items
-    pub const SELECTION_SYNC_FROM_1K: Duration = Duration::from_millis(30);
+    /// Maximum time to project a selection into 1K model rows
+    pub const SELECTION_PROJECT_1K: Duration = Duration::from_millis(30);
 
     /// Maximum time for commit_drag with 100 selected of 1K
     pub const COMMIT_DRAG_100_OF_1K: Duration = Duration::from_millis(30);
@@ -547,32 +544,41 @@ fn test_selection_manager_replace_10k() {
 }
 
 #[test]
-fn test_selection_sync_to_model_1k() {
-    let mut selection = SelectionManager::new();
-    selection.replace_selection(0..SCALE_SMALL as i32);
+fn test_selection_project_1k() {
+    #[derive(Clone)]
+    struct Row {
+        id: i32,
+        selected: bool,
+    }
 
-    let model = Rc::new(VecModel::<i32>::default());
+    let mut selection = SelectionManager::new();
+    selection.replace_selection((0..SCALE_SMALL as i32).step_by(2));
+
+    let model = Rc::new(VecModel::from(
+        (0..SCALE_SMALL as i32)
+            .map(|id| Row {
+                id,
+                selected: false,
+            })
+            .collect::<Vec<_>>(),
+    ));
 
     let start = Instant::now();
-    selection.sync_to_model(&model);
+    project_selection(
+        &model,
+        |row| selection.contains(row.id),
+        |row| row.selected,
+        |row, selected| row.selected = selected,
+    );
     let elapsed = start.elapsed();
 
-    assert_eq!(model.row_count(), SCALE_SMALL);
-    assert_timing!(elapsed, thresholds::SELECTION_SYNC_TO_1K, "sync_to_model (1K)");
-}
-
-#[test]
-fn test_selection_sync_from_model_1k() {
-    let mut selection = SelectionManager::new();
-    let ids: Vec<i32> = (0..SCALE_SMALL as i32).collect();
-    let model = Rc::new(VecModel::from(ids));
-
-    let start = Instant::now();
-    selection.sync_from_model(model.as_ref());
-    let elapsed = start.elapsed();
-
-    assert_eq!(selection.len(), SCALE_SMALL);
-    assert_timing!(elapsed, thresholds::SELECTION_SYNC_FROM_1K, "sync_from_model (1K)");
+    assert_eq!(
+        (0..model.row_count())
+            .filter(|&i| model.row_data(i).unwrap().selected)
+            .count(),
+        SCALE_SMALL / 2
+    );
+    assert_timing!(elapsed, thresholds::SELECTION_PROJECT_1K, "project_selection (1K)");
 }
 
 // ============================================================================

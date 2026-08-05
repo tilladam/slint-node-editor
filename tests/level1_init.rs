@@ -79,6 +79,7 @@ fn test_custom_nodes_and_links() {
                 title: SharedString::from("Custom Node"),
                 x: 50.0,
                 y: 75.0,
+                selected: false,
             },
         ],
         vec![],
@@ -108,7 +109,6 @@ fn test_callback_tracker_starts_empty() {
     assert!(harness.tracker.node_drag_ended.borrow().is_empty());
     assert!(harness.tracker.link_requested.borrow().is_empty());
     assert_eq!(*harness.tracker.link_cancelled.borrow(), 0);
-    assert_eq!(*harness.tracker.selection_changed.borrow(), 0);
 }
 
 #[test]

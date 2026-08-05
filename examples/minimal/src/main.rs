@@ -1,5 +1,6 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::{wire_node_editor, NodeEditorSetup};
+use slint_node_editor::{wire_node_editor, wire_node_selection, NodeEditorSetup, SelectionManager};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 slint::include_modules!();
@@ -14,12 +15,14 @@ fn main() {
             title: SharedString::from("Node A"),
             x: 100.0,
             y: 100.0,
+            selected: false,
         },
         NodeData {
             id: 2,
             title: SharedString::from("Node B"),
             x: 400.0,
             y: 200.0,
+            selected: false,
         },
     ]));
     window.set_nodes(ModelRc::from(nodes.clone()));
@@ -32,7 +35,11 @@ fn main() {
         color: Color::from_argb_u8(255, 100, 180, 255),
         line_width: 2.0,
         status: -1,
+        selected: false,
     }]))));
+
+    // Selection is the application's, not the editor's
+    let selection = Rc::new(RefCell::new(SelectionManager::new()));
 
     // Create setup with model update logic
     let setup = NodeEditorSetup::new({
@@ -49,10 +56,12 @@ fn main() {
                 }
             }
         }
-    });
+    })
+    .with_selection(selection.clone());
 
     // Wire all callbacks with one macro call
     wire_node_editor!(window, setup);
+    wire_node_selection!(window, setup, selection, nodes);
 
     window.run().unwrap();
 }
