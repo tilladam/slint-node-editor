@@ -105,8 +105,10 @@ export global NodeEditorInternalCallbacks {
     callback start-node-drag(/* node-id */ int, /* already-selected */ bool, /* world-x */ length, /* world-y */ length);
     /// Update node drag
     callback update-node-drag(/* delta-x */ length, /* delta-y */ length);
-    /// End node drag
-    callback end-node-drag(/* delta-x */ length, /* delta-y */ length);
+    /// End node drag. Carries the dragged node so the commit is self-contained:
+    /// the host moves the dragged node, plus whatever else its rows show as
+    /// selected. Nothing depends on when the press-time selection intent landed.
+    callback end-node-drag(/* node-id */ int, /* delta-x */ length, /* delta-y */ length);
     /// Click on node
     callback click-node(/* node-id */ int, /* shift-held */ bool);
     /// Double-click on node
@@ -649,6 +651,11 @@ export component BaseNode inherits Rectangle {
         property <length> start-abs-x: 0px;
         property <length> start-abs-y: 0px;
         property <bool> was-selected-on-press: false;
+        // Whether this press emitted a selection intent. Together with
+        // was-selected-on-press it answers "is this node selected?" from
+        // press-time facts alone, so the drag never has to read the flag back
+        // and never depends on when the host applied the intent.
+        property <bool> selection-intent-sent: false;
         property <length> current-drag-offset-x: 0px;
         property <length> current-drag-offset-y: 0px;
 
@@ -674,6 +681,7 @@ export component BaseNode inherits Rectangle {
                 current-drag-offset-x = 0px;
                 current-drag-offset-y = 0px;
                 was-selected-on-press = selected;
+                selection-intent-sent = false;
                 press-inert = event.modifiers.control;
 
                 if !press-inert {
@@ -684,6 +692,7 @@ export component BaseNode inherits Rectangle {
                         SelectionRequest.node-id = node-id;
                         SelectionRequest.shift-held = shift-held;
                         SelectionRequest.version += 1;
+                        selection-intent-sent = true;
                     }
                 }
             }
@@ -694,7 +703,7 @@ export component BaseNode inherits Rectangle {
                         root.persistent-offset-x += current-drag-offset-x;
                         root.persistent-offset-y += current-drag-offset-y;
                         // End drag using the tracked offset, not recalculated from mouse position
-                        NodeEditorInternalCallbacks.end-node-drag(current-drag-offset-x, current-drag-offset-y);
+                        NodeEditorInternalCallbacks.end-node-drag(node-id, current-drag-offset-x, current-drag-offset-y);
                         is-dragging = false;
                         current-drag-offset-x = 0px;
                         current-drag-offset-y = 0px;
@@ -729,7 +738,12 @@ export component BaseNode inherits Rectangle {
                 if !is-dragging {
                     if abs(screen-mouse-x - start-abs-x) > drag-threshold || abs(screen-mouse-y - start-abs-y) > drag-threshold {
                         is-dragging = true;
-                        NodeEditorInternalCallbacks.start-node-drag(node-id, selected, world-x, world-y);
+                        // Selected as of this press — either it already was, or
+                        // this press asked for it. Read from the latches, never
+                        // from the live flag: the host may not have applied the
+                        // intent yet, and re-reading would silently re-emit a
+                        // replacing click over a shift-toggle in flight.
+                        NodeEditorInternalCallbacks.start-node-drag(node-id, was-selected-on-press || selection-intent-sent, world-x, world-y);
                         // Set global drag state for multi-node drag
                         DragState.is-dragging = true;
                         DragState.dragged-node-id = node-id;

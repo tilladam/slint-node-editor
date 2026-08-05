@@ -110,7 +110,6 @@ export component NodeEditor inherits FocusScope {
 
     // === Grid properties ===
     in property <length> grid-spacing: 24px;
-    in property <bool> grid-snapping: true;
     in property <color> grid-color: #404040;
     in property <brush> background-color: #1a1a1a;
 
@@ -173,11 +172,9 @@ export component NodeEditor inherits FocusScope {
     out property <length> context-menu-x;
     out property <length> context-menu-y;
 
-    // === Node drag state ===
-    out property <bool> is-dragging: root.internal-is-dragging;
-    out property <int> dragged-node-id: root.internal-dragged-node-id;
-    out property <length> drag-offset-x: root.internal-drag-offset-x;
-    out property <length> drag-offset-y: root.internal-drag-offset-y;
+    // Node drag state is not mirrored here: BaseNode owns the live offset and
+    // reports it straight to the host through NodeEditorInternalCallbacks.
+    // DragState carries what other nodes need to follow a multi-node drag.
 
     // === Hovered link ===
     out property <int> hovered-link-id: -1;
@@ -245,13 +242,6 @@ export component NodeEditor inherits FocusScope {
     property <length> internal-link-end-x;
     property <length> internal-link-end-y;
 
-    property <bool> internal-is-dragging: false;
-    property <int> internal-dragged-node-id: 0;
-    property <length> internal-drag-offset-x: 0px;
-    property <length> internal-drag-offset-y: 0px;
-    property <length> internal-drag-origin-x: 0px;
-    property <length> internal-drag-origin-y: 0px;
-
     // === Callbacks TO Application (for computation) ===
     /// Called when grid needs to be regenerated (on pan/zoom/resize)
     callback request-grid-update();
@@ -292,8 +282,6 @@ export component NodeEditor inherits FocusScope {
     callback context-menu-dragged(/* x */ length, /* y */ length);
     callback context-menu-released(/* x */ length, /* y */ length);
     callback node-double-clicked(/* node-id */ int);
-    callback node-drag-started(/* node-id */ int);
-    callback node-drag-ended(/* delta-x */ float, /* delta-y */ float);
 
     /// Node rectangle reporting (for application-side tracking)
     callback node-rect-changed(/* id */ int, /* x */ length, /* y */ length, /* width */ length, /* height */ length);
@@ -322,13 +310,6 @@ export component NodeEditor inherits FocusScope {
         root.pin-position-changed(pin-id, node-id, pin-type, rel-x, rel-y);
     }
 
-    // === Helper Functions ===
-    pure public function snap-to-grid(value: float) -> float {
-        if (root.grid-spacing > 0px) {
-            return round(value / (root.grid-spacing / 1px)) * (root.grid-spacing / 1px);
-        }
-        return value;
-    }
 
     /// Start link creation from a pin
     public function start-link-from-pin(pin-id: int, x: length, y: length) {
@@ -418,44 +399,6 @@ export component NodeEditor inherits FocusScope {
     /// Report that the whole selection should be dropped.
     public function clear-selection() {
         root.selection-cleared();
-    }
-
-    /// Start node drag
-    public function start-node-drag(node-id: int, already-selected: bool, world-x: length, world-y: length) {
-        if !already-selected {
-            // Select the node when starting to drag an unselected node
-            root.select-node(node-id, false);
-        }
-        root.internal-is-dragging = true;
-        root.internal-dragged-node-id = node-id;
-        root.internal-drag-offset-x = 0px;
-        root.internal-drag-offset-y = 0px;
-        root.internal-drag-origin-x = world-x;
-        root.internal-drag-origin-y = world-y;
-        root.node-drag-started(node-id);
-    }
-
-    /// Update node drag
-    public function update-node-drag(offset-x: length, offset-y: length) {
-        root.internal-drag-offset-x = offset-x;
-        root.internal-drag-offset-y = offset-y;
-    }
-
-    /// End node drag
-    public function end-node-drag(delta-x: length, delta-y: length) {
-        // Call callback FIRST so Rust can update model with correct positions
-        // When grid-snapping, snap the final position (origin + delta) to grid,
-        // then compute the effective delta. This ensures nodes land on grid
-        // intersections regardless of their starting position.
-        root.node-drag-ended(
-            root.grid-snapping ? root.snap-to-grid((root.internal-drag-origin-x + delta-x) / 1px) - root.internal-drag-origin-x / 1px : delta-x / 1px,
-            root.grid-snapping ? root.snap-to-grid((root.internal-drag-origin-y + delta-y) / 1px) - root.internal-drag-origin-y / 1px : delta-y / 1px);
-
-        // THEN reset visual offset (now report-rect will find model already updated)
-        root.internal-is-dragging = false;
-        root.internal-dragged-node-id = 0;
-        root.internal-drag-offset-x = 0px;
-        root.internal-drag-offset-y = 0px;
     }
 
     // === Trigger updates on viewport changes ===

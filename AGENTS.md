@@ -85,15 +85,25 @@ VecModel<LinkData>       // Logical connections
 **Selection State**: the editor holds none — it emits intents (`node-selected`,
 `select-link`, `selection-cleared`, `box-selection-committed`) and renders the
 `selected` field of the rows.
-- **Source of Truth**: the application's `SelectionManager`s (`selection_manager`
-  for nodes, `link_selection_manager` for links).
-- **View Binding**: `selected` is per-row model data; after every write to a
-  `SelectionManager`, `project_selection` writes the flags into the rows and
-  Slint's per-row notification re-renders. A missed projection is a stale
-  highlight, so keep one projection function with enumerable callers.
-- **Timing**: intents must be applied *synchronously* inside the callback — the
-  library's click/drag logic reads back the resulting `selected` flags in the
-  same event (e.g. `was-selected-on-press`, multi-node drag visuals).
+- **Source of Truth**: the model rows themselves. `selected` is per-row data, so
+  a host needs no separate store: read the current set with
+  `selection::selected_rows`, resolve the gesture with `selection::resolve_click`
+  / `resolve_box`, write it back with `selection::project_selection`.
+  `selection::apply_click` / `apply_box` / `clear_selection` compose those three
+  and are what `wire_selection!` calls. A host that keeps selection elsewhere
+  (in its own document or session state) projects into the rows after every
+  write; a missed projection is a stale highlight.
+- **Resolution contract**: every intent resolves to an absolute set, never a
+  delta, and both resolvers are order-stable. Selection order is
+  presentation-stable and semantically meaningless — nothing may interpret it.
+- **Timing**: nothing needs to be applied synchronously. The gesture logic reads
+  only press-time latches (`was-selected-on-press`, `selection-intent-sent`), so
+  a late-applied intent costs at most a frame of sibling lag. What the host owes
+  is the drag rule below.
+- **Drag**: `end-node-drag` carries the dragged node id, and the commit moves
+  that node plus whatever the rows show as selected (`GraphLogic::commit_drag`).
+  Reading `selected` off the row is deliberate: it is the same data the editor
+  renders, so a drag's visuals and its commit cannot disagree.
 
 ## Library Helpers
 

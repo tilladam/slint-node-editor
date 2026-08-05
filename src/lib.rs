@@ -54,8 +54,7 @@
 //! - [`find_pin_at`] - Hit-test pins at screen coordinates
 //! - [`find_link_at`] - Hit-test links at screen coordinates
 //! - [`GeometryCache`] - Cache node and pin geometry for fast lookups
-//! - [`SelectionManager`] - Manage selection state with O(1) lookups
-//! - [`project_selection`] - Project that selection into per-row model data
+//! - [`selection`] - Resolve selection gestures and project the result into rows
 //! - [`GraphLogic`] - Helper for managing node graph state
 //!
 //! ## Limitations
@@ -70,40 +69,51 @@
 //! See the [README](https://github.com/slint-ui/slint/tree/master/examples/node-editor/slint-node-editor)
 //! for detailed documentation and examples.
 
-pub mod grid;
-pub mod path;
-pub mod hit_test;
-pub mod state;
-pub mod selection;
-pub mod graph;
-pub mod tracking;
-pub mod links;
 pub mod controller;
-pub mod setup;
+pub mod graph;
+pub mod grid;
+pub mod hit_test;
 #[cfg(feature = "layout")]
 pub mod layout;
+pub mod links;
+pub mod path;
+pub mod selection;
+pub mod setup;
+pub mod state;
+pub mod tracking;
 
 // Re-export traits and functions
+pub use grid::generate_grid_commands;
 pub use hit_test::{
     find_link_at, find_pin_at, links_in_selection_box, nodes_in_selection_box, LinkGeometry,
     NodeGeometry, PinGeometry, SimpleLinkGeometry, SimpleNodeGeometry,
 };
-pub use grid::generate_grid_commands;
 pub use path::{generate_bezier_path, generate_partial_bezier_path};
 pub use state::{GeometryCache, StoredPin};
-pub use selection::{project_selection, SelectionManager};
-pub use graph::{
-    GraphLogic, LinkModel, MovableNode, SimpleLink,
-    // Link validation framework
-    LinkValidator, BasicLinkValidator, NoDuplicatesValidator, CompositeValidator,
-    ValidationResult, ValidationError,
-};
-pub use tracking::GeometryTracker;
-pub use links::LinkManager;
+// `selection` is deliberately NOT re-exported at the crate root: it is the
+// host's half of selection, a family of its own, and a bare `resolve_click`
+// would say nothing about what it resolves.
 pub use controller::NodeEditorController;
-pub use setup::NodeEditorSetup;
+pub use graph::{
+    BasicLinkValidator,
+    CompositeValidator,
+    GraphLogic,
+    LinkModel,
+    // Link validation framework
+    LinkValidator,
+    MovableNode,
+    NoDuplicatesValidator,
+    SimpleLink,
+    ValidationError,
+    ValidationResult,
+};
 #[cfg(feature = "layout")]
-pub use layout::{sugiyama_layout, sugiyama_layout_from_cache, Direction, NodePosition, SugiyamaConfig};
+pub use layout::{
+    sugiyama_layout, sugiyama_layout_from_cache, Direction, NodePosition, SugiyamaConfig,
+};
+pub use links::LinkManager;
+pub use setup::NodeEditorSetup;
+pub use tracking::GeometryTracker;
 
 /// Wire up all NodeEditor callbacks with a single macro call.
 ///
@@ -131,7 +141,6 @@ macro_rules! wire_node_editor {
         let gc = $window.global::<NodeEditorInternalCallbacks>();
         gc.on_report_node_rect($setup.report_node_rect());
         gc.on_report_pin_position($setup.report_pin_position());
-        gc.on_start_node_drag($setup.start_node_drag());
         gc.on_end_node_drag($setup.end_node_drag());
 
         // Computations
@@ -139,13 +148,15 @@ macro_rules! wire_node_editor {
         computations.on_compute_link_path($setup.controller().compute_link_path_callback());
 
         let ctrl = $setup.controller().clone();
-        computations.on_compute_pin_at(move |x, y, radius| {
-            ctrl.cache().borrow().find_pin_at(x, y, radius)
-        });
+        computations
+            .on_compute_pin_at(move |x, y, radius| ctrl.cache().borrow().find_pin_at(x, y, radius));
 
-        computations.on_compute_link_preview_path(|start_x, start_y, end_x, end_y, zoom, bezier_offset| {
-            $crate::generate_bezier_path(start_x, start_y, end_x, end_y, zoom, bezier_offset).into()
-        });
+        computations.on_compute_link_preview_path(
+            |start_x, start_y, end_x, end_y, zoom, bezier_offset| {
+                $crate::generate_bezier_path(start_x, start_y, end_x, end_y, zoom, bezier_offset)
+                    .into()
+            },
+        );
 
         // Auto grid updates
         let ctrl = $setup.controller().clone();
@@ -153,7 +164,12 @@ macro_rules! wire_node_editor {
         computations.on_viewport_changed(move |zoom, pan_x, pan_y| {
             ctrl.set_viewport(zoom, pan_x, pan_y);
             if let Some(w) = w.upgrade() {
-                w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
+                w.set_grid_commands(ctrl.generate_grid(
+                    w.get_width_(),
+                    w.get_height_(),
+                    pan_x,
+                    pan_y,
+                ));
             }
         });
 
@@ -166,83 +182,142 @@ macro_rules! wire_node_editor {
     }};
 }
 
-/// Wire the editor's selection intents to an application-owned selection.
+/// Wire the editor's selection intents, using your model rows as the store.
 ///
 /// The editor holds no selection state: it reports gestures (`node-selected`,
-/// `selection-cleared`, `box-selection-committed`) and renders whatever
-/// `selected` flag it finds on the node rows. This macro closes that loop for
-/// the common case — one node model whose rows have `id` and `selected` fields:
-/// it applies each gesture to `$selection` and projects the result back into
-/// `$nodes`.
+/// `select-link`, `selection-cleared`, `box-selection-committed`) and renders
+/// whatever `selected` flag it finds on the rows. This macro closes that loop
+/// without introducing a second copy of the selection — each gesture reads the
+/// current set back out of the rows, resolves it through
+/// [`resolve_click`] / [`resolve_box`], and projects the result in. There is
+/// nothing to keep in sync, because there is only ever one record of what is
+/// selected.
 ///
-/// Applications with several node models, link selection, or non-standard
-/// gesture semantics wire the three callbacks themselves (see the `advanced`
-/// example) — the pieces are [`SelectionManager`] and [`project_selection`].
+/// Rows need an `id` and a `selected` field.
+///
+/// Two arms: node selection alone, or nodes and links together. Applications
+/// with several node models or their own gesture semantics wire the four
+/// callbacks by hand out of the [`selection`] module — see the `advanced`
+/// example.
+///
+/// [`resolve_click`]: crate::selection::resolve_click
+/// [`resolve_box`]: crate::selection::resolve_box
+/// [`selection`]: crate::selection
 ///
 /// # Example
 ///
 /// ```ignore
-/// let selection = Rc::new(RefCell::new(SelectionManager::new()));
-/// let setup = NodeEditorSetup::new(|id, dx, dy| { /* … */ })
-///     .with_selection(selection.clone());
-///
 /// wire_node_editor!(window, setup);
-/// wire_node_selection!(window, setup, selection, nodes);
+/// wire_selection!(window, setup, nodes);
+/// // …or, with selectable links:
+/// wire_selection!(window, setup, nodes, links);
 /// ```
 #[macro_export]
-macro_rules! wire_node_selection {
-    ($window:expr, $setup:expr, $selection:expr, $nodes:expr) => {{
-        // Every selection write goes through here — a missed projection is a
-        // stale highlight.
-        let project: std::rc::Rc<dyn Fn()> = {
-            let nodes = $nodes.clone();
-            let selection = $selection.clone();
-            std::rc::Rc::new(move || {
-                let selection = selection.borrow();
-                $crate::project_selection(
-                    &nodes,
-                    |node| selection.contains(node.id),
-                    |node| node.selected,
-                    |node, selected| node.selected = selected,
-                );
-            })
-        };
+macro_rules! wire_selection {
+    ($window:expr, $setup:expr, $nodes:expr) => {{
+        // `select-link` is deliberately not wired: the editor only emits it
+        // when the host opts into `has-link-selection`, and a host doing that
+        // wants the four-argument arm.
 
         $window.on_node_selected({
-            let selection = $selection.clone();
-            let project = project.clone();
-            move |node_id, shift_held| {
-                selection
-                    .borrow_mut()
-                    .handle_interaction(node_id, shift_held);
-                project();
+            let nodes = $nodes.clone();
+            move |node_id, shift| {
+                $crate::selection::apply_click(
+                    &nodes,
+                    |n| n.id,
+                    |n| &mut n.selected,
+                    node_id,
+                    shift,
+                )
             }
         });
 
         $window.on_selection_cleared({
-            let selection = $selection.clone();
-            let project = project.clone();
+            let nodes = $nodes.clone();
+            move || $crate::selection::clear_selection(&nodes, |n| &mut n.selected)
+        });
+
+        $window.on_box_selection_committed({
+            let nodes = $nodes.clone();
+            let ctrl = $setup.controller().clone();
+            move |x, y, w, h, shift| {
+                let hits = ctrl.cache().borrow().nodes_in_selection_box(x, y, w, h);
+                $crate::selection::apply_box(&nodes, |n| n.id, |n| &mut n.selected, hits, shift)
+            }
+        });
+    }};
+
+    ($window:expr, $setup:expr, $nodes:expr, $links:expr) => {{
+        // Nodes and links are selected exclusively: picking one drops the other.
+        $window.on_node_selected({
+            let nodes = $nodes.clone();
+            let links = $links.clone();
+            move |node_id, shift| {
+                $crate::selection::clear_selection(&links, |l| &mut l.selected);
+                $crate::selection::apply_click(
+                    &nodes,
+                    |n| n.id,
+                    |n| &mut n.selected,
+                    node_id,
+                    shift,
+                )
+            }
+        });
+
+        $window.on_select_link({
+            let nodes = $nodes.clone();
+            let links = $links.clone();
+            move |link_id, shift| {
+                $crate::selection::clear_selection(&nodes, |n| &mut n.selected);
+                $crate::selection::apply_click(
+                    &links,
+                    |l| l.id,
+                    |l| &mut l.selected,
+                    link_id,
+                    shift,
+                )
+            }
+        });
+
+        $window.on_selection_cleared({
+            let nodes = $nodes.clone();
+            let links = $links.clone();
             move || {
-                selection.borrow_mut().clear();
-                project();
+                $crate::selection::clear_selection(&nodes, |n| &mut n.selected);
+                $crate::selection::clear_selection(&links, |l| &mut l.selected);
             }
         });
 
         $window.on_box_selection_committed({
-            let selection = $selection.clone();
+            let nodes = $nodes.clone();
+            let links = $links.clone();
             let ctrl = $setup.controller().clone();
-            let project = project.clone();
-            move |x, y, w, h, shift_held| {
-                let hits = ctrl.cache().borrow().nodes_in_selection_box(x, y, w, h);
-                {
-                    let mut selection = selection.borrow_mut();
-                    if shift_held {
-                        selection.extend_selection(hits);
-                    } else {
-                        selection.replace_selection(hits);
-                    }
-                }
-                project();
+            move |x, y, w, h, shift| {
+                let (node_hits, link_hits) = {
+                    let cache = ctrl.cache();
+                    let cache = cache.borrow();
+                    let rows = (0..slint::Model::row_count(&*links))
+                        .filter_map(|i| slint::Model::row_data(&*links, i))
+                        .map(|l| (l.id, l.start_pin_id, l.end_pin_id));
+                    (
+                        cache.nodes_in_selection_box(x, y, w, h),
+                        cache.links_in_selection_box(x, y, w, h, rows),
+                    )
+                };
+                $crate::selection::apply_box(
+                    &nodes,
+                    |n| n.id,
+                    |n| &mut n.selected,
+                    node_hits,
+                    shift,
+                );
+                $crate::selection::apply_box(
+                    &links,
+                    |l| l.id,
+                    |l| &mut l.selected,
+                    link_hits,
+                    shift,
+                )
             }
         });
     }};

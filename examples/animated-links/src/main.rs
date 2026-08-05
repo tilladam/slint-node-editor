@@ -1,5 +1,5 @@
 use slint::{Color, Model, ModelRc, SharedString, Timer, TimerMode, VecModel};
-use slint_node_editor::{NodeEditorSetup, wire_node_editor};
+use slint_node_editor::{wire_node_editor, NodeEditorSetup};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;
@@ -128,8 +128,6 @@ fn main() {
     window.on_add_animated_link({
         let animated_links = animated_links.clone();
         let next_link_id = next_link_id.clone();
-        let start_time = start_time;
-        let link_colors = link_colors;
         move |from_pin, to_pin| {
             // Get unique ID and increment
             let id = *next_link_id.borrow();
@@ -161,7 +159,6 @@ fn main() {
         {
             let w = w.clone();
             let animated_links = animated_links.clone();
-            let start_time = start_time;
             move || {
                 if let Some(w) = w.upgrade() {
                     let elapsed = start_time.elapsed().as_secs_f32();

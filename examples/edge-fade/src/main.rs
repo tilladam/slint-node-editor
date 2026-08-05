@@ -1,9 +1,33 @@
-use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::{wire_node_editor, wire_node_selection, NodeEditorSetup, SelectionManager};
-use std::cell::RefCell;
+use slint::{Color, ModelRc, SharedString, VecModel};
+use slint_node_editor::{
+    wire_node_editor, wire_selection, GraphLogic, MovableNode, NodeEditorSetup,
+};
 use std::rc::Rc;
 
 slint::include_modules!();
+
+// The row is the node: position and selection both live here, so a drag
+// commit reads the same `selected` the editor renders.
+impl MovableNode for NodeData {
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn x(&self) -> f32 {
+        self.x
+    }
+    fn y(&self) -> f32 {
+        self.y
+    }
+    fn selected(&self) -> bool {
+        self.selected
+    }
+    fn set_x(&mut self, x: f32) {
+        self.x = x;
+    }
+    fn set_y(&mut self, y: f32) {
+        self.y = y;
+    }
+}
 
 fn main() {
     let window = MainWindow::new().unwrap();
@@ -100,27 +124,15 @@ fn main() {
         },
     ]))));
 
-    let selection = Rc::new(RefCell::new(SelectionManager::new()));
-
     let setup = NodeEditorSetup::new({
         let nodes = nodes.clone();
-        move |node_id, delta_x, delta_y| {
-            for i in 0..nodes.row_count() {
-                if let Some(mut node) = nodes.row_data(i) {
-                    if node.id == node_id {
-                        node.x += delta_x;
-                        node.y += delta_y;
-                        nodes.set_row_data(i, node);
-                        break;
-                    }
-                }
-            }
+        move |dragged, delta_x, delta_y| {
+            GraphLogic::commit_drag(&nodes, dragged, delta_x, delta_y);
         }
-    })
-    .with_selection(selection.clone());
+    });
 
     wire_node_editor!(window, setup);
-    wire_node_selection!(window, setup, selection, nodes);
+    wire_selection!(window, setup, nodes);
 
     window.run().unwrap();
 }

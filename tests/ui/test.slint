@@ -87,8 +87,6 @@ export component MainWindow inherits Window {
 
     // Core callbacks to Rust
     callback request-grid-update <=> editor.request-grid-update;
-    callback node-drag-started <=> editor.node-drag-started;
-    callback node-drag-ended <=> editor.node-drag-ended;
 
     // Additional callbacks for testing
     callback link-requested <=> editor.link-requested;

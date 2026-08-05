@@ -87,8 +87,6 @@ export component MainWindow inherits Window {
     public function refresh-links() {
         editor.refresh-links();
     }
-    callback node-drag-started <=> editor.node-drag-started;
-    callback node-drag-ended <=> editor.node-drag-ended;
 
     editor := NodeEditor {
         width: 100%;

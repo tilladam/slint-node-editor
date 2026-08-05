@@ -5,9 +5,8 @@
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    project_selection, wire_node_editor, BasicLinkValidator, CompositeValidator, GraphLogic,
-    LinkModel, LinkValidator, MovableNode, NoDuplicatesValidator, NodeEditorSetup, SelectionManager,
-    ValidationResult,
+    selection, wire_node_editor, BasicLinkValidator, CompositeValidator, GraphLogic, LinkModel,
+    LinkValidator, MovableNode, NoDuplicatesValidator, NodeEditorSetup, ValidationResult,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -23,6 +22,9 @@ impl MovableNode for NodeData {
     }
     fn y(&self) -> f32 {
         self.world_y
+    }
+    fn selected(&self) -> bool {
+        self.selected
     }
     fn set_x(&mut self, x: f32) {
         self.world_x = x;
@@ -41,6 +43,9 @@ impl MovableNode for FilterNodeData {
     }
     fn y(&self) -> f32 {
         self.world_y
+    }
+    fn selected(&self) -> bool {
+        self.selected
     }
     fn set_x(&mut self, x: f32) {
         self.world_x = x;
@@ -65,20 +70,24 @@ impl LinkModel for LinkData {
     }
 }
 
+/// Reads the current selection out of the rows it spans.
+type ReadSelection = Rc<dyn Fn() -> Vec<i32>>;
+/// Writes an absolute selection into the rows it spans.
+type WriteSelection = Rc<dyn Fn(&[i32])>;
+
 /// Helper to remove items by ID from a model based on selection
 fn remove_selected_items<T: Clone + 'static>(
     model: &VecModel<T>,
     get_id: impl Fn(&T) -> i32,
-    selection: &SelectionManager,
+    is_selected: impl Fn(&T) -> bool,
 ) -> Vec<i32> {
     let mut indices_to_remove = Vec::new();
     let mut removed_ids = Vec::new();
     for i in 0..model.row_count() {
         if let Some(item) = model.row_data(i) {
-            let id = get_id(&item);
-            if selection.contains(id) {
+            if is_selected(&item) {
                 indices_to_remove.push(i);
-                removed_ids.push(id);
+                removed_ids.push(get_id(&item));
             }
         }
     }
@@ -170,9 +179,6 @@ fn build_minimap_nodes(
 fn main() {
     let window = MainWindow::new().unwrap();
 
-    let selection_manager = Rc::new(RefCell::new(SelectionManager::new()));
-    let link_selection_manager = Rc::new(RefCell::new(SelectionManager::new()));
-
     // Create the node model
     let nodes: Rc<VecModel<NodeData>> = Rc::new(VecModel::from(vec![
         NodeData {
@@ -256,15 +262,15 @@ fn main() {
     let filter_width = filter_node_constants.get_base_width();
     let filter_height = filter_node_constants.get_base_height();
 
-    // Create setup with model update logic for both node types
+    // Commit a finished drag into both node models. The dragged node lives in
+    // exactly one of them and always moves; selected rows in either move with
+    // it. Both read the same `selected` the editor renders.
     let setup = NodeEditorSetup::new({
         let nodes = nodes.clone();
         let filter_nodes = filter_nodes.clone();
-        let sm = selection_manager.clone();
-        move |_node_id, delta_x, delta_y| {
-            let sm = sm.borrow();
-            GraphLogic::commit_drag(&nodes, &sm, delta_x, delta_y);
-            GraphLogic::commit_drag(&filter_nodes, &sm, delta_x, delta_y);
+        move |dragged, delta_x, delta_y| {
+            GraphLogic::commit_drag(&nodes, dragged, delta_x, delta_y);
+            GraphLogic::commit_drag(&filter_nodes, dragged, delta_x, delta_y);
         }
     });
 
@@ -317,10 +323,10 @@ fn main() {
                 .filter_map(|i| links.row_data(i))
                 .map(|l| (l.id, l.start_pin_id, l.end_pin_id));
             cache.find_link_at(
-                x as f32,
-                y as f32,
+                x,
+                y,
                 link_iter,
-                w.get_link_hover_distance() as f32,
+                w.get_link_hover_distance(),
                 w.get_zoom(),
                 w.get_bezier_min_offset(),
                 w.get_link_hit_samples() as usize,
@@ -329,104 +335,100 @@ fn main() {
     });
 
     // === Selection ===
-    // The editor reports gestures and renders the `selected` flag it finds on
-    // the rows; node and link selection live here, and every write to them ends
-    // in this one projection.
+    // The rows ARE the selection — there is no separate store to keep in step
+    // with them. Each gesture reads the current set back out of the rows,
+    // resolves it, and writes the answer in. This example has two node models
+    // sharing one id space, so "the node selection" spans both; that is the
+    // only reason these four accessors exist, and it is why this example wires
+    // the callbacks by hand instead of using `wire_selection!`.
 
-    let project_selection_into_rows: Rc<dyn Fn()> = {
+    let node_selection: ReadSelection = {
         let nodes = nodes.clone();
         let filter_nodes = filter_nodes.clone();
-        let links = links.clone();
-        let sm = selection_manager.clone();
-        let lsm = link_selection_manager.clone();
         Rc::new(move || {
-            let sm = sm.borrow();
-            project_selection(
-                &nodes,
-                |node| sm.contains(node.id),
-                |node| node.selected,
-                |node, selected| node.selected = selected,
-            );
-            project_selection(
+            let mut ids = selection::selected_rows(&nodes, |n| n.id, |n| n.selected);
+            ids.extend(selection::selected_rows(
                 &filter_nodes,
-                |node| sm.contains(node.id),
-                |node| node.selected,
-                |node, selected| node.selected = selected,
+                |n| n.id,
+                |n| n.selected,
+            ));
+            ids
+        })
+    };
+    let set_node_selection: WriteSelection = {
+        let nodes = nodes.clone();
+        let filter_nodes = filter_nodes.clone();
+        Rc::new(move |next: &[i32]| {
+            selection::project_selection(&nodes, |n| next.contains(&n.id), |n| &mut n.selected);
+            selection::project_selection(
+                &filter_nodes,
+                |n| next.contains(&n.id),
+                |n| &mut n.selected,
             );
-            let lsm = lsm.borrow();
-            project_selection(
-                &links,
-                |link| lsm.contains(link.id),
-                |link| link.selected,
-                |link, selected| link.selected = selected,
-            );
+        })
+    };
+    let link_selection: ReadSelection = {
+        let links = links.clone();
+        Rc::new(move || selection::selected_rows(&links, |l| l.id, |l| l.selected))
+    };
+    let set_link_selection: WriteSelection = {
+        let links = links.clone();
+        Rc::new(move |next: &[i32]| {
+            selection::project_selection(&links, |l| next.contains(&l.id), |l| &mut l.selected);
         })
     };
 
     window.on_node_selected({
-        let sm = selection_manager.clone();
-        let lsm = link_selection_manager.clone();
-        let project = project_selection_into_rows.clone();
+        let current = node_selection.clone();
+        let set_nodes = set_node_selection.clone();
+        let set_links = set_link_selection.clone();
         move |node_id, shift| {
             // Nodes and links are selected exclusively in this example
-            lsm.borrow_mut().clear();
-            sm.borrow_mut().handle_interaction(node_id, shift);
-            project();
+            set_links(&[]);
+            set_nodes(&selection::resolve_click(&current(), node_id, shift));
         }
     });
 
     window.on_select_link({
-        let sm = selection_manager.clone();
-        let lsm = link_selection_manager.clone();
-        let project = project_selection_into_rows.clone();
+        let current = link_selection.clone();
+        let set_nodes = set_node_selection.clone();
+        let set_links = set_link_selection.clone();
         move |link_id, shift| {
-            sm.borrow_mut().clear();
-            let mut lsm = lsm.borrow_mut();
-            if link_id >= 0 {
-                lsm.handle_interaction(link_id, shift);
-            } else {
-                lsm.clear();
-            }
-            drop(lsm);
-            project();
+            set_nodes(&[]);
+            set_links(&selection::resolve_click(&current(), link_id, shift));
         }
     });
 
     window.on_selection_cleared({
-        let sm = selection_manager.clone();
-        let lsm = link_selection_manager.clone();
-        let project = project_selection_into_rows.clone();
+        let set_nodes = set_node_selection.clone();
+        let set_links = set_link_selection.clone();
         move || {
-            sm.borrow_mut().clear();
-            lsm.borrow_mut().clear();
-            project();
+            set_nodes(&[]);
+            set_links(&[]);
         }
     });
 
     window.on_box_selection_committed({
         let ctrl = setup.controller().clone();
         let links = links.clone();
-        let sm = selection_manager.clone();
-        let lsm = link_selection_manager.clone();
-        let project = project_selection_into_rows.clone();
+        let node_current = node_selection.clone();
+        let link_current = link_selection.clone();
+        let set_nodes = set_node_selection.clone();
+        let set_links = set_link_selection.clone();
         move |x, y, w, h, shift| {
-            let cache = ctrl.cache();
-            let cache = cache.borrow();
-            let hit_nodes = cache.nodes_in_selection_box(x, y, w, h);
-            let link_iter = (0..links.row_count())
-                .filter_map(|i| links.row_data(i))
-                .map(|l| (l.id, l.start_pin_id, l.end_pin_id));
-            let hit_links = cache.links_in_selection_box(x, y, w, h, link_iter);
-            drop(cache);
-
-            if shift {
-                sm.borrow_mut().extend_selection(hit_nodes);
-                lsm.borrow_mut().extend_selection(hit_links);
-            } else {
-                sm.borrow_mut().replace_selection(hit_nodes);
-                lsm.borrow_mut().replace_selection(hit_links);
-            }
-            project();
+            let (hit_nodes, hit_links) = {
+                let cache = ctrl.cache();
+                let cache = cache.borrow();
+                let link_iter = (0..links.row_count())
+                    .filter_map(|i| links.row_data(i))
+                    .map(|l| (l.id, l.start_pin_id, l.end_pin_id));
+                (
+                    cache.nodes_in_selection_box(x, y, w, h),
+                    cache.links_in_selection_box(x, y, w, h, link_iter),
+                )
+            };
+            set_nodes(&selection::resolve_box(&node_current(), hit_nodes, shift));
+            set_links(&selection::resolve_box(&link_current(), hit_links, shift));
         }
     });
 
@@ -502,11 +504,13 @@ fn main() {
         let nodes = nodes.clone();
         let filter_nodes = filter_nodes.clone();
         let links = links.clone();
-        let sm = selection_manager.clone();
         move || {
-            let sm = sm.borrow();
-            let mut deleted_node_ids = remove_selected_items(&nodes, |n| n.id, &sm);
-            deleted_node_ids.extend(remove_selected_items(&filter_nodes, |n| n.id, &sm));
+            let mut deleted_node_ids = remove_selected_items(&nodes, |n| n.id, |n| n.selected);
+            deleted_node_ids.extend(remove_selected_items(
+                &filter_nodes,
+                |n| n.id,
+                |n| n.selected,
+            ));
 
             let cache = ctrl.cache();
             let cache = cache.borrow();
@@ -519,8 +523,8 @@ fn main() {
                         .get(&link.start_pin_id)
                         .map(|p| p.node_id);
                     let end_node = cache.pin_positions.get(&link.end_pin_id).map(|p| p.node_id);
-                    if start_node.map_or(false, |id| deleted_node_ids.contains(&id))
-                        || end_node.map_or(false, |id| deleted_node_ids.contains(&id))
+                    if start_node.is_some_and(|id| deleted_node_ids.contains(&id))
+                        || end_node.is_some_and(|id| deleted_node_ids.contains(&id))
                     {
                         link_indices_to_remove.push(i);
                     }
@@ -535,37 +539,20 @@ fn main() {
     });
 
     let links_for_link_delete = links.clone();
-    let lsm_delete = link_selection_manager.clone();
     window.on_delete_selected_links(move || {
-        let lsm = lsm_delete.borrow();
-        let mut indices_to_remove: Vec<usize> = Vec::new();
-        for i in 0..links_for_link_delete.row_count() {
-            if let Some(link) = links_for_link_delete.row_data(i) {
-                if lsm.contains(link.id) {
-                    indices_to_remove.push(i);
-                }
-            }
-        }
-        for &i in indices_to_remove.iter().rev() {
-            links_for_link_delete.remove(i);
-        }
+        remove_selected_items(&links_for_link_delete, |l| l.id, |l| l.selected);
     });
 
     let nodes_for_add = nodes.clone();
     let next_node_id_for_add = next_node_id.clone();
-    let window_for_add = window.as_weak();
     window.on_add_node(move || {
-        let w = match window_for_add.upgrade() {
-            Some(w) => w,
-            None => return,
-        };
         let id = *next_node_id_for_add.borrow();
         *next_node_id_for_add.borrow_mut() += 1;
         nodes_for_add.push(NodeData {
             id,
             title: SharedString::from(format!("Node {}", id)),
-            world_x: w.invoke_snap_to_grid(192.0 + (id as f32 * 48.0) % 384.0),
-            world_y: w.invoke_snap_to_grid(192.0 + (id as f32 * 24.0) % 288.0),
+            world_x: 192.0 + (id as f32 * 48.0) % 384.0,
+            world_y: 192.0 + (id as f32 * 24.0) % 288.0,
             selected: false,
         });
     });

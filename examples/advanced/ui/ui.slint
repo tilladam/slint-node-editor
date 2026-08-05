@@ -180,7 +180,6 @@ export component MainWindow inherits Window {
     in-out property <string> grid-commands;
 
     // Callbacks to Rust for state changes
-    callback commit-drag <=> editor.node-drag-ended;
     // Note: viewport changes are now handled via NodeEditorComputations global
     callback create-link <=> editor.link-requested;
     callback delete-selected-nodes();  // delete all selected nodes
@@ -197,13 +196,6 @@ export component MainWindow inherits Window {
     callback compute-link-at <=> editor.compute-link-at;
     // Note: compute-link-path, compute-link-preview-path, node-rect, and pin-position are now handled via globals
 
-    // Pure function to snap a value to the grid
-    pure public function snap-to-grid(value: float) -> float {
-        return editor.snap-to-grid(value);
-    }
-
-    // Grid snap toggle (bound to editor.grid-snapping)
-    property <bool> grid-snap-enabled: true;
 
     // Shared pan state (in-out so Rust can read them)
     // Initial pan to center viewport in the minimap (graph center at 800, 600)
@@ -297,7 +289,6 @@ export component MainWindow inherits Window {
         max-zoom: 4.0;
         background-color: #1a1a1a;
         grid-spacing: 24px;
-        grid-snapping <=> grid-snap-enabled;
         grid-color: #333333;
         grid-commands <=> root.grid-commands;
         links <=> root.links;
@@ -314,7 +305,6 @@ export component MainWindow inherits Window {
 
         // Event callbacks aliased to root:
         // link-requested => root.create-link
-        // node-drag-ended => root.commit-drag
         // add-node-requested => root.add-node
 
         context-menu-requested => {
@@ -361,9 +351,7 @@ export component MainWindow inherits Window {
     } // shortcuts
 
     // Instructions overlay
-    InstructionsOverlay {
-        grid-snap-enabled <=> grid-snap-enabled;
-    }
+    InstructionsOverlay { }
 
     // Zoom indicator
     Rectangle {

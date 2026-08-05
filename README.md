@@ -191,7 +191,6 @@ in property <length> min-node-width: 80px;          // Minimum node width at any
 in property <length> min-node-height: 40px;         // Minimum node height at any zoom
 
 in property <length> grid-spacing: 24px;       // Grid cell size
-in property <bool> grid-snapping: true;        // Enable snap-to-grid
 in property <color> grid-color: #404040;       // Grid line color
 in property <brush> background-color: #1a1a1a; // Background color
 
@@ -270,10 +269,9 @@ callback request-grid-update();
 **Callbacks (Selection):**
 
 The editor keeps **no selection state**. It reports gestures; your application
-decides what they mean, stores the result, and projects it back into the
-`selected` field of your node rows and of `LinkData`. Apply these
-**synchronously** inside the callback — the drag and click logic reads the
-resulting `selected` flags within the same event.
+decides what they mean and puts the answer in the `selected` field of your node
+rows and of `LinkData`, which is what the editor renders. Those rows can be the
+only record you keep — there is nothing to hold on the side.
 
 ```slint
 /// A node was clicked (or dragged while unselected):
@@ -291,21 +289,32 @@ callback selection-cleared();
 callback box-selection-committed(x: length, y: length, w: length, h: length, shift-held: bool);
 ```
 
-On the Rust side, `SelectionManager` holds the selection, `project_selection`
-writes it into the model rows, and `wire_node_selection!` connects the two for
-the common case (one node model with `id` and `selected` fields):
+On the Rust side the `selection` module holds the policy — `resolve_click` and
+`resolve_box` turn a gesture and the current set into the new set, and
+`project_selection` writes a set into the rows. Every intent resolves to an
+**absolute set**, never a delta, and both resolvers are order-stable.
+
+`wire_selection!` composes them for the common case — rows with `id` and
+`selected` fields — and keeps no state of its own:
 
 ```rust
-let selection = Rc::new(RefCell::new(SelectionManager::new()));
-let setup = NodeEditorSetup::new(|id, dx, dy| { /* … */ })
-    .with_selection(selection.clone());   // multi-node drag
+let setup = NodeEditorSetup::new({
+    let nodes = nodes.clone();
+    move |dragged, dx, dy| GraphLogic::commit_drag(&nodes, dragged, dx, dy)
+});
 
 wire_node_editor!(window, setup);
-wire_node_selection!(window, setup, selection, nodes);
+wire_selection!(window, setup, nodes);          // nodes only
+wire_selection!(window, setup, nodes, links);   // …or nodes and links
 ```
 
-Applications with several node models, link selection, or their own gesture
-semantics wire the four callbacks by hand — see the `advanced` example.
+Applications with several node models or their own gesture semantics wire the
+four callbacks by hand out of the `selection` module — see the `advanced`
+example, which spans two node models sharing one id space.
+
+Multi-node drag needs no wiring: `GraphLogic::commit_drag` moves the dragged
+node plus every row the model shows as selected, which is the same data the
+editor renders.
 
 **Callbacks (Events):**
 
@@ -330,12 +339,6 @@ callback add-node-requested();
 
 /// User right-clicked (context menu)
 callback context-menu-requested();
-
-/// User started dragging a node
-callback node-drag-started(node-id: int);
-
-/// User finished dragging nodes
-callback node-drag-ended(delta-x: float, delta-y: float);
 
 /// Node geometry changed (position or size)
 callback node-rect-changed(id: int, x: length, y: length, w: length, h: length);

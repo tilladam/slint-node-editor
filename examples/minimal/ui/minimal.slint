@@ -88,7 +88,6 @@ export component MainWindow inherits Window {
     editor := NodeEditor {
         width: 100%;
         height: 100%;
-        grid-snapping: true;  // Disable grid snapping for testing
 
         // Zero boilerplate! Drag offsets computed automatically in BaseNode
         for data in root.nodes: SimpleNode {

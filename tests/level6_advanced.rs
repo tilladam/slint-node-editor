@@ -152,14 +152,10 @@ fn test_middle_click_for_pan() {
 fn test_multi_node_selection_setup() {
     let harness = MinimalTestHarness::new();
 
-    // Create multi-selection
-    {
-        let mut sel = harness.selection.borrow_mut();
-        sel.handle_interaction(1, false);
-        sel.handle_interaction(2, true);
-    }
+    harness.window.invoke_node_selected(1, false);
+    harness.window.invoke_node_selected(2, true);
 
-    assert_eq!(harness.selection.borrow().len(), 2);
+    assert_eq!(harness.selected_node_ids(), vec![1, 2]);
 }
 
 #[test]
@@ -194,30 +190,18 @@ fn test_multi_node_drag_updates_all_selected() {
     );
 
     // Select nodes 1 and 2
-    {
-        let mut sel = harness.selection.borrow_mut();
-        sel.handle_interaction(1, false);
-        sel.handle_interaction(2, true);
-    }
+    harness.window.invoke_node_selected(1, false);
+    harness.window.invoke_node_selected(2, true);
 
     let node1_orig_x = harness.nodes.row_data(0).unwrap().x;
     let node2_orig_x = harness.nodes.row_data(1).unwrap().x;
     let node3_orig_x = harness.nodes.row_data(2).unwrap().x;
 
-    // Simulate drag delta applied to all selected nodes
+    // Drag node 1 for real: the commit reads `selected` off the rows, so the
+    // whole selection follows and node 3 stays put.
     let delta_x = 50.0;
     let delta_y = 30.0;
-
-    let selected: Vec<i32> = harness.selection.borrow().iter().copied().collect();
-    for i in 0..harness.nodes.row_count() {
-        if let Some(mut node) = harness.nodes.row_data(i) {
-            if selected.contains(&node.id) {
-                node.x += delta_x;
-                node.y += delta_y;
-                harness.nodes.set_row_data(i, node);
-            }
-        }
-    }
+    harness.end_node_drag(1, delta_x, delta_y);
 
     // Verify selected nodes moved
     let node1 = harness.nodes.row_data(0).unwrap();
