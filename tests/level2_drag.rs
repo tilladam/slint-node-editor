@@ -30,44 +30,8 @@ fn setup_test_geometry(harness: &MinimalTestHarness) {
     cache.handle_pin_report(5, 2, 2, 150.0, 50.0); // Output pin at right
 }
 
-#[test]
-fn test_click_on_node_triggers_selection() {
-    let harness = MinimalTestHarness::new();
-    setup_test_geometry(&harness);
-
-    // Simulate selection via the selection manager (as the callback would do)
-    // This tests the selection mechanism that would be triggered by a click
-    harness.selection.borrow_mut().handle_interaction(1, false);
-
-    // Node should be selected
-    assert!(
-        harness.selection.borrow().contains(1),
-        "Node 1 should be selected after click"
-    );
-}
-
-#[test]
-fn test_click_replaces_selection() {
-    let harness = MinimalTestHarness::new();
-    setup_test_geometry(&harness);
-
-    // Simulate clicking on Node A
-    harness.selection.borrow_mut().handle_interaction(1, false);
-    assert!(harness.selection.borrow().contains(1));
-
-    // Simulate clicking on Node B (without shift = replace selection)
-    harness.selection.borrow_mut().handle_interaction(2, false);
-
-    // Only Node B should be selected now
-    assert!(
-        !harness.selection.borrow().contains(1),
-        "Node 1 should no longer be selected"
-    );
-    assert!(
-        harness.selection.borrow().contains(2),
-        "Node 2 should be selected"
-    );
-}
+// Click-to-select lives in level4 — it is selection behavior, not drag
+// behavior, and these tests only ever exercised it.
 
 #[test]
 fn test_mouse_down_on_node_records_dragged_node() {
@@ -94,7 +58,11 @@ fn test_node_drag_started_callback_fires() {
     harness.tracker.node_drag_started.borrow_mut().push(1);
 
     let started = harness.tracker.node_drag_started.borrow();
-    assert_eq!(started.len(), 1, "node_drag_started should have been called");
+    assert_eq!(
+        started.len(),
+        1,
+        "node_drag_started should have been called"
+    );
     assert_eq!(started[0], 1, "Should have started drag on node 1");
 }
 
@@ -104,7 +72,11 @@ fn test_node_drag_ended_callback_records_delta() {
     setup_test_geometry(&harness);
 
     // Simulate that a drag ended with delta (48, 24)
-    harness.tracker.node_drag_ended.borrow_mut().push((48.0, 24.0));
+    harness
+        .tracker
+        .node_drag_ended
+        .borrow_mut()
+        .push((48.0, 24.0));
 
     let ended = harness.tracker.node_drag_ended.borrow();
     assert_eq!(ended.len(), 1, "node_drag_ended should have been called");
@@ -155,55 +127,9 @@ fn test_node_position_updates_after_drag() {
     );
 }
 
-#[test]
-fn test_grid_snapping_applies_to_position() {
-    let harness = MinimalTestHarness::new();
-    setup_test_geometry(&harness);
-
-    let original = harness.nodes.row_data(0).unwrap();
-    let original_x = original.x;
-    let original_y = original.y;
-
-    // Simulate drag that should snap to grid
-    // Grid spacing is 24.0 by default
-    // A delta of 25 should snap to 24
-    harness.ctrl.handle_node_drag_started(1);
-
-    // The snap calculation happens in the Slint end-node-drag function:
-    // snap_to_grid rounds to nearest grid spacing
-    let raw_delta_x: f32 = 25.0;
-    let raw_delta_y: f32 = 13.0;
-
-    // Snap calculation: round(value / grid_spacing) * grid_spacing
-    let grid_spacing: f32 = 24.0;
-    let snapped_delta_x = (raw_delta_x / grid_spacing).round() * grid_spacing; // 24.0
-    let snapped_delta_y = (raw_delta_y / grid_spacing).round() * grid_spacing; // 24.0 (13/24 = 0.54, rounds to 1)
-
-    // Update position with snapped values
-    let node_id = harness.ctrl.dragged_node_id();
-    for i in 0..harness.nodes.row_count() {
-        if let Some(mut node) = harness.nodes.row_data(i) {
-            if node.id == node_id {
-                node.x += snapped_delta_x;
-                node.y += snapped_delta_y;
-                harness.nodes.set_row_data(i, node);
-                break;
-            }
-        }
-    }
-
-    let updated = harness.nodes.row_data(0).unwrap();
-    assert_eq!(
-        updated.x,
-        original_x + snapped_delta_x,
-        "Node X should be snapped to grid"
-    );
-    assert_eq!(
-        updated.y,
-        original_y + snapped_delta_y,
-        "Node Y should be snapped to grid"
-    );
-}
+// Grid snapping is gone: it never ran (its only reader sat inside an
+// unreachable function), and the test that "covered" it did the arithmetic
+// itself without calling the library. Position policy is the host's, at commit.
 
 #[test]
 fn test_dragged_node_id_resets_after_drag() {

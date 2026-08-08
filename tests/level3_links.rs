@@ -144,18 +144,21 @@ fn test_add_new_link_to_model() {
                 title: SharedString::from("A"),
                 x: 100.0,
                 y: 100.0,
+                selected: false,
             },
             common::harness::NodeData {
                 id: 2,
                 title: SharedString::from("B"),
                 x: 400.0,
                 y: 200.0,
+                selected: false,
             },
             common::harness::NodeData {
                 id: 3,
                 title: SharedString::from("C"),
                 x: 700.0,
                 y: 100.0,
+                selected: false,
             },
         ],
         vec![],
@@ -171,6 +174,7 @@ fn test_add_new_link_to_model() {
         color: Color::from_argb_u8(255, 255, 128, 0),
         line_width: 2.0,
         status: -1,
+        selected: false,
     });
 
     assert_eq!(harness.links.row_count(), 1);
@@ -194,6 +198,7 @@ fn test_multiple_links_supported() {
         color: Color::from_argb_u8(255, 0, 255, 128),
         line_width: 2.0,
         status: -1,
+        selected: false,
     });
 
     assert_eq!(harness.links.row_count(), 2);

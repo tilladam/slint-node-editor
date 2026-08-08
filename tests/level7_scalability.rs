@@ -7,14 +7,14 @@
 //! **IMPORTANT:** Run with `cargo test level7 --release` for realistic performance.
 //! Debug mode is 10-50x slower and timing assertions will be skipped.
 
-use slint_node_editor::{
-    find_link_at, find_pin_at, nodes_in_selection_box,
-    generate_bezier_path, GeometryCache, GraphLogic, SelectionManager,
-    SimpleNodeGeometry, LinkModel,
-};
-use slint_node_editor::hit_test::{SimplePinGeometry, SimpleLinkGeometry};
-use slint_node_editor::state::StoredPin;
 use slint::{Model, VecModel};
+use slint_node_editor::hit_test::{SimpleLinkGeometry, SimplePinGeometry};
+use slint_node_editor::selection::{project_selection, resolve_box, resolve_click, selected_rows};
+use slint_node_editor::state::StoredPin;
+use slint_node_editor::{
+    find_link_at, find_pin_at, generate_bezier_path, nodes_in_selection_box, GeometryCache,
+    GraphLogic, LinkModel, SimpleNodeGeometry,
+};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -99,20 +99,17 @@ mod thresholds {
     /// Maximum time for box selection with 10K nodes (full canvas)
     pub const BOX_SELECT_10K: Duration = Duration::from_millis(100);
 
-    /// Maximum time for selection manager add operations (1K items)
+    /// Maximum time to build a 1K selection by repeated shift-click
     pub const SELECTION_ADD_1K: Duration = Duration::from_millis(20);
 
-    /// Maximum time for selection manager contains check (1K lookups)
+    /// Maximum time to scan 1K rows for the selected ones
     pub const SELECTION_CONTAINS_1K: Duration = Duration::from_millis(10);
 
-    /// Maximum time for selection replace with 10K items
+    /// Maximum time to resolve a 10K-hit marquee
     pub const SELECTION_REPLACE_10K: Duration = Duration::from_millis(50);
 
-    /// Maximum time for sync_to_model with 1K items
-    pub const SELECTION_SYNC_TO_1K: Duration = Duration::from_millis(30);
-
-    /// Maximum time for sync_from_model with 1K items
-    pub const SELECTION_SYNC_FROM_1K: Duration = Duration::from_millis(30);
+    /// Maximum time to project a selection into 1K model rows
+    pub const SELECTION_PROJECT_1K: Duration = Duration::from_millis(30);
 
     /// Maximum time for commit_drag with 100 selected of 1K
     pub const COMMIT_DRAG_100_OF_1K: Duration = Duration::from_millis(30);
@@ -205,21 +202,27 @@ fn populate_cache(count: usize, spacing: f32) -> GeometryCache<SimpleNodeGeometr
 
         // Add input pin (type 1) on left side
         let input_pin_id = node.id * 10;
-        cache.pin_positions.insert(input_pin_id, StoredPin {
-            node_id: node.id,
-            pin_type: 1, // Input
-            rel_x: 0.0,
-            rel_y: 40.0,
-        });
+        cache.pin_positions.insert(
+            input_pin_id,
+            StoredPin {
+                node_id: node.id,
+                pin_type: 1, // Input
+                rel_x: 0.0,
+                rel_y: 40.0,
+            },
+        );
 
         // Add output pin (type 2) on right side
         let output_pin_id = node.id * 10 + 1;
-        cache.pin_positions.insert(output_pin_id, StoredPin {
-            node_id: node.id,
-            pin_type: 2, // Output
-            rel_x: 100.0,
-            rel_y: 40.0,
-        });
+        cache.pin_positions.insert(
+            output_pin_id,
+            StoredPin {
+                node_id: node.id,
+                pin_type: 2, // Output
+                rel_x: 100.0,
+                rel_y: 40.0,
+            },
+        );
     }
 
     cache
@@ -273,9 +276,15 @@ struct TestLink {
 }
 
 impl LinkModel for TestLink {
-    fn id(&self) -> i32 { self.id }
-    fn start_pin_id(&self) -> i32 { self.start_pin_id }
-    fn end_pin_id(&self) -> i32 { self.end_pin_id }
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn start_pin_id(&self) -> i32 {
+        self.start_pin_id
+    }
+    fn end_pin_id(&self) -> i32 {
+        self.end_pin_id
+    }
 }
 
 // ============================================================================
@@ -287,14 +296,40 @@ struct TestMovableNode {
     id: i32,
     x: f32,
     y: f32,
+    selected: bool,
 }
 
 impl slint_node_editor::MovableNode for TestMovableNode {
-    fn id(&self) -> i32 { self.id }
-    fn x(&self) -> f32 { self.x }
-    fn y(&self) -> f32 { self.y }
-    fn set_x(&mut self, x: f32) { self.x = x; }
-    fn set_y(&mut self, y: f32) { self.y = y; }
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn x(&self) -> f32 {
+        self.x
+    }
+    fn y(&self) -> f32 {
+        self.y
+    }
+    fn selected(&self) -> bool {
+        self.selected
+    }
+    fn set_x(&mut self, x: f32) {
+        self.x = x;
+    }
+    fn set_y(&mut self, y: f32) {
+        self.y = y;
+    }
+}
+
+/// `count` nodes on a grid, the first `selected_count` of them selected.
+fn movable_nodes(count: usize, selected_count: usize) -> Vec<TestMovableNode> {
+    (0..count)
+        .map(|i| TestMovableNode {
+            id: i as i32,
+            x: (i % 100) as f32 * 150.0,
+            y: (i / 100) as f32 * 150.0,
+            selected: i < selected_count,
+        })
+        .collect()
 }
 
 // ============================================================================
@@ -309,7 +344,11 @@ fn test_cache_populate_1k_nodes() {
 
     assert_eq!(cache.node_rects.len(), SCALE_SMALL);
     assert_eq!(cache.pin_positions.len(), SCALE_SMALL * 2); // 2 pins per node
-    assert_timing!(elapsed, thresholds::CACHE_POPULATE_1K, "Cache population (1K)");
+    assert_timing!(
+        elapsed,
+        thresholds::CACHE_POPULATE_1K,
+        "Cache population (1K)"
+    );
 }
 
 #[test]
@@ -320,7 +359,11 @@ fn test_cache_populate_10k_nodes() {
 
     assert_eq!(cache.node_rects.len(), SCALE_LARGE);
     assert_eq!(cache.pin_positions.len(), SCALE_LARGE * 2);
-    assert_timing!(elapsed, thresholds::CACHE_POPULATE_10K, "Cache population (10K)");
+    assert_timing!(
+        elapsed,
+        thresholds::CACHE_POPULATE_10K,
+        "Cache population (10K)"
+    );
 }
 
 // ============================================================================
@@ -442,7 +485,11 @@ fn test_find_link_at_simulated_mouse_tracking() {
 
     let elapsed = start.elapsed();
 
-    assert_timing!(elapsed, thresholds::LINK_HIT_100_QUERIES, "100 link queries");
+    assert_timing!(
+        elapsed,
+        thresholds::LINK_HIT_100_QUERIES,
+        "100 link queries"
+    );
 }
 
 // ============================================================================
@@ -459,7 +506,11 @@ fn test_box_selection_1k_nodes_small_box() {
     let elapsed = start.elapsed();
 
     assert!(!selected.is_empty(), "Should select some nodes");
-    assert_timing!(elapsed, thresholds::BOX_SELECT_1K, "Box selection (1K, small box)");
+    assert_timing!(
+        elapsed,
+        thresholds::BOX_SELECT_1K,
+        "Box selection (1K, small box)"
+    );
 }
 
 #[test]
@@ -469,14 +520,20 @@ fn test_box_selection_10k_nodes_full_canvas() {
     // Large selection box covering all nodes
     let start = Instant::now();
     let selected = nodes_in_selection_box(
-        0.0, 0.0,
-        20000.0, 20000.0, // Large enough to cover all
+        0.0,
+        0.0,
+        20000.0,
+        20000.0, // Large enough to cover all
         nodes.iter().copied(),
     );
     let elapsed = start.elapsed();
 
     assert_eq!(selected.len(), SCALE_LARGE, "Should select all nodes");
-    assert_timing!(elapsed, thresholds::BOX_SELECT_10K, "Box selection (10K, full canvas)");
+    assert_timing!(
+        elapsed,
+        thresholds::BOX_SELECT_10K,
+        "Box selection (10K, full canvas)"
+    );
 }
 
 #[test]
@@ -485,94 +542,99 @@ fn test_box_selection_10k_nodes_empty_area() {
 
     // Selection box in empty area
     let start = Instant::now();
-    let selected = nodes_in_selection_box(
-        -10000.0, -10000.0,
-        100.0, 100.0,
-        nodes.iter().copied(),
-    );
+    let selected = nodes_in_selection_box(-10000.0, -10000.0, 100.0, 100.0, nodes.iter().copied());
     let elapsed = start.elapsed();
 
     assert!(selected.is_empty(), "Should select no nodes");
-    assert_timing!(elapsed, thresholds::BOX_SELECT_10K, "Box selection (10K, empty area)");
+    assert_timing!(
+        elapsed,
+        thresholds::BOX_SELECT_10K,
+        "Box selection (10K, empty area)"
+    );
 }
 
 // ============================================================================
-// Selection Manager Tests
+// Selection Tests
+//
+// Selection is resolved as absolute sets over the model rows, so these measure
+// the shapes actually on the gesture path: read the current set out of 1K rows,
+// resolve it, project it back.
 // ============================================================================
 
 #[test]
-fn test_selection_manager_add_1k_items() {
-    let mut selection = SelectionManager::new();
-
+fn test_shift_click_extends_1k_selection() {
     let start = Instant::now();
-    for i in 0..SCALE_SMALL {
-        selection.handle_interaction(i as i32, true); // Shift+click to add
+    let mut current: Vec<i32> = Vec::new();
+    for i in 0..SCALE_SMALL as i32 {
+        current = resolve_click(&current, i, true);
     }
     let elapsed = start.elapsed();
 
-    assert_eq!(selection.len(), SCALE_SMALL);
-    assert_timing!(elapsed, thresholds::SELECTION_ADD_1K, "Adding 1K items");
+    assert_eq!(current.len(), SCALE_SMALL);
+    assert_timing!(
+        elapsed,
+        thresholds::SELECTION_ADD_1K,
+        "1K shift-click extends"
+    );
 }
 
 #[test]
-fn test_selection_manager_contains_check_1k() {
-    let mut selection = SelectionManager::new();
-    let ids: Vec<i32> = (0..SCALE_SMALL as i32).collect();
-    selection.replace_selection(ids.clone());
+fn test_selected_rows_scan_1k() {
+    let model = Rc::new(VecModel::from(movable_nodes(SCALE_SMALL, SCALE_SMALL)));
 
     let start = Instant::now();
-    for id in &ids {
-        assert!(selection.contains(*id));
-    }
+    let ids = selected_rows(&*model, |n| n.id, |n| n.selected);
     let elapsed = start.elapsed();
 
-    assert_timing!(elapsed, thresholds::SELECTION_CONTAINS_1K, "1K contains checks");
+    assert_eq!(ids.len(), SCALE_SMALL);
+    assert_timing!(
+        elapsed,
+        thresholds::SELECTION_CONTAINS_1K,
+        "1K selected-rows scan"
+    );
 }
 
 #[test]
-fn test_selection_manager_replace_10k() {
-    let mut selection = SelectionManager::new();
-
-    // Pre-populate with some items
-    selection.replace_selection(0..1000);
-
-    let ids: Vec<i32> = (0..SCALE_LARGE as i32).collect();
+fn test_box_resolve_replaces_10k() {
+    let current: Vec<i32> = (0..1000).collect();
+    let hits: Vec<i32> = (0..SCALE_LARGE as i32).collect();
 
     let start = Instant::now();
-    selection.replace_selection(ids);
+    let next = resolve_box(&current, hits, false);
     let elapsed = start.elapsed();
 
-    assert_eq!(selection.len(), SCALE_LARGE);
-    assert_timing!(elapsed, thresholds::SELECTION_REPLACE_10K, "Replace with 10K items");
+    assert_eq!(next.len(), SCALE_LARGE);
+    assert_timing!(
+        elapsed,
+        thresholds::SELECTION_REPLACE_10K,
+        "Box replace with 10K hits"
+    );
 }
 
 #[test]
-fn test_selection_sync_to_model_1k() {
-    let mut selection = SelectionManager::new();
-    selection.replace_selection(0..SCALE_SMALL as i32);
-
-    let model = Rc::new(VecModel::<i32>::default());
+fn test_selection_project_1k() {
+    let model = Rc::new(VecModel::from(movable_nodes(SCALE_SMALL, 0)));
+    let wanted: Vec<i32> = (0..SCALE_SMALL as i32).step_by(2).collect();
 
     let start = Instant::now();
-    selection.sync_to_model(&model);
+    project_selection(
+        &*model,
+        |row| wanted.binary_search(&row.id).is_ok(),
+        |row| &mut row.selected,
+    );
     let elapsed = start.elapsed();
 
-    assert_eq!(model.row_count(), SCALE_SMALL);
-    assert_timing!(elapsed, thresholds::SELECTION_SYNC_TO_1K, "sync_to_model (1K)");
-}
-
-#[test]
-fn test_selection_sync_from_model_1k() {
-    let mut selection = SelectionManager::new();
-    let ids: Vec<i32> = (0..SCALE_SMALL as i32).collect();
-    let model = Rc::new(VecModel::from(ids));
-
-    let start = Instant::now();
-    selection.sync_from_model(model.as_ref());
-    let elapsed = start.elapsed();
-
-    assert_eq!(selection.len(), SCALE_SMALL);
-    assert_timing!(elapsed, thresholds::SELECTION_SYNC_FROM_1K, "sync_from_model (1K)");
+    assert_eq!(
+        (0..model.row_count())
+            .filter(|&i| model.row_data(i).unwrap().selected)
+            .count(),
+        SCALE_SMALL / 2
+    );
+    assert_timing!(
+        elapsed,
+        thresholds::SELECTION_PROJECT_1K,
+        "project_selection (1K)"
+    );
 }
 
 // ============================================================================
@@ -581,51 +643,36 @@ fn test_selection_sync_from_model_1k() {
 
 #[test]
 fn test_commit_drag_100_selected_of_1k() {
-    let nodes: Vec<TestMovableNode> = (0..SCALE_SMALL)
-        .map(|i| TestMovableNode {
-            id: i as i32,
-            x: (i % 100) as f32 * 150.0,
-            y: (i / 100) as f32 * 150.0,
-        })
-        .collect();
-
-    let model = Rc::new(VecModel::from(nodes));
-
-    let mut selection = SelectionManager::new();
-    // Select first 100 nodes
-    selection.replace_selection(0..100);
+    let model = Rc::new(VecModel::from(movable_nodes(SCALE_SMALL, 100)));
 
     let start = Instant::now();
-    GraphLogic::commit_drag(&model, &selection, 50.0, 50.0);
+    GraphLogic::commit_drag(&model, 0, 50.0, 50.0);
     let elapsed = start.elapsed();
 
     // Verify some nodes moved
     let node0 = model.row_data(0).unwrap();
     assert_eq!(node0.x, 50.0); // Was at 0, moved by 50
 
-    assert_timing!(elapsed, thresholds::COMMIT_DRAG_100_OF_1K, "commit_drag (100 of 1K)");
+    assert_timing!(
+        elapsed,
+        thresholds::COMMIT_DRAG_100_OF_1K,
+        "commit_drag (100 of 1K)"
+    );
 }
 
 #[test]
 fn test_commit_drag_1k_selected_of_10k() {
-    let nodes: Vec<TestMovableNode> = (0..SCALE_LARGE)
-        .map(|i| TestMovableNode {
-            id: i as i32,
-            x: (i % 100) as f32 * 150.0,
-            y: (i / 100) as f32 * 150.0,
-        })
-        .collect();
-
-    let model = Rc::new(VecModel::from(nodes));
-
-    let mut selection = SelectionManager::new();
-    selection.replace_selection(0..SCALE_SMALL as i32);
+    let model = Rc::new(VecModel::from(movable_nodes(SCALE_LARGE, SCALE_SMALL)));
 
     let start = Instant::now();
-    GraphLogic::commit_drag(&model, &selection, 25.0, 25.0);
+    GraphLogic::commit_drag(&model, 0, 25.0, 25.0);
     let elapsed = start.elapsed();
 
-    assert_timing!(elapsed, thresholds::COMMIT_DRAG_1K_OF_10K, "commit_drag (1K of 10K)");
+    assert_timing!(
+        elapsed,
+        thresholds::COMMIT_DRAG_1K_OF_10K,
+        "commit_drag (1K of 10K)"
+    );
 }
 
 // ============================================================================
@@ -638,19 +685,28 @@ fn test_find_links_connected_to_node_1k_links() {
 
     let links: Vec<TestLink> = generate_chain_links(SCALE_SMALL)
         .into_iter()
-        .map(|(id, start, end)| TestLink { id, start_pin_id: start, end_pin_id: end })
+        .map(|(id, start, end)| TestLink {
+            id,
+            start_pin_id: start,
+            end_pin_id: end,
+        })
         .collect();
 
     // Find links connected to node in the middle
     let target_node = (SCALE_SMALL / 2) as i32 + 1;
 
     let start = Instant::now();
-    let connected = GraphLogic::find_links_connected_to_node(target_node, links.iter().cloned(), &cache);
+    let connected =
+        GraphLogic::find_links_connected_to_node(target_node, links.iter().cloned(), &cache);
     let elapsed = start.elapsed();
 
     // Middle node should have 2 connections (incoming and outgoing)
     assert!(!connected.is_empty());
-    assert_timing!(elapsed, thresholds::FIND_CONNECTED_1K, "find_links_connected_to_node (1K)");
+    assert_timing!(
+        elapsed,
+        thresholds::FIND_CONNECTED_1K,
+        "find_links_connected_to_node (1K)"
+    );
 }
 
 #[test]
@@ -659,7 +715,11 @@ fn test_find_links_connected_to_node_5k_mesh() {
 
     let links: Vec<TestLink> = generate_mesh_links(SCALE_SMALL, 5)
         .into_iter()
-        .map(|(id, start, end)| TestLink { id, start_pin_id: start, end_pin_id: end })
+        .map(|(id, start, end)| TestLink {
+            id,
+            start_pin_id: start,
+            end_pin_id: end,
+        })
         .collect();
 
     assert!(links.len() >= SCALE_MEDIUM); // Should have ~5K links
@@ -667,11 +727,16 @@ fn test_find_links_connected_to_node_5k_mesh() {
     let target_node = (SCALE_SMALL / 2) as i32 + 1;
 
     let start = Instant::now();
-    let connected = GraphLogic::find_links_connected_to_node(target_node, links.iter().cloned(), &cache);
+    let connected =
+        GraphLogic::find_links_connected_to_node(target_node, links.iter().cloned(), &cache);
     let elapsed = start.elapsed();
 
     assert!(!connected.is_empty());
-    assert_timing!(elapsed, thresholds::FIND_CONNECTED_5K, "find_links_connected_to_node (5K mesh)");
+    assert_timing!(
+        elapsed,
+        thresholds::FIND_CONNECTED_5K,
+        "find_links_connected_to_node (5K mesh)"
+    );
 }
 
 // ============================================================================
@@ -692,7 +757,11 @@ fn test_compute_link_path_1k_links() {
 
     let elapsed = start.elapsed();
 
-    assert_timing!(elapsed, thresholds::COMPUTE_PATHS_1K, "Computing 1K link paths");
+    assert_timing!(
+        elapsed,
+        thresholds::COMPUTE_PATHS_1K,
+        "Computing 1K link paths"
+    );
 }
 
 #[test]
@@ -713,7 +782,11 @@ fn test_update_all_paths_with_zoom_change() {
 
     let elapsed = start.elapsed();
 
-    assert_timing!(elapsed, thresholds::UPDATE_PATHS_ZOOM, "Updating paths across zoom levels");
+    assert_timing!(
+        elapsed,
+        thresholds::UPDATE_PATHS_ZOOM,
+        "Updating paths across zoom levels"
+    );
 }
 
 // ============================================================================
@@ -722,25 +795,17 @@ fn test_update_all_paths_with_zoom_change() {
 
 #[test]
 fn test_all_nodes_selected_commit_drag() {
-    let nodes: Vec<TestMovableNode> = (0..SCALE_LARGE)
-        .map(|i| TestMovableNode {
-            id: i as i32,
-            x: (i % 100) as f32 * 150.0,
-            y: (i / 100) as f32 * 150.0,
-        })
-        .collect();
-
-    let model = Rc::new(VecModel::from(nodes));
-
-    let mut selection = SelectionManager::new();
-    // Select ALL nodes
-    selection.replace_selection(0..SCALE_LARGE as i32);
+    let model = Rc::new(VecModel::from(movable_nodes(SCALE_LARGE, SCALE_LARGE)));
 
     let start = Instant::now();
-    GraphLogic::commit_drag(&model, &selection, 10.0, 10.0);
+    GraphLogic::commit_drag(&model, 0, 10.0, 10.0);
     let elapsed = start.elapsed();
 
-    assert_timing!(elapsed, thresholds::ALL_SELECTED_DRAG, "All nodes selected drag");
+    assert_timing!(
+        elapsed,
+        thresholds::ALL_SELECTED_DRAG,
+        "All nodes selected drag"
+    );
 }
 
 #[test]
@@ -771,20 +836,23 @@ fn test_dense_links_hit_test() {
 
 #[test]
 fn test_repeated_selection_replace_no_slowdown() {
-    let mut selection = SelectionManager::new();
-
     let start = Instant::now();
 
     // Repeatedly replace selection - should not accumulate memory/slow down
+    let mut current: Vec<i32> = Vec::new();
     for _ in 0..100 {
         let ids: Vec<i32> = (0..SCALE_SMALL as i32).collect();
-        selection.replace_selection(ids);
+        current = resolve_box(&current, ids, false);
     }
 
     let elapsed = start.elapsed();
 
-    assert_eq!(selection.len(), SCALE_SMALL);
-    assert_timing!(elapsed, thresholds::REPEATED_REPLACE, "100 repeated replacements");
+    assert_eq!(current.len(), SCALE_SMALL);
+    assert_timing!(
+        elapsed,
+        thresholds::REPEATED_REPLACE,
+        "100 repeated replacements"
+    );
 }
 
 // ============================================================================
@@ -809,5 +877,9 @@ fn test_generate_bezier_path_1k_calls() {
     let elapsed = start.elapsed();
 
     // Path generation should be very fast (string formatting)
-    assert_timing!(elapsed, Duration::from_millis(50), "1K bezier path generations");
+    assert_timing!(
+        elapsed,
+        Duration::from_millis(50),
+        "1K bezier path generations"
+    );
 }

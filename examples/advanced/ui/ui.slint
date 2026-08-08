@@ -37,6 +37,8 @@ export struct NodeData {
     title: string,
     world-x: float,
     world-y: float,
+    /// Selection lives in the application; it projects the flag into this row.
+    selected: bool,
 }
 
 // Re-export LinkData and NodeEditorComputations for Rust
@@ -178,8 +180,6 @@ export component MainWindow inherits Window {
     in-out property <string> grid-commands;
 
     // Callbacks to Rust for state changes
-    callback selection-changed <=> editor.selection-changed;
-    callback commit-drag <=> editor.node-drag-ended;
     // Note: viewport changes are now handled via NodeEditorComputations global
     callback create-link <=> editor.link-requested;
     callback delete-selected-nodes();  // delete all selected nodes
@@ -194,16 +194,8 @@ export component MainWindow inherits Window {
     callback request-grid-update <=> editor.request-grid-update;
     callback compute-pin-at <=> editor.compute-pin-at;
     callback compute-link-at <=> editor.compute-link-at;
-    callback compute-link-box-selection <=> editor.compute-link-box-selection;
     // Note: compute-link-path, compute-link-preview-path, node-rect, and pin-position are now handled via globals
 
-    // Pure function to snap a value to the grid
-    pure public function snap-to-grid(value: float) -> float {
-        return editor.snap-to-grid(value);
-    }
-
-    // Grid snap toggle (bound to editor.grid-snapping)
-    property <bool> grid-snap-enabled: true;
 
     // Shared pan state (in-out so Rust can read them)
     // Initial pan to center viewport in the minimap (graph center at 800, 600)
@@ -218,20 +210,13 @@ export component MainWindow inherits Window {
     // Link hover state (managed by editor)
     out property <int> hovered-link-id <=> editor.hovered-link-id;
 
-    // Selection state (for implementing selection callbacks)
-    in-out property <[int]> selected-node-ids <=> editor.selected-node-ids;
-    in-out property <[int]> selected-link-ids <=> editor.selected-link-ids;
-
-    // Selection notification callbacks (NodeEditor handles selection logic internally)
+    // Selection intents — Rust owns node and link selection, applies each
+    // gesture, and projects the result into the `selected` field of the node,
+    // filter-node and link rows.
     callback node-selected <=> editor.node-selected;
     callback select-link <=> editor.select-link;
     callback selection-cleared <=> editor.selection-cleared;
-    callback sync-selection-to-links <=> editor.sync-selection-to-links;
-
-    // Selection checking is now via NodeEditorComputations global
-
-    // Selection version counter
-    in-out property <int> selection-version <=> editor.selection-version;
+    callback box-selection-committed <=> editor.box-selection-committed;
 
     // Callback to delete selected links (called from Rust)
     callback delete-selected-links();
@@ -304,7 +289,6 @@ export component MainWindow inherits Window {
         max-zoom: 4.0;
         background-color: #1a1a1a;
         grid-spacing: 24px;
-        grid-snapping <=> grid-snap-enabled;
         grid-color: #333333;
         grid-commands <=> root.grid-commands;
         links <=> root.links;
@@ -321,7 +305,6 @@ export component MainWindow inherits Window {
 
         // Event callbacks aliased to root:
         // link-requested => root.create-link
-        // node-drag-ended => root.commit-drag
         // add-node-requested => root.add-node
 
         context-menu-requested => {
@@ -335,7 +318,7 @@ export component MainWindow inherits Window {
         for node-data in nodes: Node {
             title: node-data.title;
             node-id: node-data.id;
-            selected: NodeEditorComputations.is-node-selected(node-data.id, editor.selection-version);
+            selected: node-data.selected;
             world-x: node-data.world-x * 1px;
             world-y: node-data.world-y * 1px;
             viewport-width: editor.width;
@@ -346,7 +329,7 @@ export component MainWindow inherits Window {
         for filter-data in filter-nodes: FilterNode {
             title: filter-data.title;
             node-id: filter-data.id;
-            selected: NodeEditorComputations.is-node-selected(filter-data.id, editor.selection-version);
+            selected: filter-data.selected;
             world-x: filter-data.world-x * 1px;
             world-y: filter-data.world-y * 1px;
             viewport-width: editor.width;
@@ -368,9 +351,7 @@ export component MainWindow inherits Window {
     } // shortcuts
 
     // Instructions overlay
-    InstructionsOverlay {
-        grid-snap-enabled <=> grid-snap-enabled;
-    }
+    InstructionsOverlay { }
 
     // Zoom indicator
     Rectangle {

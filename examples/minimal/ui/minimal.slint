@@ -14,6 +14,8 @@ export struct NodeData {
     title: string,
     x: float,
     y: float,
+    /// Selection lives in the application; it projects the flag into this row.
+    selected: bool,
 }
 
 // Re-export for Rust
@@ -77,10 +79,15 @@ export component MainWindow inherits Window {
     out property <float> width_: self.width / 1px;
     out property <float> height_: self.height / 1px;
 
+    // Selection intents — Rust applies them and projects the result back into
+    // `nodes`, which is where `selected` below comes from.
+    callback node-selected <=> editor.node-selected;
+    callback selection-cleared <=> editor.selection-cleared;
+    callback box-selection-committed <=> editor.box-selection-committed;
+
     editor := NodeEditor {
         width: 100%;
         height: 100%;
-        grid-snapping: true;  // Disable grid snapping for testing
 
         // Zero boilerplate! Drag offsets computed automatically in BaseNode
         for data in root.nodes: SimpleNode {
@@ -90,7 +97,7 @@ export component MainWindow inherits Window {
             world-y: data.y * 1px;
             viewport-width: editor.width;
             viewport-height: editor.height;
-            selected: NodeEditorComputations.is-node-selected(data.id, editor.selection-version);
+            selected: data.selected;
         }
     }
 }

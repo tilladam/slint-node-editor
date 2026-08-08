@@ -1,8 +1,33 @@
-use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::{wire_node_editor, NodeEditorSetup};
+use slint::{Color, ModelRc, SharedString, VecModel};
+use slint_node_editor::{
+    wire_node_editor, wire_selection, GraphLogic, MovableNode, NodeEditorSetup,
+};
 use std::rc::Rc;
 
 slint::include_modules!();
+
+// The row is the node: position and selection both live here, so a drag
+// commit reads the same `selected` the editor renders.
+impl MovableNode for NodeData {
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn x(&self) -> f32 {
+        self.x
+    }
+    fn y(&self) -> f32 {
+        self.y
+    }
+    fn selected(&self) -> bool {
+        self.selected
+    }
+    fn set_x(&mut self, x: f32) {
+        self.x = x;
+    }
+    fn set_y(&mut self, y: f32) {
+        self.y = y;
+    }
+}
 
 fn main() {
     let window = MainWindow::new().unwrap();
@@ -14,6 +39,7 @@ fn main() {
             x: 80.0,
             y: 80.0,
             color: Color::from_argb_u8(255, 229, 57, 53), // red
+            selected: false,
         },
         NodeData {
             id: 2,
@@ -21,6 +47,7 @@ fn main() {
             x: 380.0,
             y: 60.0,
             color: Color::from_argb_u8(255, 156, 39, 176), // purple
+            selected: false,
         },
         NodeData {
             id: 3,
@@ -28,6 +55,7 @@ fn main() {
             x: 380.0,
             y: 220.0,
             color: Color::from_argb_u8(255, 0, 137, 123), // teal
+            selected: false,
         },
         NodeData {
             id: 4,
@@ -35,6 +63,7 @@ fn main() {
             x: 680.0,
             y: 140.0,
             color: Color::from_argb_u8(255, 30, 136, 229), // blue
+            selected: false,
         },
         NodeData {
             id: 5,
@@ -42,6 +71,7 @@ fn main() {
             x: 680.0,
             y: 320.0,
             color: Color::from_argb_u8(255, 255, 179, 0), // amber
+            selected: false,
         },
     ]));
     window.set_nodes(ModelRc::from(nodes.clone()));
@@ -54,6 +84,7 @@ fn main() {
             color: Color::from_argb_u8(255, 244, 143, 177), // pink
             line_width: 2.5,
             status: -1,
+            selected: false,
         },
         LinkData {
             id: 2,
@@ -62,6 +93,7 @@ fn main() {
             color: Color::from_argb_u8(255, 128, 203, 196), // teal light
             line_width: 2.5,
             status: -1,
+            selected: false,
         },
         LinkData {
             id: 3,
@@ -70,6 +102,7 @@ fn main() {
             color: Color::from_argb_u8(255, 206, 147, 216), // purple light
             line_width: 2.5,
             status: -1,
+            selected: false,
         },
         LinkData {
             id: 4,
@@ -78,6 +111,7 @@ fn main() {
             color: Color::from_argb_u8(255, 100, 221, 221), // cyan
             line_width: 2.5,
             status: -1,
+            selected: false,
         },
         LinkData {
             id: 5,
@@ -86,26 +120,19 @@ fn main() {
             color: Color::from_argb_u8(255, 255, 213, 79), // amber light
             line_width: 2.5,
             status: -1,
+            selected: false,
         },
     ]))));
 
     let setup = NodeEditorSetup::new({
         let nodes = nodes.clone();
-        move |node_id, delta_x, delta_y| {
-            for i in 0..nodes.row_count() {
-                if let Some(mut node) = nodes.row_data(i) {
-                    if node.id == node_id {
-                        node.x += delta_x;
-                        node.y += delta_y;
-                        nodes.set_row_data(i, node);
-                        break;
-                    }
-                }
-            }
+        move |dragged, delta_x, delta_y| {
+            GraphLogic::commit_drag(&nodes, dragged, delta_x, delta_y);
         }
     });
 
     wire_node_editor!(window, setup);
+    wire_selection!(window, setup, nodes);
 
     window.run().unwrap();
 }

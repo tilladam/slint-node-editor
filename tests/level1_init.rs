@@ -61,10 +61,8 @@ fn test_controller_initializes_with_defaults() {
 fn test_selection_starts_empty() {
     let harness = MinimalTestHarness::new();
 
-    assert!(harness.selection.borrow().is_empty());
-    assert_eq!(harness.selection.borrow().len(), 0);
-    assert!(!harness.selection.borrow().contains(1));
-    assert!(!harness.selection.borrow().contains(2));
+    assert!(harness.selected_node_ids().is_empty());
+    assert!(harness.selected_link_ids().is_empty());
 }
 
 #[test]
@@ -73,14 +71,13 @@ fn test_custom_nodes_and_links() {
     use slint::SharedString;
 
     let harness = MinimalTestHarness::with_nodes_and_links(
-        vec![
-            NodeData {
-                id: 10,
-                title: SharedString::from("Custom Node"),
-                x: 50.0,
-                y: 75.0,
-            },
-        ],
+        vec![NodeData {
+            id: 10,
+            title: SharedString::from("Custom Node"),
+            x: 50.0,
+            y: 75.0,
+            selected: false,
+        }],
         vec![],
     );
 
@@ -108,7 +105,6 @@ fn test_callback_tracker_starts_empty() {
     assert!(harness.tracker.node_drag_ended.borrow().is_empty());
     assert!(harness.tracker.link_requested.borrow().is_empty());
     assert_eq!(*harness.tracker.link_cancelled.borrow(), 0);
-    assert_eq!(*harness.tracker.selection_changed.borrow(), 0);
 }
 
 #[test]

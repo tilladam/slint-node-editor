@@ -1,8 +1,33 @@
-use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::{wire_node_editor, NodeEditorSetup};
+use slint::{Color, ModelRc, SharedString, VecModel};
+use slint_node_editor::{
+    wire_node_editor, wire_selection, GraphLogic, MovableNode, NodeEditorSetup,
+};
 use std::rc::Rc;
 
 slint::include_modules!();
+
+// The row is the node: its position and whether it's selected both live here,
+// which is what lets a drag commit read the same `selected` the editor renders.
+impl MovableNode for NodeData {
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn x(&self) -> f32 {
+        self.x
+    }
+    fn y(&self) -> f32 {
+        self.y
+    }
+    fn selected(&self) -> bool {
+        self.selected
+    }
+    fn set_x(&mut self, x: f32) {
+        self.x = x;
+    }
+    fn set_y(&mut self, y: f32) {
+        self.y = y;
+    }
+}
 
 fn main() {
     let window = MainWindow::new().unwrap();
@@ -14,12 +39,14 @@ fn main() {
             title: SharedString::from("Node A"),
             x: 100.0,
             y: 100.0,
+            selected: false,
         },
         NodeData {
             id: 2,
             title: SharedString::from("Node B"),
             x: 400.0,
             y: 200.0,
+            selected: false,
         },
     ]));
     window.set_nodes(ModelRc::from(nodes.clone()));
@@ -32,27 +59,21 @@ fn main() {
         color: Color::from_argb_u8(255, 100, 180, 255),
         line_width: 2.0,
         status: -1,
+        selected: false,
     }]))));
 
-    // Create setup with model update logic
+    // Commit a finished drag: the dragged node, plus anything else the rows
+    // show as selected. There is no selection state to keep anywhere else.
     let setup = NodeEditorSetup::new({
         let nodes = nodes.clone();
-        move |node_id, delta_x, delta_y| {
-            for i in 0..nodes.row_count() {
-                if let Some(mut node) = nodes.row_data(i) {
-                    if node.id == node_id {
-                        node.x += delta_x;
-                        node.y += delta_y;
-                        nodes.set_row_data(i, node);
-                        break;
-                    }
-                }
-            }
+        move |dragged, delta_x, delta_y| {
+            GraphLogic::commit_drag(&nodes, dragged, delta_x, delta_y);
         }
     });
 
     // Wire all callbacks with one macro call
     wire_node_editor!(window, setup);
+    wire_selection!(window, setup, nodes);
 
     window.run().unwrap();
 }

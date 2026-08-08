@@ -1,5 +1,4 @@
 use crate::hit_test::{NodeGeometry, SimpleNodeGeometry};
-use crate::selection::SelectionManager;
 use crate::state::GeometryCache;
 use slint::{Color, Model, VecModel};
 use std::fmt;
@@ -122,10 +121,17 @@ impl LinkModel for SimpleLink {
 
 /// Trait for nodes that can be moved (dragged) in the editor.
 /// This allows generic logic to update node positions.
+///
+/// `selected` is part of the contract because a drag commits the *co-selected*
+/// set, not just the dragged node — and it must read that from the same place
+/// the rendering does. The row already carries the flag (the editor renders it
+/// from there); asking a separate set instead is what lets a drag's visuals and
+/// its commit disagree.
 pub trait MovableNode: Clone + 'static {
     fn id(&self) -> i32;
     fn x(&self) -> f32;
     fn y(&self) -> f32;
+    fn selected(&self) -> bool;
     fn set_x(&mut self, x: f32);
     fn set_y(&mut self, y: f32);
 }
@@ -189,19 +195,26 @@ impl GraphLogic {
         }
     }
 
-    /// Apply a drag translation to selected nodes in a model
-    pub fn commit_drag<T>(
-        model: &VecModel<T>,
-        selection: &SelectionManager,
-        delta_x: f32,
-        delta_y: f32,
-    ) where
+    /// Commit a finished drag of `dragged_id` into a node model.
+    ///
+    /// A row moves if it is selected, or if it is the dragged node itself. That
+    /// one rule covers every case without a second source of truth to consult:
+    ///
+    /// - Dragging a node that is part of a multi-selection moves the whole
+    ///   selection, because the editor selects an unselected node before it
+    ///   starts dragging it.
+    /// - A host that wires no selection at all has no selected rows, so only
+    ///   the dragged node moves.
+    /// - Splitting nodes across several models composes: the dragged node lives
+    ///   in exactly one of them and always moves, and selected rows in every
+    ///   model move with it. Call this once per model.
+    pub fn commit_drag<T>(model: &VecModel<T>, dragged_id: i32, delta_x: f32, delta_y: f32)
+    where
         T: MovableNode,
     {
         for i in 0..model.row_count() {
             if let Some(mut node) = model.row_data(i) {
-                let id = MovableNode::id(&node);
-                if selection.contains(id) {
+                if node.selected() || node.id() == dragged_id {
                     node.set_x(node.x() + delta_x);
                     node.set_y(node.y() + delta_y);
                     model.set_row_data(i, node);
@@ -1186,155 +1199,106 @@ mod tests {
     // GraphLogic::commit_drag() tests
     // ========================================================================
 
-    #[test]
-    fn test_commit_drag_moves_selected_nodes() {
-        #[derive(Clone)]
-        struct TestMovableNode {
-            id: i32,
-            x: f32,
-            y: f32,
+    #[derive(Clone)]
+    struct TestMovableNode {
+        id: i32,
+        x: f32,
+        y: f32,
+        selected: bool,
+    }
+
+    impl MovableNode for TestMovableNode {
+        fn id(&self) -> i32 {
+            self.id
         }
-
-        impl MovableNode for TestMovableNode {
-            fn id(&self) -> i32 {
-                self.id
-            }
-            fn x(&self) -> f32 {
-                self.x
-            }
-            fn y(&self) -> f32 {
-                self.y
-            }
-            fn set_x(&mut self, x: f32) {
-                self.x = x;
-            }
-            fn set_y(&mut self, y: f32) {
-                self.y = y;
-            }
+        fn x(&self) -> f32 {
+            self.x
         }
+        fn y(&self) -> f32 {
+            self.y
+        }
+        fn selected(&self) -> bool {
+            self.selected
+        }
+        fn set_x(&mut self, x: f32) {
+            self.x = x;
+        }
+        fn set_y(&mut self, y: f32) {
+            self.y = y;
+        }
+    }
 
-        let model = std::rc::Rc::new(VecModel::from(vec![
-            TestMovableNode {
-                id: 1,
-                x: 0.0,
-                y: 0.0,
-            },
-            TestMovableNode {
-                id: 2,
-                x: 100.0,
-                y: 100.0,
-            },
-            TestMovableNode {
-                id: 3,
-                x: 200.0,
-                y: 200.0,
-            },
-        ]));
+    /// `(id, x, y, selected)` rows.
+    fn movable_model(rows: &[(i32, f32, f32, bool)]) -> std::rc::Rc<VecModel<TestMovableNode>> {
+        std::rc::Rc::new(VecModel::from(
+            rows.iter()
+                .map(|&(id, x, y, selected)| TestMovableNode { id, x, y, selected })
+                .collect::<Vec<_>>(),
+        ))
+    }
 
-        let mut selection = crate::selection::SelectionManager::new();
-        selection.replace_selection(vec![1, 3]); // Select nodes 1 and 3
-
-        GraphLogic::commit_drag(&model, &selection, 10.0, 20.0);
-
-        // Node 1 should be moved
-        let node1 = model.row_data(0).unwrap();
-        assert_eq!(node1.x, 10.0);
-        assert_eq!(node1.y, 20.0);
-
-        // Node 2 should NOT be moved (not selected)
-        let node2 = model.row_data(1).unwrap();
-        assert_eq!(node2.x, 100.0);
-        assert_eq!(node2.y, 100.0);
-
-        // Node 3 should be moved
-        let node3 = model.row_data(2).unwrap();
-        assert_eq!(node3.x, 210.0);
-        assert_eq!(node3.y, 220.0);
+    fn positions(model: &VecModel<TestMovableNode>) -> Vec<(f32, f32)> {
+        (0..model.row_count())
+            .filter_map(|i| model.row_data(i))
+            .map(|n| (n.x, n.y))
+            .collect()
     }
 
     #[test]
-    fn test_commit_drag_empty_selection() {
-        #[derive(Clone)]
-        struct TestMovableNode {
-            id: i32,
-            x: f32,
-            y: f32,
-        }
+    fn commit_drag_moves_the_whole_selection() {
+        let model = movable_model(&[
+            (1, 0.0, 0.0, true),
+            (2, 100.0, 100.0, false),
+            (3, 200.0, 200.0, true),
+        ]);
 
-        impl MovableNode for TestMovableNode {
-            fn id(&self) -> i32 {
-                self.id
-            }
-            fn x(&self) -> f32 {
-                self.x
-            }
-            fn y(&self) -> f32 {
-                self.y
-            }
-            fn set_x(&mut self, x: f32) {
-                self.x = x;
-            }
-            fn set_y(&mut self, y: f32) {
-                self.y = y;
-            }
-        }
+        GraphLogic::commit_drag(&model, 1, 10.0, 20.0);
 
-        let model = std::rc::Rc::new(VecModel::from(vec![TestMovableNode {
-            id: 1,
-            x: 50.0,
-            y: 50.0,
-        }]));
-
-        let selection = crate::selection::SelectionManager::new(); // Empty
-
-        GraphLogic::commit_drag(&model, &selection, 100.0, 100.0);
-
-        // Node should NOT be moved
-        let node = model.row_data(0).unwrap();
-        assert_eq!(node.x, 50.0);
-        assert_eq!(node.y, 50.0);
+        // The unselected node 2 stays put.
+        assert_eq!(
+            positions(&model),
+            vec![(10.0, 20.0), (100.0, 100.0), (210.0, 220.0)]
+        );
     }
 
     #[test]
-    fn test_commit_drag_negative_delta() {
-        #[derive(Clone)]
-        struct TestMovableNode {
-            id: i32,
-            x: f32,
-            y: f32,
-        }
+    fn commit_drag_moves_the_dragged_node_even_when_nothing_is_selected() {
+        // A host that wires no selection at all still gets working drags.
+        let model = movable_model(&[(1, 50.0, 50.0, false), (2, 0.0, 0.0, false)]);
 
-        impl MovableNode for TestMovableNode {
-            fn id(&self) -> i32 {
-                self.id
-            }
-            fn x(&self) -> f32 {
-                self.x
-            }
-            fn y(&self) -> f32 {
-                self.y
-            }
-            fn set_x(&mut self, x: f32) {
-                self.x = x;
-            }
-            fn set_y(&mut self, y: f32) {
-                self.y = y;
-            }
-        }
+        GraphLogic::commit_drag(&model, 1, 100.0, 100.0);
 
-        let model = std::rc::Rc::new(VecModel::from(vec![TestMovableNode {
-            id: 1,
-            x: 100.0,
-            y: 100.0,
-        }]));
+        assert_eq!(positions(&model), vec![(150.0, 150.0), (0.0, 0.0)]);
+    }
 
-        let mut selection = crate::selection::SelectionManager::new();
-        selection.handle_interaction(1, false);
+    #[test]
+    fn commit_drag_ignores_a_dragged_id_from_another_model() {
+        // Splitting nodes across models: the dragged node lives in exactly one
+        // of them, and this call sees only the selected rows of its own.
+        let model = movable_model(&[(1, 0.0, 0.0, true), (2, 100.0, 100.0, false)]);
 
-        GraphLogic::commit_drag(&model, &selection, -50.0, -30.0);
+        GraphLogic::commit_drag(&model, 99, 10.0, 10.0);
 
-        let node = model.row_data(0).unwrap();
-        assert_eq!(node.x, 50.0);
-        assert_eq!(node.y, 70.0);
+        assert_eq!(positions(&model), vec![(10.0, 10.0), (100.0, 100.0)]);
+    }
+
+    #[test]
+    fn commit_drag_does_not_move_a_selected_node_twice() {
+        // The dragged node is normally selected too — the two clauses of the
+        // rule must not both fire.
+        let model = movable_model(&[(1, 0.0, 0.0, true)]);
+
+        GraphLogic::commit_drag(&model, 1, 10.0, 20.0);
+
+        assert_eq!(positions(&model), vec![(10.0, 20.0)]);
+    }
+
+    #[test]
+    fn commit_drag_accepts_a_negative_delta() {
+        let model = movable_model(&[(1, 100.0, 100.0, true)]);
+
+        GraphLogic::commit_drag(&model, 1, -50.0, -30.0);
+
+        assert_eq!(positions(&model), vec![(50.0, 70.0)]);
     }
 }

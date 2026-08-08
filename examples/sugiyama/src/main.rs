@@ -4,15 +4,39 @@ use std::rc::Rc;
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    sugiyama_layout, wire_node_editor, Direction, NodeEditorSetup, SugiyamaConfig,
+    sugiyama_layout, wire_node_editor, wire_selection, Direction, GraphLogic, MovableNode,
+    NodeEditorSetup, SugiyamaConfig,
 };
 
 slint::include_modules!();
 
+// The row is the node: position and selection both live here, so a drag
+// commit reads the same `selected` the editor renders.
+impl MovableNode for NodeData {
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn x(&self) -> f32 {
+        self.x
+    }
+    fn y(&self) -> f32 {
+        self.y
+    }
+    fn selected(&self) -> bool {
+        self.selected
+    }
+    fn set_x(&mut self, x: f32) {
+        self.x = x;
+    }
+    fn set_y(&mut self, y: f32) {
+        self.y = y;
+    }
+}
+
 /// Deterministic LCG — produces the same sequence on first click after each
 /// restart, but varies across subsequent clicks within a session.
 fn random_f32() -> f32 {
-    thread_local! { static SEED: Cell<u64> = Cell::new(12345); }
+    thread_local! { static SEED: Cell<u64> = const { Cell::new(12345) }; }
     SEED.with(|s| {
         let v = s.get().wrapping_mul(6364136223846793005).wrapping_add(1);
         s.set(v);
@@ -44,48 +68,56 @@ fn main() {
             title: SharedString::from("Input"),
             x: 50.0,
             y: 50.0,
+            selected: false,
         },
         NodeData {
             id: 2,
             title: SharedString::from("Parse"),
             x: 50.0,
             y: 120.0,
+            selected: false,
         },
         NodeData {
             id: 3,
             title: SharedString::from("Validate"),
             x: 50.0,
             y: 190.0,
+            selected: false,
         },
         NodeData {
             id: 4,
             title: SharedString::from("Transform"),
             x: 50.0,
             y: 260.0,
+            selected: false,
         },
         NodeData {
             id: 5,
             title: SharedString::from("Filter"),
             x: 50.0,
             y: 330.0,
+            selected: false,
         },
         NodeData {
             id: 6,
             title: SharedString::from("Merge"),
             x: 50.0,
             y: 400.0,
+            selected: false,
         },
         NodeData {
             id: 7,
             title: SharedString::from("Format"),
             x: 50.0,
             y: 470.0,
+            selected: false,
         },
         NodeData {
             id: 8,
             title: SharedString::from("Output"),
             x: 50.0,
             y: 540.0,
+            selected: false,
         },
     ]));
     window.set_nodes(ModelRc::from(nodes.clone()));
@@ -117,6 +149,7 @@ fn main() {
             color: link_color,
             line_width: 2.0,
             status: -1,
+            selected: false,
         })
         .collect();
     window.set_links(ModelRc::from(Rc::new(VecModel::from(link_data))));
@@ -207,22 +240,14 @@ fn main() {
     // Create setup with model update logic
     let setup = NodeEditorSetup::new({
         let nodes = nodes.clone();
-        move |node_id, delta_x, delta_y| {
-            for i in 0..nodes.row_count() {
-                if let Some(mut node) = nodes.row_data(i) {
-                    if node.id == node_id {
-                        node.x += delta_x;
-                        node.y += delta_y;
-                        nodes.set_row_data(i, node);
-                        break;
-                    }
-                }
-            }
+        move |dragged, delta_x, delta_y| {
+            GraphLogic::commit_drag(&nodes, dragged, delta_x, delta_y);
         }
     });
 
     // Wire all callbacks with one macro call
     wire_node_editor!(window, setup);
+    wire_selection!(window, setup, nodes);
 
     window.run().unwrap();
 }

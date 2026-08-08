@@ -11,13 +11,34 @@ use slint::{
     Color, ComponentHandle, LogicalPosition, Model, ModelRc, SharedString, VecModel,
 };
 use slint_node_editor::{
-    wire_node_editor, NodeEditorController, NodeEditorSetup, SelectionManager,
+    selection, wire_node_editor, wire_selection, GraphLogic, MovableNode, NodeEditorController,
+    NodeEditorSetup,
 };
-use std::cell::RefCell;
 use std::rc::Rc;
 
 // Include the compiled UI from build.rs
 slint::include_modules!();
+
+impl MovableNode for NodeData {
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn x(&self) -> f32 {
+        self.x
+    }
+    fn y(&self) -> f32 {
+        self.y
+    }
+    fn selected(&self) -> bool {
+        self.selected
+    }
+    fn set_x(&mut self, x: f32) {
+        self.x = x;
+    }
+    fn set_y(&mut self, y: f32) {
+        self.y = y;
+    }
+}
 
 /// Initialize the testing backend for this thread.
 /// With init_no_event_loop(), each test thread can have its own backend instance.
@@ -45,7 +66,6 @@ pub struct MinimalTestHarness {
     pub nodes: Rc<VecModel<NodeData>>,
     pub links: Rc<VecModel<LinkData>>,
     pub tracker: CallbackTracker,
-    pub selection: Rc<RefCell<SelectionManager>>,
 }
 
 impl MinimalTestHarness {
@@ -58,12 +78,14 @@ impl MinimalTestHarness {
                     title: SharedString::from("Node A"),
                     x: 100.0,
                     y: 100.0,
+                    selected: false,
                 },
                 NodeData {
                     id: 2,
                     title: SharedString::from("Node B"),
                     x: 400.0,
                     y: 200.0,
+                    selected: false,
                 },
             ],
             vec![LinkData {
@@ -73,6 +95,7 @@ impl MinimalTestHarness {
                 color: Color::from_argb_u8(255, 100, 180, 255),
                 line_width: 2.0,
                 status: -1,
+                selected: false,
             }],
         )
     }
@@ -82,7 +105,6 @@ impl MinimalTestHarness {
         init_testing_backend();
         let window = MainWindow::new().unwrap();
         let tracker = CallbackTracker::new();
-        let selection = Rc::new(RefCell::new(SelectionManager::new()));
         let w = window.as_weak();
 
         // Set up nodes
@@ -96,20 +118,12 @@ impl MinimalTestHarness {
         // Wire all standard callbacks via the macro
         let setup = NodeEditorSetup::new({
             let nodes = nodes.clone();
-            move |node_id, delta_x, delta_y| {
-                for i in 0..nodes.row_count() {
-                    if let Some(mut node) = nodes.row_data(i) {
-                        if node.id == node_id {
-                            node.x += delta_x;
-                            node.y += delta_y;
-                            nodes.set_row_data(i, node);
-                            break;
-                        }
-                    }
-                }
+            move |dragged, delta_x, delta_y| {
+                GraphLogic::commit_drag(&nodes, dragged, delta_x, delta_y);
             }
         });
         wire_node_editor!(window, setup);
+        wire_selection!(window, setup, nodes, links);
 
         // Layer tracking on top of the macro-wired callbacks.
         // We re-wire globals callbacks to add tracking, forwarding to the controller.
@@ -165,10 +179,10 @@ impl MinimalTestHarness {
         window
             .global::<NodeEditorInternalCallbacks>()
             .on_start_node_drag({
-                let setup_start = setup.start_node_drag();
+                let ctrl = setup.controller().clone();
                 let tracker = tracker.clone();
-                move |node_id, already_selected, wx, wy| {
-                    setup_start(node_id, already_selected, wx, wy);
+                move |node_id, _already_selected, _wx, _wy| {
+                    ctrl.handle_node_drag_started(node_id);
                     tracker.node_drag_started.borrow_mut().push(node_id);
                 }
             });
@@ -178,8 +192,8 @@ impl MinimalTestHarness {
             .on_end_node_drag({
                 let setup_end = setup.end_node_drag();
                 let tracker = tracker.clone();
-                move |delta_x, delta_y| {
-                    setup_end(delta_x, delta_y);
+                move |node_id, delta_x, delta_y| {
+                    setup_end(node_id, delta_x, delta_y);
                     tracker
                         .node_drag_ended
                         .borrow_mut()
@@ -208,14 +222,6 @@ impl MinimalTestHarness {
             }
         });
 
-        // Selection changed callback
-        window.on_selection_changed({
-            let tracker = tracker.clone();
-            move || {
-                *tracker.selection_changed.borrow_mut() += 1;
-            }
-        });
-
         // Context menu requested callback
         window.on_context_menu_requested({
             let tracker = tracker.clone();
@@ -223,52 +229,6 @@ impl MinimalTestHarness {
                 *tracker.context_menu_requested.borrow_mut() += 1;
             }
         });
-
-        // Selection notifications — shift-select is handled by app, non-shift by NodeEditor
-        window.on_node_selected({
-            let selection = selection.clone();
-            let w = w.clone();
-            move |node_id, shift_held| {
-                if shift_held {
-                    let mut sel = selection.borrow_mut();
-                    sel.handle_interaction(node_id, true);
-                    if let Some(w) = w.upgrade() {
-                        let ids: Vec<i32> = sel.iter().cloned().collect();
-                        w.set_selected_node_ids(ModelRc::from(Rc::new(VecModel::from(ids))));
-                        w.set_selection_version(w.get_selection_version() + 1);
-                    }
-                }
-                // Non-shift: synced via sync-selection-to-nodes callback
-            }
-        });
-
-        window.on_selection_cleared(move || {
-            // NodeEditor already cleared selection and synced via globals
-        });
-
-        // Override is-node-selected and sync-selection-to-nodes to use our SelectionManager
-        // (overrides the defaults wired by wire_node_editor!)
-        window
-            .global::<NodeEditorComputations>()
-            .on_is_node_selected({
-                let selection = selection.clone();
-                move |node_id, _version| selection.borrow().contains(node_id)
-            });
-
-        window
-            .global::<NodeEditorComputations>()
-            .on_sync_selection_to_nodes({
-                let selection = selection.clone();
-                move |ids: ModelRc<i32>| {
-                    let mut sel = selection.borrow_mut();
-                    sel.clear();
-                    for i in 0..ids.row_count() {
-                        if let Some(id) = ids.row_data(i) {
-                            sel.handle_interaction(id, true);
-                        }
-                    }
-                }
-            });
 
         // Compute callbacks — link-at needs the links model for hit testing
         window.on_compute_link_at({
@@ -294,8 +254,17 @@ impl MinimalTestHarness {
             nodes,
             links,
             tracker,
-            selection,
         }
+    }
+
+    /// The current node selection, read where it actually lives: the rows.
+    pub fn selected_node_ids(&self) -> Vec<i32> {
+        selection::selected_rows(&*self.nodes, |n| n.id, |n| n.selected)
+    }
+
+    /// The current link selection, likewise.
+    pub fn selected_link_ids(&self) -> Vec<i32> {
+        selection::selected_rows(&*self.links, |l| l.id, |l| l.selected)
     }
 
     /// Process all pending events and render a frame.
@@ -437,6 +406,24 @@ impl MinimalTestHarness {
     pub fn key_tap(&self, key: Key) {
         self.key_press(key);
         self.key_release(key);
+    }
+
+    /// Commit a finished node drag, the way `BaseNode` does at pointer-up.
+    pub fn end_node_drag(&self, node_id: i32, delta_x: f32, delta_y: f32) {
+        self.window
+            .global::<NodeEditorInternalCallbacks>()
+            .invoke_end_node_drag(node_id, delta_x, delta_y);
+        self.pump_events();
+    }
+
+    /// Hold shift down, so subsequent pointer events carry the modifier.
+    pub fn shift_down(&self) {
+        self.key_press(Key::Shift);
+    }
+
+    /// Release shift.
+    pub fn shift_up(&self) {
+        self.key_release(Key::Shift);
     }
 
     /// Simulate text input.

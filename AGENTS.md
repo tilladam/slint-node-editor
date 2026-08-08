@@ -82,10 +82,28 @@ VecModel<FilterNodeData> // Complex nodes
 VecModel<LinkData>       // Logical connections
 ```
 
-**Selection State**:
-- **Source of Truth**: `selected_node_ids` and `selected_link_ids` (VecModels shared with Slint).
-- **Performance Cache**: Rust maintains `HashSet<i32>` caches (`selection_set`, `link_selection_set`) for O(1) lookups.
-- **View Binding**: UI components bind `selected` property to the `is-node-selected` callback (reactive via `selection-version`).
+**Selection State**: the editor holds none — it emits intents (`node-selected`,
+`select-link`, `selection-cleared`, `box-selection-committed`) and renders the
+`selected` field of the rows.
+- **Source of Truth**: the model rows themselves. `selected` is per-row data, so
+  a host needs no separate store: read the current set with
+  `selection::selected_rows`, resolve the gesture with `selection::resolve_click`
+  / `resolve_box`, write it back with `selection::project_selection`.
+  `selection::apply_click` / `apply_box` / `clear_selection` compose those three
+  and are what `wire_selection!` calls. A host that keeps selection elsewhere
+  (in its own document or session state) projects into the rows after every
+  write; a missed projection is a stale highlight.
+- **Resolution contract**: every intent resolves to an absolute set, never a
+  delta, and both resolvers are order-stable. Selection order is
+  presentation-stable and semantically meaningless — nothing may interpret it.
+- **Timing**: selection intents that can affect a drag must be projected into
+  the row flags synchronously, before the callback returns. `wire_selection!`
+  does this. A host that defers selection updates must also own its drag policy
+  and commit; selection changes during an active drag are otherwise unspecified.
+- **Drag**: `end-node-drag` carries the dragged node id, and the commit moves
+  that node plus whatever the rows show as selected (`GraphLogic::commit_drag`).
+  Reading `selected` off the row is deliberate: it is the same data the editor
+  renders, so a drag's visuals and its commit cannot disagree.
 
 ## Library Helpers
 

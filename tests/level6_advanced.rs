@@ -152,14 +152,33 @@ fn test_middle_click_for_pan() {
 fn test_multi_node_selection_setup() {
     let harness = MinimalTestHarness::new();
 
-    // Create multi-selection
-    {
-        let mut sel = harness.selection.borrow_mut();
-        sel.handle_interaction(1, false);
-        sel.handle_interaction(2, true);
-    }
+    harness.window.invoke_node_selected(1, false);
+    harness.window.invoke_node_selected(2, true);
 
-    assert_eq!(harness.selection.borrow().len(), 2);
+    assert_eq!(harness.selected_node_ids(), vec![1, 2]);
+}
+
+#[test]
+fn test_standard_selection_wiring_projects_before_drag_commit() {
+    let harness = MinimalTestHarness::new();
+
+    harness.window.invoke_node_selected(1, false);
+    let node1_before = harness.node_data(1).unwrap();
+    let node2_before = harness.node_data(2).unwrap();
+
+    // The standard wiring is synchronous: replacing node 1 with node 2 updates
+    // the row flags before a following drag commit reads them.
+    harness.window.invoke_node_selected(2, false);
+    assert_eq!(harness.selected_node_ids(), vec![2]);
+
+    harness.end_node_drag(2, 50.0, 30.0);
+
+    let node1_after = harness.node_data(1).unwrap();
+    let node2_after = harness.node_data(2).unwrap();
+    assert_eq!(node1_after.x, node1_before.x);
+    assert_eq!(node1_after.y, node1_before.y);
+    assert_eq!(node2_after.x, node2_before.x + 50.0);
+    assert_eq!(node2_after.y, node2_before.y + 30.0);
 }
 
 #[test]
@@ -173,48 +192,39 @@ fn test_multi_node_drag_updates_all_selected() {
                 title: SharedString::from("A"),
                 x: 100.0,
                 y: 100.0,
+                selected: false,
             },
             NodeData {
                 id: 2,
                 title: SharedString::from("B"),
                 x: 400.0,
                 y: 200.0,
+                selected: false,
             },
             NodeData {
                 id: 3,
                 title: SharedString::from("C"),
                 x: 700.0,
                 y: 100.0,
+                selected: false,
             },
         ],
         vec![],
     );
 
     // Select nodes 1 and 2
-    {
-        let mut sel = harness.selection.borrow_mut();
-        sel.handle_interaction(1, false);
-        sel.handle_interaction(2, true);
-    }
+    harness.window.invoke_node_selected(1, false);
+    harness.window.invoke_node_selected(2, true);
 
     let node1_orig_x = harness.nodes.row_data(0).unwrap().x;
     let node2_orig_x = harness.nodes.row_data(1).unwrap().x;
     let node3_orig_x = harness.nodes.row_data(2).unwrap().x;
 
-    // Simulate drag delta applied to all selected nodes
+    // Drag node 1 for real: the commit reads `selected` off the rows, so the
+    // whole selection follows and node 3 stays put.
     let delta_x = 50.0;
     let delta_y = 30.0;
-
-    let selected: Vec<i32> = harness.selection.borrow().iter().copied().collect();
-    for i in 0..harness.nodes.row_count() {
-        if let Some(mut node) = harness.nodes.row_data(i) {
-            if selected.contains(&node.id) {
-                node.x += delta_x;
-                node.y += delta_y;
-                harness.nodes.set_row_data(i, node);
-            }
-        }
-    }
+    harness.end_node_drag(1, delta_x, delta_y);
 
     // Verify selected nodes moved
     let node1 = harness.nodes.row_data(0).unwrap();
@@ -425,18 +435,21 @@ fn test_find_links_connected_to_node() {
                 title: SharedString::from("A"),
                 x: 100.0,
                 y: 100.0,
+                selected: false,
             },
             common::harness::NodeData {
                 id: 2,
                 title: SharedString::from("B"),
                 x: 400.0,
                 y: 200.0,
+                selected: false,
             },
             common::harness::NodeData {
                 id: 3,
                 title: SharedString::from("C"),
                 x: 700.0,
                 y: 100.0,
+                selected: false,
             },
         ],
         vec![
@@ -447,6 +460,7 @@ fn test_find_links_connected_to_node() {
                 color: Color::from_argb_u8(255, 100, 180, 255),
                 line_width: 2.0,
                 status: -1,
+                selected: false,
             },
             LinkData {
                 id: 2,
@@ -455,6 +469,7 @@ fn test_find_links_connected_to_node() {
                 color: Color::from_argb_u8(255, 255, 100, 100),
                 line_width: 2.0,
                 status: -1,
+                selected: false,
             },
         ],
     );

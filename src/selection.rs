@@ -1,467 +1,367 @@
-use std::collections::HashSet;
-use slint::{VecModel, Model};
+//! Host-side selection helpers.
+//!
+//! The editor holds no selection state. It reports gestures — a node or link
+//! was clicked, the background was clicked, a marquee was released — and
+//! renders the `selected` flag it finds on the rows of your models. Everything
+//! between those two ends is the host's, and this module is what the host
+//! needs to do it:
+//!
+//! - [`resolve_click`] and [`resolve_box`] hold the *policy*: what a click,
+//!   a shift-click, a marquee and a shift-marquee mean. They are pure — no
+//!   storage, no interior mutability — so the host is free to keep the
+//!   selection wherever it already keeps its state.
+//! - [`project_selection`] writes a selection back into the rows, and
+//!   [`selected_rows`] reads it back out, so a host that wants no separate
+//!   store can let the rows *be* the selection.
+//!
+//! # Contract
+//!
+//! Every intent resolves to an **absolute set**: the resolvers take the
+//! current selection and return the new one in full, never a delta. There is
+//! no "add" or "remove" call, and no reachable state in which a selection was
+//! half-applied.
+//!
+//! # Order
+//!
+//! Both resolvers are **order-stable**: surviving members keep their relative
+//! order and new members are appended. Order is presentation-stable and
+//! semantically meaningless — it is what an introspecting client sees, and
+//! nothing may interpret it. If you ever need a distinguished member (a paste
+//! anchor, a "primary" selection), that is an explicit concept to add, never a
+//! position in this vector.
 
-#[derive(Default)]
-pub struct SelectionManager {
-    selected: HashSet<i32>,
+use slint::Model;
+
+/// Resolve a click on `item` against the current selection.
+///
+/// Without shift a click replaces the selection with `item`. With shift it
+/// toggles: an unselected item joins the end, a selected one drops out and
+/// the rest keep their order.
+pub fn resolve_click<T: Clone + PartialEq>(current: &[T], item: T, shift: bool) -> Vec<T> {
+    if !shift {
+        return vec![item];
+    }
+    if current.contains(&item) {
+        current.iter().filter(|x| **x != item).cloned().collect()
+    } else {
+        let mut extended = Vec::with_capacity(current.len() + 1);
+        extended.extend_from_slice(current);
+        extended.push(item);
+        extended
+    }
 }
 
-impl SelectionManager {
-    pub fn new() -> Self {
-        Self::default()
+/// Resolve a released marquee against the current selection.
+///
+/// Without shift the hits become the selection. With shift the marquee
+/// extends it: the current selection keeps its order, and whichever hits
+/// aren't already in it are appended. Extending never toggles — a hit that is
+/// already selected stays selected.
+pub fn resolve_box<T: Clone + PartialEq>(current: &[T], hits: Vec<T>, shift: bool) -> Vec<T> {
+    if !shift {
+        return hits;
     }
+    let mut extended = current.to_vec();
+    for hit in hits {
+        if !extended.contains(&hit) {
+            extended.push(hit);
+        }
+    }
+    extended
+}
 
-    /// Handle selection of an item (e.g., node or link) based on interaction modifiers
-    pub fn handle_interaction(&mut self, id: i32, shift_held: bool) {
-        if shift_held {
-            if self.selected.contains(&id) {
-                self.selected.remove(&id);
+/// Project a selection into a model's per-row `selected` flag.
+///
+/// Rendering reads `selected` as model data, so every write to the host's
+/// selection must be followed by a projection into the rows. `wanted` decides
+/// whether a row should be selected; `flag` hands back the row's own flag,
+/// which is both read and written — one accessor, so the read and the write
+/// can never disagree about which field holds the answer.
+///
+/// Only rows whose flag actually changes are written back, so untouched rows
+/// don't re-render.
+///
+/// ```ignore
+/// project_selection(&nodes, |n| selection.contains(&n.id), |n| &mut n.selected);
+/// ```
+pub fn project_selection<T: Clone + 'static>(
+    model: &impl Model<Data = T>,
+    wanted: impl Fn(&T) -> bool,
+    flag: impl Fn(&mut T) -> &mut bool,
+) {
+    for i in 0..model.row_count() {
+        let Some(mut row) = model.row_data(i) else {
+            continue;
+        };
+        let want = wanted(&row);
+        let current = flag(&mut row);
+        if *current != want {
+            *current = want;
+            model.set_row_data(i, row);
+        }
+    }
+}
+
+/// Apply a click to a model whose rows carry the selection.
+///
+/// Reads the current selection out of the rows, resolves the click against it,
+/// and projects the answer back — the whole gesture, with no state in between.
+/// `flag` is the row's own selected field, used for both halves.
+pub fn apply_click<T: Clone + 'static, K: Clone + PartialEq>(
+    model: &impl Model<Data = T>,
+    key: impl Fn(&T) -> K,
+    flag: impl Fn(&mut T) -> &mut bool,
+    item: K,
+    shift: bool,
+) {
+    let current = collect_selected(model, &key, &flag);
+    let next = resolve_click(&current, item, shift);
+    project_selection(model, |row| next.contains(&key(row)), &flag);
+}
+
+/// Apply a released marquee to a model whose rows carry the selection.
+///
+/// The mirror of [`apply_click`] for [`resolve_box`].
+pub fn apply_box<T: Clone + 'static, K: Clone + PartialEq>(
+    model: &impl Model<Data = T>,
+    key: impl Fn(&T) -> K,
+    flag: impl Fn(&mut T) -> &mut bool,
+    hits: Vec<K>,
+    shift: bool,
+) {
+    let current = collect_selected(model, &key, &flag);
+    let next = resolve_box(&current, hits, shift);
+    project_selection(model, |row| next.contains(&key(row)), &flag);
+}
+
+/// Deselect every row of a model.
+pub fn clear_selection<T: Clone + 'static>(
+    model: &impl Model<Data = T>,
+    flag: impl Fn(&mut T) -> &mut bool,
+) {
+    project_selection(model, |_| false, flag);
+}
+
+/// Read the selection through the same mutable accessor the writers use, so a
+/// gesture never needs a second accessor that could disagree with it.
+fn collect_selected<T: Clone + 'static, K>(
+    model: &impl Model<Data = T>,
+    key: &impl Fn(&T) -> K,
+    flag: &impl Fn(&mut T) -> &mut bool,
+) -> Vec<K> {
+    (0..model.row_count())
+        .filter_map(|i| model.row_data(i))
+        .filter_map(|mut row| {
+            if *flag(&mut row) {
+                Some(key(&row))
             } else {
-                self.selected.insert(id);
+                None
             }
-        } else {
-            if self.selected.len() == 1 && self.selected.contains(&id) {
-                return;
-            }
-            self.selected.clear();
-            self.selected.insert(id);
-        }
-    }
+        })
+        .collect()
+}
 
-    /// Clear the current selection
-    pub fn clear(&mut self) {
-        self.selected.clear();
-    }
-
-    /// Replace the current selection with a new set of IDs
-    /// 
-    /// Useful for box selection sync
-    pub fn replace_selection<I>(&mut self, ids: I)
-    where
-        I: IntoIterator<Item = i32>,
-    {
-        self.selected.clear();
-        self.selected.extend(ids);
-    }
-
-    /// Check if an ID is selected
-    pub fn contains(&self, id: i32) -> bool {
-        self.selected.contains(&id)
-    }
-
-    /// Get an iterator over the selected IDs
-    pub fn iter(&self) -> std::collections::hash_set::Iter<'_, i32> {
-        self.selected.iter()
-    }
-
-    /// Sync the internal selection set to a Slint VecModel
-    pub fn sync_to_model(&self, model: &VecModel<i32>) {
-        // Clear by removing from the back to avoid O(n²) shifting
-        while model.row_count() > 0 {
-            model.remove(model.row_count() - 1);
-        }
-        for &id in &self.selected {
-            model.push(id);
-        }
-    }
-
-    /// Sync the internal selection set from any Slint Model (e.g. after box selection)
-    pub fn sync_from_model(&mut self, model: &dyn Model<Data = i32>) {
-        self.selected.clear();
-        for i in 0..model.row_count() {
-            if let Some(id) = model.row_data(i) {
-                self.selected.insert(id);
-            }
-        }
-    }
-
-    /// Get the number of selected items
-    pub fn len(&self) -> usize {
-        self.selected.len()
-    }
-
-    /// Check if the selection is empty
-    pub fn is_empty(&self) -> bool {
-        self.selected.is_empty()
-    }
+/// Collect a key for every row the model currently shows as selected.
+///
+/// The rows are a complete record of the selection, so this is how a host
+/// with no separate selection store reads the current set before resolving a
+/// gesture against it. Results come back in row order — the rows do not
+/// remember the order the selection was built in.
+pub fn selected_rows<T: Clone + 'static, K>(
+    model: &impl Model<Data = T>,
+    key: impl Fn(&T) -> K,
+    flag: impl Fn(&T) -> bool,
+) -> Vec<K> {
+    (0..model.row_count())
+        .filter_map(|i| model.row_data(i))
+        .filter(|row| flag(row))
+        .map(|row| key(&row))
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use slint::VecModel;
     use std::rc::Rc;
 
     // ========================================================================
-    // SelectionManager::new() and Default
+    // resolve_click() — click policy
     // ========================================================================
 
     #[test]
-    fn test_new_selection_is_empty() {
-        let selection = SelectionManager::new();
-        assert!(selection.is_empty());
-        assert_eq!(selection.len(), 0);
+    fn click_replaces_the_selection() {
+        assert_eq!(resolve_click(&[1, 2, 3], 9, false), vec![9]);
     }
 
     #[test]
-    fn test_default_selection_is_empty() {
-        let selection = SelectionManager::default();
-        assert!(selection.is_empty());
-    }
-
-    // ========================================================================
-    // contains() - Basic HashSet operations
-    // ========================================================================
-
-    #[test]
-    fn test_contains_returns_false_for_empty() {
-        let selection = SelectionManager::new();
-        assert!(!selection.contains(1));
-        assert!(!selection.contains(0));
-        assert!(!selection.contains(-1));
+    fn click_on_the_only_selected_item_is_idempotent() {
+        assert_eq!(resolve_click(&[7], 7, false), vec![7]);
     }
 
     #[test]
-    fn test_contains_returns_true_for_selected() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(42, false);
-        assert!(selection.contains(42));
-    }
-
-    // ========================================================================
-    // handle_interaction() - State Machine Behavior
-    // ========================================================================
-
-    #[test]
-    fn test_handle_interaction_click_selects_single() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(1, false);
-
-        assert!(selection.contains(1));
-        assert_eq!(selection.len(), 1);
+    fn shift_click_appends_an_unselected_item() {
+        assert_eq!(resolve_click(&[1, 2], 3, true), vec![1, 2, 3]);
     }
 
     #[test]
-    fn test_handle_interaction_click_replaces_selection() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(1, false);
-        selection.handle_interaction(2, false);
-
-        assert!(!selection.contains(1));
-        assert!(selection.contains(2));
-        assert_eq!(selection.len(), 1);
+    fn shift_click_removes_a_selected_item_and_keeps_order() {
+        assert_eq!(resolve_click(&[1, 2, 3], 2, true), vec![1, 3]);
     }
 
     #[test]
-    fn test_handle_interaction_click_on_already_selected_single_is_noop() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(1, false);
-        selection.handle_interaction(1, false); // Click again
-
-        // Should still be selected (single item case)
-        assert!(selection.contains(1));
-        assert_eq!(selection.len(), 1);
+    fn shift_click_on_an_empty_selection_selects() {
+        assert_eq!(resolve_click(&[], 4, true), vec![4]);
     }
 
     #[test]
-    fn test_handle_interaction_click_on_already_selected_in_multi_collapses() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(1, true); // Shift+click
-        selection.handle_interaction(2, true); // Shift+click
-
-        assert_eq!(selection.len(), 2);
-
-        // Normal click on one - should collapse to just that one
-        selection.handle_interaction(1, false);
-
-        assert!(selection.contains(1));
-        assert!(!selection.contains(2));
-        assert_eq!(selection.len(), 1);
-    }
-
-    #[test]
-    fn test_handle_interaction_shift_click_adds_to_selection() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(1, false);
-        selection.handle_interaction(2, true); // Shift+click
-
-        assert!(selection.contains(1));
-        assert!(selection.contains(2));
-        assert_eq!(selection.len(), 2);
-    }
-
-    #[test]
-    fn test_handle_interaction_shift_click_toggles_off() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(1, false);
-        selection.handle_interaction(2, true);
-
-        assert_eq!(selection.len(), 2);
-
-        // Shift+click on already selected removes it
-        selection.handle_interaction(1, true);
-
-        assert!(!selection.contains(1));
-        assert!(selection.contains(2));
-        assert_eq!(selection.len(), 1);
-    }
-
-    #[test]
-    fn test_handle_interaction_shift_click_on_empty_adds() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(1, true); // Shift+click on empty
-
-        assert!(selection.contains(1));
-        assert_eq!(selection.len(), 1);
-    }
-
-    #[test]
-    fn test_handle_interaction_shift_click_toggle_all_off() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(1, true);
-        selection.handle_interaction(1, true); // Toggle off
-
-        assert!(!selection.contains(1));
-        assert!(selection.is_empty());
+    fn click_policy_is_not_id_specific() {
+        // The resolvers are generic so hosts can key selection by whatever
+        // identity they already have — here a link's (output, input) pair.
+        let current = [(1, 2), (3, 4)];
+        assert_eq!(resolve_click(&current, (3, 4), true), vec![(1, 2)]);
     }
 
     // ========================================================================
-    // clear() - Selection Clearing
+    // resolve_box() — marquee policy
     // ========================================================================
 
     #[test]
-    fn test_clear_empties_selection() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(1, false);
-        selection.handle_interaction(2, true);
-
-        selection.clear();
-
-        assert!(selection.is_empty());
-        assert!(!selection.contains(1));
-        assert!(!selection.contains(2));
+    fn box_replaces_the_selection() {
+        assert_eq!(resolve_box(&[1, 2], vec![5, 6], false), vec![5, 6]);
     }
 
     #[test]
-    fn test_clear_on_empty_is_noop() {
-        let mut selection = SelectionManager::new();
-        selection.clear();
-        assert!(selection.is_empty());
-    }
-
-    // ========================================================================
-    // replace_selection() - Box Selection Sync
-    // ========================================================================
-
-    #[test]
-    fn test_replace_selection_sets_new_items() {
-        let mut selection = SelectionManager::new();
-        selection.replace_selection(vec![1, 2, 3]);
-
-        assert!(selection.contains(1));
-        assert!(selection.contains(2));
-        assert!(selection.contains(3));
-        assert_eq!(selection.len(), 3);
+    fn empty_box_clears_without_shift() {
+        assert_eq!(resolve_box(&[1, 2], Vec::new(), false), Vec::<i32>::new());
     }
 
     #[test]
-    fn test_replace_selection_clears_previous() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(10, false);
-
-        selection.replace_selection(vec![1, 2]);
-
-        assert!(!selection.contains(10));
-        assert!(selection.contains(1));
-        assert!(selection.contains(2));
+    fn shift_box_keeps_current_order_and_appends_new_hits() {
+        assert_eq!(resolve_box(&[3, 1], vec![4, 5], true), vec![3, 1, 4, 5]);
     }
 
     #[test]
-    fn test_replace_selection_with_empty_clears_all() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(1, false);
-
-        selection.replace_selection(Vec::<i32>::new());
-
-        assert!(selection.is_empty());
+    fn shift_box_never_toggles_an_already_selected_hit() {
+        // Unlike shift-click, a hit that is already selected stays selected.
+        assert_eq!(resolve_box(&[1, 2], vec![2, 3], true), vec![1, 2, 3]);
     }
 
     #[test]
-    fn test_replace_selection_deduplicates() {
-        let mut selection = SelectionManager::new();
-        selection.replace_selection(vec![1, 2, 1, 2, 1]); // Duplicates
-
-        assert_eq!(selection.len(), 2); // HashSet deduplicates
-    }
-
-    #[test]
-    fn test_replace_selection_idempotent() {
-        let mut selection = SelectionManager::new();
-        selection.replace_selection(vec![1, 2, 3]);
-
-        let count_before = selection.len();
-
-        selection.replace_selection(vec![1, 2, 3]); // Same items
-
-        assert_eq!(selection.len(), count_before);
+    fn shift_box_with_no_hits_is_a_no_op() {
+        assert_eq!(resolve_box(&[1, 2], Vec::new(), true), vec![1, 2]);
     }
 
     // ========================================================================
-    // iter() - Iteration
+    // project_selection() — selection → per-row model data
     // ========================================================================
 
-    #[test]
-    fn test_iter_returns_all_selected() {
-        let mut selection = SelectionManager::new();
-        selection.replace_selection(vec![1, 2, 3]);
-
-        let mut items: Vec<i32> = selection.iter().copied().collect();
-        items.sort();
-
-        assert_eq!(items, vec![1, 2, 3]);
+    #[derive(Clone, PartialEq, Debug)]
+    struct Row {
+        id: i32,
+        selected: bool,
     }
 
-    #[test]
-    fn test_iter_empty_selection() {
-        let selection = SelectionManager::new();
-        assert_eq!(selection.iter().count(), 0);
+    fn rows(ids: &[i32]) -> Rc<VecModel<Row>> {
+        Rc::new(VecModel::from(
+            ids.iter()
+                .map(|&id| Row {
+                    id,
+                    selected: false,
+                })
+                .collect::<Vec<_>>(),
+        ))
     }
 
-    // ========================================================================
-    // sync_to_model() - Export to VecModel
-    // ========================================================================
-
-    #[test]
-    fn test_sync_to_model_populates_empty_model() {
-        let mut selection = SelectionManager::new();
-        selection.replace_selection(vec![1, 2, 3]);
-
-        let model: Rc<VecModel<i32>> = Rc::new(VecModel::default());
-        selection.sync_to_model(&model);
-
-        assert_eq!(model.row_count(), 3);
+    fn project(model: &VecModel<Row>, selection: &[i32]) {
+        project_selection(model, |r| selection.contains(&r.id), |r| &mut r.selected);
     }
 
-    #[test]
-    fn test_sync_to_model_clears_existing_data() {
-        let mut selection = SelectionManager::new();
-        selection.replace_selection(vec![1]);
-
-        let model: Rc<VecModel<i32>> = Rc::new(VecModel::from(vec![10, 20, 30]));
-        selection.sync_to_model(&model);
-
-        assert_eq!(model.row_count(), 1);
-        // The old values should be gone
-        let values: Vec<i32> = (0..model.row_count())
+    fn flags(model: &VecModel<Row>) -> Vec<bool> {
+        (0..model.row_count())
             .filter_map(|i| model.row_data(i))
-            .collect();
-        assert!(values.contains(&1));
-        assert!(!values.contains(&10));
+            .map(|r| r.selected)
+            .collect()
     }
 
     #[test]
-    fn test_sync_to_model_empty_selection() {
-        let selection = SelectionManager::new();
-
-        let model: Rc<VecModel<i32>> = Rc::new(VecModel::from(vec![1, 2, 3]));
-        selection.sync_to_model(&model);
-
-        assert_eq!(model.row_count(), 0);
-    }
-
-    // ========================================================================
-    // sync_from_model() - Import from Model
-    // ========================================================================
-
-    #[test]
-    fn test_sync_from_model_imports_items() {
-        let mut selection = SelectionManager::new();
-        let model: Rc<VecModel<i32>> = Rc::new(VecModel::from(vec![1, 2, 3]));
-
-        selection.sync_from_model(model.as_ref());
-
-        assert!(selection.contains(1));
-        assert!(selection.contains(2));
-        assert!(selection.contains(3));
-        assert_eq!(selection.len(), 3);
+    fn project_marks_selected_rows() {
+        let model = rows(&[1, 2, 3]);
+        project(&model, &[2]);
+        assert_eq!(flags(&model), vec![false, true, false]);
     }
 
     #[test]
-    fn test_sync_from_model_clears_existing() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(10, false);
-
-        let model: Rc<VecModel<i32>> = Rc::new(VecModel::from(vec![1, 2]));
-        selection.sync_from_model(model.as_ref());
-
-        assert!(!selection.contains(10));
-        assert!(selection.contains(1));
-        assert!(selection.contains(2));
+    fn project_clears_stale_flags() {
+        let model = rows(&[1, 2]);
+        project(&model, &[1]);
+        project(&model, &[2]);
+        assert_eq!(flags(&model), vec![false, true]);
     }
 
     #[test]
-    fn test_sync_from_model_empty_model() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(1, false);
+    fn project_only_writes_changed_rows() {
+        let model = rows(&[1, 2]);
+        project(&model, &[1]);
 
-        let model: Rc<VecModel<i32>> = Rc::new(VecModel::default());
-        selection.sync_from_model(model.as_ref());
+        // A second projection of the same selection must write nothing. The
+        // model itself is the witness: a rewrite would have to change a flag,
+        // and none of them move.
+        let before = flags(&model);
+        project(&model, &[1]);
+        assert_eq!(flags(&model), before);
+        assert_eq!(before, vec![true, false]);
+    }
 
-        assert!(selection.is_empty());
+    #[test]
+    fn project_into_an_empty_model_is_a_no_op() {
+        let model = rows(&[]);
+        project(&model, &[1, 2]);
+        assert_eq!(flags(&model), Vec::<bool>::new());
     }
 
     // ========================================================================
-    // Round-trip: sync_to_model then sync_from_model
+    // selected_rows() — the rows are the selection
     // ========================================================================
 
     #[test]
-    fn test_sync_roundtrip_preserves_selection() {
-        let mut selection1 = SelectionManager::new();
-        selection1.replace_selection(vec![1, 2, 3]);
+    fn selected_rows_reads_back_what_was_projected() {
+        let model = rows(&[1, 2, 3]);
+        project(&model, &[3, 1]);
 
-        let model: Rc<VecModel<i32>> = Rc::new(VecModel::default());
-        selection1.sync_to_model(&model);
+        // Row order, not selection order — the rows don't remember the latter.
+        assert_eq!(selected_rows(&model, |r| r.id, |r| r.selected), vec![1, 3]);
+    }
 
-        let mut selection2 = SelectionManager::new();
-        selection2.sync_from_model(model.as_ref());
-
-        // Both should have the same items
-        assert!(selection2.contains(1));
-        assert!(selection2.contains(2));
-        assert!(selection2.contains(3));
-        assert_eq!(selection2.len(), 3);
+    #[test]
+    fn selected_rows_is_empty_when_nothing_is_selected() {
+        let model = rows(&[1, 2]);
+        assert_eq!(
+            selected_rows(&model, |r| r.id, |r| r.selected),
+            Vec::<i32>::new()
+        );
     }
 
     // ========================================================================
-    // Edge Cases
+    // Round trip: the rows as the only selection store
     // ========================================================================
 
     #[test]
-    fn test_negative_ids_work() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(-1, false);
-        selection.handle_interaction(-2, true);
+    fn gesture_round_trip_through_the_rows() {
+        let model = rows(&[1, 2, 3]);
 
-        assert!(selection.contains(-1));
-        assert!(selection.contains(-2));
+        // Click 2, then shift-click 3, then shift-click 2 back off.
+        for (item, shift) in [(2, false), (3, true), (2, true)] {
+            let current = selected_rows(&model, |r| r.id, |r| r.selected);
+            let next = resolve_click(&current, item, shift);
+            project(&model, &next);
+        }
+
+        assert_eq!(flags(&model), vec![false, false, true]);
     }
 
     #[test]
-    fn test_zero_id_works() {
-        let mut selection = SelectionManager::new();
-        selection.handle_interaction(0, false);
-
-        assert!(selection.contains(0));
-    }
-
-    #[test]
-    fn test_large_selection() {
-        let mut selection = SelectionManager::new();
-        let ids: Vec<i32> = (0..1000).collect();
-        selection.replace_selection(ids);
-
-        assert_eq!(selection.len(), 1000);
-        assert!(selection.contains(0));
-        assert!(selection.contains(500));
-        assert!(selection.contains(999));
+    fn negative_ids_work() {
+        assert_eq!(resolve_click(&[-1], -2, true), vec![-1, -2]);
     }
 }

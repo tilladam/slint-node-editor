@@ -57,6 +57,7 @@ fn main() {
             color: Color::from_argb_u8(255, 100, 180, 255),
             line_width: 2.0,
             status: -1,
+            selected: false,
         },
         LinkData {
             id: 2,
@@ -65,6 +66,7 @@ fn main() {
             color: Color::from_argb_u8(255, 255, 180, 100),
             line_width: 3.0, // Thicker link
             status: -1,
+            selected: false,
         },
     ]))));
 

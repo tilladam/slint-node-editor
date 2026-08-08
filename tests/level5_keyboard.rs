@@ -68,18 +68,21 @@ fn test_delete_removes_selected_nodes_from_model() {
                 title: SharedString::from("A"),
                 x: 100.0,
                 y: 100.0,
+                selected: false,
             },
             NodeData {
                 id: 2,
                 title: SharedString::from("B"),
                 x: 400.0,
                 y: 200.0,
+                selected: false,
             },
             NodeData {
                 id: 3,
                 title: SharedString::from("C"),
                 x: 700.0,
                 y: 100.0,
+                selected: false,
             },
         ],
         vec![],
@@ -88,10 +91,10 @@ fn test_delete_removes_selected_nodes_from_model() {
     assert_eq!(harness.nodes.row_count(), 3);
 
     // Select node 2
-    harness.selection.borrow_mut().handle_interaction(2, false);
+    harness.window.invoke_node_selected(2, false);
 
     // Simulate delete operation directly on the model (embedder's responsibility)
-    let to_delete: Vec<i32> = harness.selection.borrow().iter().copied().collect();
+    let to_delete: Vec<i32> = harness.selected_node_ids();
     for id in to_delete {
         for i in 0..harness.nodes.row_count() {
             if let Some(node) = harness.nodes.row_data(i) {
@@ -102,7 +105,7 @@ fn test_delete_removes_selected_nodes_from_model() {
             }
         }
     }
-    harness.selection.borrow_mut().clear();
+    harness.window.invoke_selection_cleared();
 
     assert_eq!(harness.nodes.row_count(), 2);
     // Verify node 2 was removed
@@ -125,12 +128,14 @@ fn test_delete_removes_selected_links_from_model() {
                 title: SharedString::from("A"),
                 x: 100.0,
                 y: 100.0,
+                selected: false,
             },
             common::harness::NodeData {
                 id: 2,
                 title: SharedString::from("B"),
                 x: 400.0,
                 y: 200.0,
+                selected: false,
             },
         ],
         vec![
@@ -141,6 +146,7 @@ fn test_delete_removes_selected_links_from_model() {
                 color: Color::from_argb_u8(255, 100, 180, 255),
                 line_width: 2.0,
                 status: -1,
+                selected: false,
             },
             LinkData {
                 id: 2,
@@ -149,6 +155,7 @@ fn test_delete_removes_selected_links_from_model() {
                 color: Color::from_argb_u8(255, 255, 100, 100),
                 line_width: 2.0,
                 status: -1,
+                selected: false,
             },
         ],
     );
@@ -186,12 +193,14 @@ fn test_deleting_node_should_also_remove_connected_links() {
                 title: SharedString::from("A"),
                 x: 100.0,
                 y: 100.0,
+                selected: false,
             },
             NodeData {
                 id: 2,
                 title: SharedString::from("B"),
                 x: 400.0,
                 y: 200.0,
+                selected: false,
             },
         ],
         vec![LinkData {
@@ -201,6 +210,7 @@ fn test_deleting_node_should_also_remove_connected_links() {
             color: Color::from_argb_u8(255, 100, 180, 255),
             line_width: 2.0,
             status: -1,
+            selected: false,
         }],
     );
 
@@ -249,12 +259,12 @@ fn test_deleting_node_should_also_remove_connected_links() {
 fn test_delete_with_empty_selection() {
     let harness = MinimalTestHarness::new();
 
-    assert!(harness.selection.borrow().is_empty());
+    assert!(harness.selected_node_ids().is_empty());
     let initial_node_count = harness.nodes.row_count();
     let initial_link_count = harness.links.row_count();
 
     // Delete with nothing selected should do nothing
-    let to_delete: Vec<i32> = harness.selection.borrow().iter().copied().collect();
+    let to_delete: Vec<i32> = harness.selected_node_ids();
     assert!(to_delete.is_empty(), "Nothing should be selected");
 
     // Verify nothing changed
@@ -273,32 +283,32 @@ fn test_delete_multiple_selected_nodes() {
                 title: SharedString::from("A"),
                 x: 100.0,
                 y: 100.0,
+                selected: false,
             },
             NodeData {
                 id: 2,
                 title: SharedString::from("B"),
                 x: 400.0,
                 y: 200.0,
+                selected: false,
             },
             NodeData {
                 id: 3,
                 title: SharedString::from("C"),
                 x: 700.0,
                 y: 100.0,
+                selected: false,
             },
         ],
         vec![],
     );
 
     // Select multiple nodes
-    {
-        let mut sel = harness.selection.borrow_mut();
-        sel.handle_interaction(1, false);
-        sel.handle_interaction(3, true);
-    }
+    harness.window.invoke_node_selected(1, false);
+    harness.window.invoke_node_selected(3, true);
 
     // Delete selected
-    let to_delete: Vec<i32> = harness.selection.borrow().iter().copied().collect();
+    let to_delete: Vec<i32> = harness.selected_node_ids();
     for id in to_delete {
         loop {
             let mut found = false;
@@ -316,7 +326,7 @@ fn test_delete_multiple_selected_nodes() {
             }
         }
     }
-    harness.selection.borrow_mut().clear();
+    harness.window.invoke_selection_cleared();
 
     assert_eq!(harness.nodes.row_count(), 1, "Only node 2 should remain");
     let remaining = harness.nodes.row_data(0).unwrap();
