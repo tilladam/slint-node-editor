@@ -96,10 +96,10 @@ VecModel<LinkData>       // Logical connections
 - **Resolution contract**: every intent resolves to an absolute set, never a
   delta, and both resolvers are order-stable. Selection order is
   presentation-stable and semantically meaningless — nothing may interpret it.
-- **Timing**: nothing needs to be applied synchronously. The gesture logic reads
-  only press-time latches (`was-selected-on-press`, `selection-intent-sent`), so
-  a late-applied intent costs at most a frame of sibling lag. What the host owes
-  is the drag rule below.
+- **Timing**: selection intents that can affect a drag must be projected into
+  the row flags synchronously, before the callback returns. `wire_selection!`
+  does this. A host that defers selection updates must also own its drag policy
+  and commit; selection changes during an active drag are otherwise unspecified.
 - **Drag**: `end-node-drag` carries the dragged node id, and the commit moves
   that node plus whatever the rows show as selected (`GraphLogic::commit_drag`).
   Reading `selected` off the row is deliberate: it is the same data the editor

@@ -159,6 +159,29 @@ fn test_multi_node_selection_setup() {
 }
 
 #[test]
+fn test_standard_selection_wiring_projects_before_drag_commit() {
+    let harness = MinimalTestHarness::new();
+
+    harness.window.invoke_node_selected(1, false);
+    let node1_before = harness.node_data(1).unwrap();
+    let node2_before = harness.node_data(2).unwrap();
+
+    // The standard wiring is synchronous: replacing node 1 with node 2 updates
+    // the row flags before a following drag commit reads them.
+    harness.window.invoke_node_selected(2, false);
+    assert_eq!(harness.selected_node_ids(), vec![2]);
+
+    harness.end_node_drag(2, 50.0, 30.0);
+
+    let node1_after = harness.node_data(1).unwrap();
+    let node2_after = harness.node_data(2).unwrap();
+    assert_eq!(node1_after.x, node1_before.x);
+    assert_eq!(node1_after.y, node1_before.y);
+    assert_eq!(node2_after.x, node2_before.x + 50.0);
+    assert_eq!(node2_after.y, node2_before.y + 30.0);
+}
+
+#[test]
 fn test_multi_node_drag_updates_all_selected() {
     use common::harness::NodeData;
 

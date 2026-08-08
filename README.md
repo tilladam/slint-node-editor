@@ -230,10 +230,6 @@ out property <length> link-end-x;               // Link preview end
 out property <length> link-end-y;
 out property <int> link-start-pin-id;           // Which pin started the link
 
-out property <bool> is-dragging;                // User is dragging nodes
-out property <length> drag-offset-x;            // Drag delta
-out property <length> drag-offset-y;
-
 out property <length> context-menu-x;           // Right-click position
 out property <length> context-menu-y;
 
@@ -288,6 +284,12 @@ callback selection-cleared();
 /// hit-test it and select the hits, extending the selection when shift-held
 callback box-selection-committed(x: length, y: length, w: length, h: length, shift-held: bool);
 ```
+
+Handlers for selection intents that can affect a subsequent drag must update
+the rows' `selected` flags before returning; the live multi-node preview and
+drag commit read those flags. `wire_selection!` provides this behavior.
+Applications that defer selection projection must also own their drag policy
+and commit. Selection changes during an active drag are otherwise unspecified.
 
 On the Rust side the `selection` module holds the policy — `resolve_click` and
 `resolve_box` turn a gesture and the current set into the new set, and
@@ -498,4 +500,3 @@ All examples are located in the `examples/` directory and can be run from the ro
 ## License
 
 MIT/Apache
-

@@ -254,8 +254,9 @@ export component NodeEditor inherits FocusScope {
 
     // === Selection intents (the application owns the selection) ===
     // Each of these reports a gesture; none of them changes any state here.
-    // Apply them synchronously — the gesture logic below reads back the
-    // resulting `selected` flags within the same event.
+    // Apply drag-affecting intents synchronously, before the callback returns:
+    // the live multi-node preview and drag commit read the resulting
+    // `selected` flags. Hosts that defer projection must own drag policy too.
 
     /// A node was clicked (or dragged from unselected). Click-replace semantics
     /// unless `shift-held`, in which case the node toggles.
