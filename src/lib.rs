@@ -15,7 +15,7 @@
 //! ## Quick Start
 //!
 //! ```slint
-//! import { NodeEditor, BaseNode, Pin, PinTypes } from "slint-node-editor/node-editor.slint";
+//! import { NodeEditor, BaseNode, Pin, PinTypes } from "@nodeeditor/node-editor.slint";
 //!
 //! export component MainWindow inherits Window {
 //!     NodeEditor {
@@ -66,7 +66,7 @@
 //! supported. Multiple editors in separate windows work fine. This limitation
 //! will be lifted once Slint introduces component-scoped globals.
 //!
-//! See the [README](https://github.com/slint-ui/slint/tree/master/examples/node-editor/slint-node-editor)
+//! See the [README](https://github.com/tilladam/slint-node-editor)
 //! for detailed documentation and examples.
 
 pub mod controller;
