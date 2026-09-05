@@ -499,4 +499,34 @@ All examples are located in the `examples/` directory and can be run from the ro
 
 ## License
 
-MIT/Apache
+This library is licensed under either of
+
+- MIT license ([LICENSE-MIT](LICENSE-MIT))
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+
+at your option.
+
+### A note on Slint's licensing
+
+That choice covers **this library's own code only**. It does not, and cannot,
+relicense Slint.
+
+Slint is distributed by SixtyFPS GmbH under its own terms, and you pick one of
+three: **GPLv3**, a **royalty-free** license, or a **commercial** license.
+Anything you build with this library links against Slint, so those terms apply
+to your application independently of the permissive license above.
+
+Two conditions are easy to miss if you assume the royalty-free option is
+unconditional:
+
+- It requires **disclosing that you use Slint** — via the `AboutSlint` widget or
+  the Slint badge. Without that disclosure, Slint's terms direct you to the
+  commercial license.
+- It **excludes embedded systems**, which need a commercial license regardless
+  of disclosure.
+
+In short: a permissive license here does not make the resulting application
+unencumbered. Confirm which Slint license you are relying on and comply with it.
+The authoritative statement is Slint's
+[LICENSE.md](https://github.com/slint-ui/slint/blob/master/LICENSE.md); the
+available plans are at [slint.dev/pricing](https://slint.dev/pricing).
