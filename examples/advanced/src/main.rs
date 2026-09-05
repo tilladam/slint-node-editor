@@ -176,7 +176,21 @@ fn build_minimap_nodes(
     Rc::new(VecModel::from(minimap_nodes)).into()
 }
 
-fn main() {
+/// The window plus the models its callbacks mutate.
+///
+/// Split out of `main` so tests can drive the real wiring: the callbacks
+/// installed here are the ones the app runs with.
+struct App {
+    window: MainWindow,
+    // Only the tests reach for the models directly; `main` drives everything
+    // through the window's callbacks.
+    #[cfg_attr(not(test), allow(dead_code))]
+    nodes: Rc<VecModel<NodeData>>,
+    #[cfg_attr(not(test), allow(dead_code))]
+    filter_nodes: Rc<VecModel<FilterNodeData>>,
+}
+
+fn build_app() -> App {
     let window = MainWindow::new().unwrap();
 
     // Create the node model
@@ -618,6 +632,144 @@ fn main() {
         }
     });
 
-    window.invoke_request_grid_update();
-    window.run().unwrap();
+    App {
+        window,
+        nodes,
+        filter_nodes,
+    }
+}
+
+fn main() {
+    let app = build_app();
+    app.window.invoke_request_grid_update();
+    app.window.run().unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn init_backend() {
+        use std::cell::Cell;
+        thread_local! {
+            static INITIALIZED: Cell<bool> = const { Cell::new(false) };
+        }
+        INITIALIZED.with(|init| {
+            if !init.get() {
+                i_slint_backend_testing::init_no_event_loop();
+                init.set(true);
+            }
+        });
+    }
+
+    fn app() -> App {
+        init_backend();
+        build_app()
+    }
+
+    /// Minimap rows, as (id, x, y).
+    fn minimap(app: &App) -> Vec<(i32, f32, f32)> {
+        app.window
+            .get_minimap_nodes()
+            .iter()
+            .map(|n| (n.id, n.x, n.y))
+            .collect()
+    }
+
+    fn find(rows: &[(i32, f32, f32)], id: i32) -> (f32, f32) {
+        rows.iter()
+            .find(|r| r.0 == id)
+            .map(|r| (r.1, r.2))
+            .unwrap_or_else(|| panic!("no minimap row for node {id}, have {rows:?}"))
+    }
+
+    fn select(nodes: &VecModel<NodeData>, id: i32) {
+        let (i, mut node) =
+            GraphLogic::find_node_by_id(nodes, id, |n| n.id).expect("node to select");
+        node.selected = true;
+        nodes.set_row_data(i, node);
+    }
+
+    /// The minimap is a snapshot of the node models, so a committed drag has to
+    /// rebuild it. Regression test: it used to be built once during setup and
+    /// never again, leaving the minimap showing the startup layout forever.
+    #[test]
+    fn minimap_follows_a_committed_drag() {
+        let app = app();
+        let before = find(&minimap(&app), 1);
+
+        app.window
+            .global::<NodeEditorInternalCallbacks>()
+            .invoke_end_node_drag(1, 120.0, 90.0);
+
+        let after = find(&minimap(&app), 1);
+        assert_eq!(
+            (after.0 - before.0, after.1 - before.1),
+            (120.0, 90.0),
+            "minimap row for node 1 should move by the committed delta"
+        );
+    }
+
+    /// Deleting a node has to shrink the minimap too.
+    #[test]
+    fn minimap_drops_a_deleted_node() {
+        let app = app();
+        let before = minimap(&app);
+        assert!(before.iter().any(|r| r.0 == 1));
+
+        select(&app.nodes, 1);
+        app.window.invoke_delete_selected_nodes();
+
+        let after = minimap(&app);
+        assert_eq!(after.len(), before.len() - 1);
+        assert!(
+            !after.iter().any(|r| r.0 == 1),
+            "deleted node should be gone from the minimap, got {after:?}"
+        );
+    }
+
+    /// ...and adding one has to grow it.
+    #[test]
+    fn minimap_gains_an_added_node() {
+        let app = app();
+        let before = minimap(&app);
+
+        app.window.invoke_add_node();
+
+        let after = minimap(&app);
+        assert_eq!(after.len(), before.len() + 1);
+    }
+
+    /// The graph bounds are the other half of the same snapshot: they drive the
+    /// minimap's viewport indicator, and were also only computed once.
+    #[test]
+    fn graph_bounds_follow_a_committed_drag() {
+        let app = app();
+        let before = app.window.get_graph_max_x();
+
+        // Node 3 is the right-most node, so pushing it right must widen the graph.
+        app.window
+            .global::<NodeEditorInternalCallbacks>()
+            .invoke_end_node_drag(3, 200.0, 0.0);
+
+        assert_eq!(
+            app.window.get_graph_max_x() - before,
+            200.0,
+            "graph bounds should widen by the committed delta"
+        );
+    }
+
+    /// Every node model feeds the minimap, not just the plain ones.
+    #[test]
+    fn minimap_covers_filter_nodes() {
+        let app = app();
+        let rows = minimap(&app);
+        for i in 0..app.filter_nodes.row_count() {
+            let id = app.filter_nodes.row_data(i).unwrap().id;
+            assert!(
+                rows.iter().any(|r| r.0 == id),
+                "filter node {id} missing from minimap"
+            );
+        }
+    }
 }

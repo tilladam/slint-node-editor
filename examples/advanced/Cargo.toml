@@ -8,5 +8,8 @@ publish = false
 slint = { workspace = true }
 slint-node-editor = { workspace = true }
 
+[dev-dependencies]
+i-slint-backend-testing = { workspace = true }
+
 [build-dependencies]
 slint-build = { workspace = true }
