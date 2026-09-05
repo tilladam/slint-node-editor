@@ -202,8 +202,10 @@ homepage   = "https://github.com/tilladam/slint-node-editor"  # was: https://sli
 - `README.md:46-53` documents a `path = "path/to/slint-node-editor"` dependency.
   Replace with the registry form.
 - The `NodeEditor` / `BaseNode` / `Pin` / `Link` / `Minimap` intra-doc links in
-  `src/lib.rs` name no Rust symbols and will not resolve. Either point them at
-  real items or drop the brackets.
+  `src/lib.rs` do not resolve. They are now *fixable* rather than impossible:
+  1.3 made them real Rust symbols, so point them at `nodeeditor::NodeEditor`
+  and friends rather than dropping the brackets. (`LinkManager::update_paths`
+  is separately unresolved and unrelated.)
 
 Gate this with `RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps`.
 
@@ -258,10 +260,29 @@ It compiles `import { NodeEditor, BaseNode, Pin, PinTypes, LinkData } from
 "@nodeeditor";` and constructs a `LinkData` in Rust, so it covers both halves of
 the contract. Verified to fail when `links` is removed.
 
-Two modes. `path` (the default) builds against this checkout and works today.
-`packaged` extracts the `cargo package` tarball first and is blocked on 2.1 —
-`cargo package` needs the `version` key on `slint`. **Path mode does not prove
-the packaged file set is sufficient**; run `packaged` before publishing.
+Three modes, because path mode alone proves less than it looks like it does:
+`SLINT_LIBRARY_SOURCE` is an absolute path into the library's manifest dir, so
+against this checkout the fixture cannot tell "the `.slint` files ship" from
+"they happen to be on this disk".
+
+| Mode | Builds against | Status |
+|---|---|---|
+| `path` (default) | this checkout | green |
+| `included` | a copy of exactly what `cargo package --list` reports | green |
+| `packaged` | an extracted `cargo package` tarball | blocked on 2.1 |
+
+`included` is `packaged` minus the tarball and closes the gap today: it proved
+the shipped file set is self-sufficient, including `node-editor.slint`'s own
+import of `node-editor-building-blocks.slint` resolving inside the copy.
+Verified to fail when that second file is withheld. CI runs this mode.
+
+After 2.1, still run `packaged` before publishing. The only residual it covers
+is a divergence between cargo's `include` filter and the tarball itself — small,
+but the last unproven step.
+
+The fixture is deliberately unlocked (its `Cargo.lock` is gitignored), so it
+re-resolves every run. A red smoke test can therefore be dependency drift rather
+than a regression here; check the resolution before assuming the library broke.
 
 All nine examples were also stripped of their `with_library_paths` plumbing.
 They now resolve `@nodeeditor` exactly as an outside consumer does, which makes
@@ -274,7 +295,8 @@ the whole example suite a second, broader smoke test.
 `cargo package` exits 101. Add:
 
 - `cargo package --locked` (the real check),
-- the 1.5 smoke fixture, built from the extracted archive,
+- ✅ **done:** the 1.5 smoke fixture — `./smoke/run.sh included` runs on every
+  push. Switch it to `packaged` once 2.1 lands,
 - `RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps`,
 - an MSRV job on a pinned toolchain (see 2.2).
 
@@ -316,6 +338,13 @@ i-slint-backend-testing = "1.18"
 the root and `examples/advanced` share one entry. The smoke fixture added the
 two outside the workspace; it must move to `version = "1.18"` in the same pass
 or `packaged` mode will resolve a different slint than the crate under test.
+
+**The fixture's slint *features* need the same treatment.**
+`smoke/downstream/Cargo.toml` says `compat-1-2`, matching the root today. When
+the root moves to `compat-1-18` the fixture must move with it — otherwise the
+two resolve different feature sets, and because our public API exposes Slint
+types, that is the duplicate-slint hard type error described below, surfacing
+in the one test meant to catch exactly that class of problem.
 
 Two changes from the first draft:
 

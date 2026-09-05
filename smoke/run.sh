@@ -7,10 +7,20 @@
 # component — or a library name that silently fails to resolve — passes it.
 #
 #   ./smoke/run.sh            # path mode: against this checkout
+#   ./smoke/run.sh included   # against only the files `include` would ship
 #   ./smoke/run.sh packaged   # against an extracted `cargo package` tarball
 #
-# Packaged mode is blocked until slint 1.18 is on crates.io: `cargo package`
-# needs a `version` key on the slint dependency (release plan, phase 2.1).
+# Path mode cannot tell "the .slint files ship" from "they happen to be on this
+# disk", because SLINT_LIBRARY_SOURCE is an absolute path into the library's
+# manifest dir. `included` closes that: it copies exactly what
+# `cargo package --list` reports and builds against the copy. Prefer
+# `packaged`, which is the real thing — but that needs `cargo package` to
+# succeed, which needs a `version` key on slint (release plan, phase 2.1).
+#
+# The fixture is deliberately unlocked (smoke/downstream/Cargo.lock is
+# gitignored), so it re-resolves on every run. A failure here can therefore be
+# dependency drift rather than a regression in this crate — check the
+# resolution before assuming the library broke.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -19,6 +29,22 @@ mode="${1:-path}"
 case "$mode" in
 path)
     library="$root"
+    ;;
+included)
+    # cargo's own include filter, without needing `cargo package` to succeed.
+    staged_library="$root/target/smoke-included"
+    rm -rf "$staged_library"
+    mkdir -p "$staged_library"
+    cargo package --list --allow-dirty --manifest-path "$root/Cargo.toml" \
+        | while read -r file; do
+            # Skip the entries cargo synthesises rather than copies.
+            case "$file" in
+            .cargo_vcs_info.json | Cargo.toml.orig | Cargo.lock) continue ;;
+            esac
+            mkdir -p "$staged_library/$(dirname "$file")"
+            cp "$root/$file" "$staged_library/$file"
+        done
+    library="$staged_library"
     ;;
 packaged)
     cargo package --locked --manifest-path "$root/Cargo.toml"
@@ -31,7 +57,7 @@ packaged)
     library="$root/target/smoke-package/slint-node-editor-$version"
     ;;
 *)
-    echo "usage: $0 [path|packaged]" >&2
+    echo "usage: $0 [path|included|packaged]" >&2
     exit 2
     ;;
 esac
