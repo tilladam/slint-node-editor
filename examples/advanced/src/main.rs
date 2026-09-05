@@ -262,15 +262,52 @@ fn main() {
     let filter_width = filter_node_constants.get_base_width();
     let filter_height = filter_node_constants.get_base_height();
 
+    // The minimap model and the graph bounds are snapshots: both copy world
+    // positions out of the node models, so a later move of a node does not
+    // propagate into them. Rebuild both whenever node geometry or membership
+    // changes - on a committed drag, on delete, and on add.
+    let refresh_minimap: Rc<dyn Fn()> = {
+        let window = window.as_weak();
+        let nodes = nodes.clone();
+        let filter_nodes = filter_nodes.clone();
+        Rc::new(move || {
+            let Some(window) = window.upgrade() else {
+                return;
+            };
+            window.set_minimap_nodes(build_minimap_nodes(
+                &nodes,
+                &filter_nodes,
+                node_width,
+                node_height,
+                filter_width,
+                filter_height,
+            ));
+            let (min_x, min_y, max_x, max_y) = compute_graph_bounds(
+                &nodes,
+                &filter_nodes,
+                node_width,
+                node_height,
+                filter_width,
+                filter_height,
+            );
+            window.set_graph_min_x(min_x);
+            window.set_graph_min_y(min_y);
+            window.set_graph_max_x(max_x);
+            window.set_graph_max_y(max_y);
+        })
+    };
+
     // Commit a finished drag into both node models. The dragged node lives in
     // exactly one of them and always moves; selected rows in either move with
     // it. Both read the same `selected` the editor renders.
     let setup = NodeEditorSetup::new({
         let nodes = nodes.clone();
         let filter_nodes = filter_nodes.clone();
+        let refresh_minimap = refresh_minimap.clone();
         move |dragged, delta_x, delta_y| {
             GraphLogic::commit_drag(&nodes, dragged, delta_x, delta_y);
             GraphLogic::commit_drag(&filter_nodes, dragged, delta_x, delta_y);
+            refresh_minimap();
         }
     });
 
@@ -279,29 +316,9 @@ fn main() {
         .controller()
         .set_grid_spacing(node_constants.get_grid_spacing());
 
-    // Enable minimap
+    // Enable minimap and populate it with the initial geometry.
     window.set_minimap_enabled(true);
-    window.set_minimap_nodes(build_minimap_nodes(
-        &nodes,
-        &filter_nodes,
-        node_width,
-        node_height,
-        filter_width,
-        filter_height,
-    ));
-
-    let (min_x, min_y, max_x, max_y) = compute_graph_bounds(
-        &nodes,
-        &filter_nodes,
-        node_width,
-        node_height,
-        filter_width,
-        filter_height,
-    );
-    window.set_graph_min_x(min_x);
-    window.set_graph_min_y(min_y);
-    window.set_graph_max_x(max_x);
-    window.set_graph_max_y(max_y);
+    refresh_minimap();
 
     // === Computation Callbacks ===
 
@@ -510,6 +527,7 @@ fn main() {
         let nodes = nodes.clone();
         let filter_nodes = filter_nodes.clone();
         let links = links.clone();
+        let refresh_minimap = refresh_minimap.clone();
         move || {
             let mut deleted_node_ids = remove_selected_items(&nodes, |n| n.id, |n| n.selected);
             deleted_node_ids.extend(remove_selected_items(
@@ -541,6 +559,8 @@ fn main() {
             for &i in link_indices_to_remove.iter().rev() {
                 links.remove(i);
             }
+
+            refresh_minimap();
         }
     });
 
@@ -551,6 +571,7 @@ fn main() {
 
     let nodes_for_add = nodes.clone();
     let next_node_id_for_add = next_node_id.clone();
+    let refresh_minimap_for_add = refresh_minimap.clone();
     window.on_add_node(move || {
         let id = *next_node_id_for_add.borrow();
         *next_node_id_for_add.borrow_mut() += 1;
@@ -561,6 +582,8 @@ fn main() {
             world_y: 192.0 + (id as f32 * 24.0) % 288.0,
             selected: false,
         });
+
+        refresh_minimap_for_add();
     });
 
     let filter_nodes_for_type = filter_nodes.clone();
