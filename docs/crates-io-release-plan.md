@@ -80,14 +80,27 @@ link cascade, in-node widgets, and the `@nodeeditor` imports resolving at all.
 ### Open, unblocked today
 
 - Nothing in Phase 1. 1.1 – 1.7 are done bar the packaging check (below).
-- `filter_node.slint` text overlap: `'Ctrl'` x=[432,448] collides with
-  `'Active'` x=[440,473]; `'In'` and `'Type:'` touch. Measured, not eyeballed.
 
 ### Open, blocked
 
 - Phase 2 (2.1 – 2.3) and Phase 3, on the `v1.18.0` tag.
 - The `cargo package --locked` CI step (last piece of 1.6) and
   `./smoke/run.sh packaged`, both on the same `version` key.
+
+### Fixed since
+
+- `filter_node.slint` text overlap. `pin-area-width` was 24px while the labels
+  inside it are offset 16px and `Rectangle` does not clip, so `Ctrl` ran 8px
+  into `Active`. `Out` was separately constrained to 8px and truncated. Six
+  `ElementHandle` tests in `examples/advanced` now measure the real geometry.
+
+  Worth recording how the first fix went wrong: widening the pin columns to
+  44px assumed the content column would absorb it. It would not — the ComboBox
+  has a ~160px minimum — so the layout overflowed and pushed the right-hand pin
+  column 31px off the node, trading one overlap for a worse one. Capping the
+  ComboBox at `min-width: 110px` is what actually frees the space. The tests
+  that compared labels against each other all passed while that was broken;
+  only checking against the node's own bounds caught it.
 
 ### Open, needs a reproduction first
 

@@ -87,10 +87,14 @@ export component FilterNode inherits BaseNode {
     property <length> title-height: 28px;
     property <length> row-height: 32px;
     property <length> content-padding: 8px;
-    property <length> pin-area-width: 24px;  // Space for pins on each side
+    // Space for pins on each side. Must cover the pin itself (pin-margin +
+    // pin-size = 16px), the gap after it, and the label — the labels below are
+    // offset 16px into this column and `Rectangle` does not clip, so a column
+    // narrower than offset + label width spills into the content column.
+    property <length> pin-area-width: 44px;
 
     // Base dimensions - sized to fit content
-    // Width must accommodate: pin areas (24px×2) + padding (8px×2) + "Type:" label + ComboBox
+    // Width must accommodate: pin areas (44px×2) + padding (8px×2) + "Type:" label + ComboBox
     // Height = VL-padding + title + HL-padding-top + 3*rows + VL-padding
     property <length> base-width: 260px;
     property <length> base-height: content-padding + title-height + content-padding + (row-height * 3) + content-padding;
@@ -195,6 +199,12 @@ export component FilterNode inherits BaseNode {
 
                     ComboBox {
                         horizontal-stretch: 1;
+                        // Without this the widget's own minimum (~160px) pins
+                        // the content column open, and widening the pin
+                        // columns pushes the right-hand one off the node
+                        // instead of taking space from here. 110px still
+                        // renders the longest item ("Low Pass") comfortably.
+                        min-width: 110px;
                         model: ["Low Pass", "High Pass", "Band Pass", "Notch"];
                         current-index <=> root.filter-type-index;
                         selected(_value) => {

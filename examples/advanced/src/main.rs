@@ -758,4 +758,113 @@ mod tests {
             );
         }
     }
+    /// Horizontal extent of a text run, found by its rendered string.
+    ///
+    /// `Text` sets `accessible-label` to its own text by default, so the label
+    /// is the handle. Returns `(left, right)` in window coordinates.
+    fn text_span(app: &App, label: &str) -> (f32, f32) {
+        let e = i_slint_backend_testing::ElementHandle::find_by_accessible_label(
+            &app.window, label,
+        )
+        .next()
+        .unwrap_or_else(|| panic!("no element with accessible label {label:?}"));
+        let x = e.absolute_position().x;
+        (x, x + e.size().width)
+    }
+
+    /// The filter node's pin labels sit in a fixed-width column and are offset
+    /// far enough into it to clear the pin. Regression test: the column was
+    /// narrower than the offset plus the label, and `Rectangle` does not clip,
+    /// so `Ctrl` rendered 8px into `Active` and `In` grazed `Type:`.
+    #[test]
+    fn filter_node_pin_labels_do_not_overlap_the_content_column() {
+        let app = app();
+
+        for (pin_label, content_label) in [("Ctrl", "Active"), ("In", "Type:")] {
+            let (_, pin_right) = text_span(&app, pin_label);
+            let (content_left, _) = text_span(&app, content_label);
+            assert!(
+                pin_right <= content_left,
+                "{pin_label:?} ends at {pin_right} but {content_label:?} starts at \
+                 {content_left} — overlapping by {}px",
+                pin_right - content_left
+            );
+        }
+    }
+
+    /// The right-hand label is width-constrained rather than free-flowing, so
+    /// it fails the opposite way: too narrow a column truncates it instead of
+    /// overflowing. Guard the width it actually needs.
+    #[test]
+    fn filter_node_out_label_is_not_truncated() {
+        let app = app();
+        let (left, right) = text_span(&app, "Out");
+        assert!(
+            right - left >= 15.0,
+            "\"Out\" got {}px, too narrow to render at font-size 10",
+            right - left
+        );
+    }
+
+    /// Widening the pin columns comes out of the content column, so the widget
+    /// that has to absorb it needs a floor. Guards the trade-off rather than
+    /// the widget: if a future change re-widens the pin columns, this is what
+    /// says the ComboBox has run out of room.
+    #[test]
+    fn filter_node_combobox_keeps_usable_width() {
+        let app = app();
+        let combo = i_slint_backend_testing::ElementHandle::find_by_element_type_name(
+            &app.window, "ComboBox",
+        )
+        .next()
+        .expect("the filter node has a ComboBox");
+        let width = combo.size().width;
+        assert!(
+            width >= 100.0,
+            "ComboBox is {width}px wide, below the 100px floor"
+        );
+    }
+
+    /// The fix was supposed to be absorbed by the content column, not paid for
+    /// by a wider node.
+    #[test]
+    fn filter_node_width_is_unchanged() {
+        let app = app();
+        let node = i_slint_backend_testing::ElementHandle::find_by_element_type_name(
+            &app.window, "FilterNode",
+        )
+        .next()
+        .expect("a FilterNode is instantiated");
+        assert_eq!(node.size().width, 260.0, "filter node width");
+    }
+
+    /// Everything the node draws has to stay inside the node.
+    ///
+    /// Regression test, and the one that matters most here: the first attempt
+    /// at fixing the label overlap widened the pin columns and assumed the
+    /// content column would absorb it. It did not — the ComboBox has a
+    /// minimum width — so the layout overflowed and pushed the right-hand pin
+    /// column off the node entirely, trading a text overlap for a worse one.
+    /// Checking the labels against each other could not see that; only
+    /// checking them against the node's own bounds can.
+    #[test]
+    fn filter_node_content_stays_inside_the_node() {
+        let app = app();
+        let node = i_slint_backend_testing::ElementHandle::find_by_element_type_name(
+            &app.window, "FilterNode",
+        )
+        .next()
+        .expect("a FilterNode is instantiated");
+        let left = node.absolute_position().x;
+        let right = left + node.size().width;
+
+        for label in ["In", "Ctrl", "Type:", "Active", "Out", "Bypass", "Reset"] {
+            let (l, r) = text_span(&app, label);
+            assert!(
+                l >= left && r <= right,
+                "{label:?} spans [{l},{r}], outside the node's [{left},{right}]"
+            );
+        }
+    }
+
 }
