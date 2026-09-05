@@ -3,6 +3,7 @@
 Plan drafted 2026-09-05, against `aa5a12b` (slint pinned to the 1.18 pre-release tip).
 Revised the same day after a Codex second-opinion review; every claim below was
 re-verified against the Slint 1.18 source or by running the command shown.
+Status section below refreshed 2026-09-05 against `ad620cf`.
 
 ## Executive summary
 
@@ -25,6 +26,56 @@ Two corrections to the first draft of this plan, both material:
   `{ git, rev, version }` together and strips the git source when packaging;
   this was tested and packaged 21 files successfully. The blocker is the missing
   `version` key, plus the fact that 1.18 is not yet on the registry.
+
+## Current status
+
+Refreshed 2026-09-05 at `ad620cf`. Nothing in Phase 1 or Phase 2 has been done
+yet — the work below is what has landed *around* the release, not release work.
+
+### Landed
+
+| Commit | What |
+|---|---|
+| `aa5a12b` | Slint bumped to the 1.18 pre-release tip `2bb5a20` |
+| `af10e02` | Slint library prefix renamed to `@nodeeditor` (dash constraint) |
+| `1d584cf` | This plan |
+| `fba04a8` | README states our license covers only our code |
+| `761fa3b` | Imports use the bare `@nodeeditor` form |
+| `eda18d8` | Minimap kept in sync with the graph |
+| `ad620cf` | Regression tests for the minimap |
+
+Health at `ad620cf`: `cargo test --workspace` 354 passed / 0 failed,
+`cargo clippy --workspace --all-targets` clean, `cargo package --list` works and
+`cargo package` still fails only on the missing `version` key for `slint`.
+
+Runtime behaviour was verified over the Slint MCP server against the running
+`advanced` example: node drag, selection, link creation by pin drag, delete with
+link cascade, in-node widgets, and the `@nodeeditor` imports resolving at all.
+
+### Open, unblocked today
+
+- Phase 1 in full (1.1 – 1.7). None of it started.
+- `filter_node.slint` text overlap: `'Ctrl'` x=[432,448] collides with
+  `'Active'` x=[440,473]; `'In'` and `'Type:'` touch. Measured, not eyeballed.
+
+### Open, blocked
+
+- Phase 2 (2.1 – 2.3) and Phase 3, on the `v1.18.0` tag.
+
+### Open, needs a reproduction first
+
+- During MCP testing, `Node 3` moved from `(648,214)` to `(673.574,175.734)`
+  without being dragged — fractional where every other node is integral. Two
+  subsequent controlled drags moved only the dragged node, and six samples
+  showed the position stable rather than mid-animation. A single clean run on
+  1.17 is not enough to blame 1.18. Unexplained; needs a repro before it is
+  worth chasing.
+
+### Decided
+
+- License stays `MIT OR Apache-2.0` — see the licensing section below.
+- Component distribution uses Slint's experimental library modules — see
+  "The central decision".
 
 ## Verified facts
 
@@ -214,14 +265,18 @@ all-features = true
 
 ## Phase 2 — blocked on the `v1.18.0` tag
 
-### 2.1 Swap the five git pins to registry versions
+### 2.1 Swap the git pins to registry versions
+
+There are five `rev = "..."` strings, all in the root `Cargo.toml` (lines 25, 35,
+51, 52, 53). Every other crate in the workspace inherits with
+`{ workspace = true }`, so those five are the only edits.
 
 ```toml
 [dependencies]
 slint = { version = "1.18", default-features = false, features = ["std", "compat-1-18"] }
 
 [dev-dependencies]
-i-slint-backend-testing = "1.18"
+i-slint-backend-testing = { workspace = true }   # inherited, no rev of its own
 
 [build-dependencies]
 slint-build = { version = "1.18", features = ["experimental-module-builds"] }
@@ -229,7 +284,12 @@ slint-build = { version = "1.18", features = ["experimental-module-builds"] }
 [workspace.dependencies]
 slint = { version = "1.18", default-features = false, features = ["std", "compat-1-18", "backend-winit", "renderer-skia"] }
 slint-build = { version = "1.18", features = ["experimental-module-builds"] }
+i-slint-backend-testing = "1.18"
 ```
+
+`i-slint-backend-testing` moved into `[workspace.dependencies]` in `ad620cf` so
+the root and `examples/advanced` share one entry. That changed where the rev
+lives, not how many there are — it was five before and it is five now.
 
 Two changes from the first draft:
 
