@@ -15,7 +15,7 @@
 //! ## Quick Start
 //!
 //! ```slint
-//! import { NodeEditor, BaseNode, Pin, PinTypes } from "@nodeeditor/node-editor.slint";
+//! import { NodeEditor, BaseNode, Pin, PinTypes } from "@nodeeditor";
 //!
 //! export component MainWindow inherits Window {
 //!     NodeEditor {

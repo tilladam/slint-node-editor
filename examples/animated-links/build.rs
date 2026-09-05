@@ -1,6 +1,6 @@
 fn main() {
     let mut library_paths = std::collections::HashMap::new();
-    library_paths.insert("nodeeditor".into(), "../../".into());
+    library_paths.insert("nodeeditor".into(), "../../node-editor.slint".into());
 
     let config = slint_build::CompilerConfiguration::default()
         .with_library_paths(library_paths);

@@ -70,10 +70,25 @@ the `with_library_paths` key and every `@`-import were renamed across the root
 `build.rs`, all 9 example `build.rs` files, 14 `.slint` files, `README.md`, and
 `src/lib.rs`. Verified: 349 tests pass, 0 warnings.
 
-Note the imports currently keep the `/node-editor.slint` suffix
-(`@nodeeditor/node-editor.slint`), because `with_library_paths` maps the name to
-a *directory*. The suffix drops to a bare `@nodeeditor` only when `as_library`
-lands in Phase 2 — see the warning below.
+Imports use the bare `@nodeeditor` form. An earlier draft of this plan claimed
+the suffix could only drop once `as_library` landed — that was **wrong**.
+`find_file_in_library_path` (`typeloader.rs:1755`) handles both shapes:
+
+```rust
+// "@library/file.slint" -> "/path/to/library/" + "file.slint"
+Some(file) => library_path.join(file),
+// "@library"            -> the mapped path IS the file
+None => library_path.clone(),
+```
+
+Upstream's own `test_library_import` maps `"libfile.slint"` to `lib.slint` and
+imports `from "@libfile.slint"`. So mapping the name to the *file*
+(`node-editor.slint`) rather than the directory gives the bare-`@name` form on
+**stable** `with_library_paths`, today. Applied 2026-09-05.
+
+This is worth noting for Phase 2: the consumer-visible import syntax is already
+the one `as_library` produces, so adopting library modules becomes a `build.rs`
+change with no further churn in consumer code.
 
 ```toml
 # Cargo.toml
@@ -93,11 +108,11 @@ slint_build::compile_with_config("node-editor.slint", config).unwrap();
 import { NodeEditor, BaseNode, Pin, Link, PinTypes } from "@nodeeditor";
 ```
 
-⚠️ **This changes the public import syntax.** The README currently documents
-`@slint-node-editor/node-editor.slint` (name + path suffix). Library modules
-resolve a bare `@name` against a single entry file — `typeloader.rs` compares
-`library_name == import.strip_prefix('@')`, so a path suffix will not match.
-The README and all nine examples must be updated together.
+✅ **The public import syntax is already migrated.** Library modules resolve a
+bare `@name` against a single entry file — `typeloader.rs` compares
+`library_name == import.strip_prefix('@')`, so a path suffix would not match.
+The README, `src/lib.rs`, `tests/ui/test.slint` and all nine examples were moved
+to the bare form ahead of time, so this is no longer a blocker for Phase 2.
 
 `node-editor.slint` is a suitable single entry point: line 55 already re-exports
 `PinTypes`, `BaseNode`, `Pin`, `Link`, `Minimap`, `LinkData` and the rest, and it

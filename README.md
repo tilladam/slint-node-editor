@@ -58,7 +58,7 @@ path = "path/to/slint-node-editor"
 
 ```slint
 // In your main .slint file
-import { NodeEditor, BaseNode, Pin, Link, LinkData, PinTypes } from "@nodeeditor/node-editor.slint";
+import { NodeEditor, BaseNode, Pin, Link, LinkData, PinTypes } from "@nodeeditor";
 ```
 
 ### 3. Configure build.rs
@@ -68,7 +68,7 @@ To use the `@nodeeditor` import prefix, you must register it in your `build.rs`:
 ```rust
 fn main() {
     let mut library_paths = std::collections::HashMap::new();
-    library_paths.insert("nodeeditor".into(), "path/to/slint-node-editor".into());
+    library_paths.insert("nodeeditor".into(), "path/to/slint-node-editor/node-editor.slint".into());
 
     let config = slint_build::CompilerConfiguration::default()
         .with_library_paths(library_paths);
