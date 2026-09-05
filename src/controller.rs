@@ -16,7 +16,9 @@
 //!     let w = window.as_weak();
 //!
 //!     // Core callbacks - controller handles the logic
-//!     window.on_compute_link_path(ctrl.compute_link_path_callback());
+//!     window.on_compute_link_path(ctrl.compute_link_path_callback(
+//!         |commands, x, y, width, height| LinkPath { commands: commands.into(), x, y, width, height },
+//!     ));
 //!     window.on_node_drag_started(ctrl.node_drag_started_callback());
 //!
 //!     // Geometry tracking

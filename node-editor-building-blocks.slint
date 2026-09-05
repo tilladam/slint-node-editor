@@ -504,11 +504,17 @@ export component Link inherits Path {
     in property <bool> selected: false;
     in property <bool> hovered: false;
 
-    // Half the widest stroke the link can ever take, plus a pixel of
-    // antialiasing slop. Constant across selected/hovered on purpose: sizing
-    // to the current stroke would move the element on hover, dirtying the box
-    // it left as well as the one it arrived at.
-    property <length> stroke-padding: line-width * 0.75 + 1px;
+    // Half the widest stroke the link can ever take, plus slop. Constant
+    // across selected/hovered on purpose: sizing to the current stroke would
+    // move the element on hover, dirtying the box it left as well as the one
+    // it arrived at.
+    //
+    // The slop is divided by the zoom because it is a *device*-pixel quantity
+    // expressed in the world units this element is measured in: antialiasing
+    // spreads a fixed number of screen pixels however far the canvas is zoomed
+    // out, and a stroke thinner than a device pixel is drawn as a hairline
+    // rather than vanishing. 1.5 covers half a hairline plus a pixel of edge.
+    property <length> stroke-padding: line-width * 0.75 + 1.5px / max(ViewportState.zoom, 0.01);
 
     x: geometry.x - stroke-padding;
     y: geometry.y - stroke-padding;
