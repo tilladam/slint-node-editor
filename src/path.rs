@@ -114,6 +114,17 @@ impl CubicBezier {
         (min_x, min_y, max_x - min_x, max_y - min_y)
     }
 
+    /// Build a `LinkPath` from the curve: box-relative commands plus the box.
+    ///
+    /// Takes the constructor rather than naming the type, because which
+    /// `LinkPath` a consumer has depends on how they compile the `.slint` — the
+    /// crate's re-export when the library module comes in through cargo
+    /// metadata, their own generated copy when they pass a library path.
+    pub fn to_link_path<T>(&self, make: impl FnOnce(String, f32, f32, f32, f32) -> T) -> T {
+        let (x, y, width, height) = self.bounds();
+        make(self.commands_from((x, y)), x, y, width, height)
+    }
+
     /// The sub-curve from `t=0` to `t=t`, by de Casteljau subdivision.
     pub fn split_at(&self, t: f32) -> CubicBezier {
         let q0 = lerp_point(self.p0, self.p1, t);
@@ -650,6 +661,17 @@ mod tests {
                 pair[1]
             );
         }
+    }
+
+    #[test]
+    fn test_to_link_path_hands_over_relative_commands_and_the_box() {
+        let curve = CubicBezier::from_endpoints(100.0, 40.0, 300.0, 160.0, 1.0, 50.0);
+        let (bx, by, bw, bh) = curve.bounds();
+
+        let (commands, x, y, width, height) = curve.to_link_path(|c, x, y, w, h| (c, x, y, w, h));
+
+        assert_eq!((x, y, width, height), (bx, by, bw, bh));
+        assert_eq!(commands, curve.commands_from((bx, by)));
     }
 
     // ========================================================================

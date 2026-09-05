@@ -92,8 +92,8 @@ where
 /// links.add(SimpleLink::new(1, start_pin, end_pin, color));
 ///
 /// // Bind once - auto-syncs on every update_paths call
-/// let model = Rc::new(VecModel::<LinkPath>::default());
-/// links.bind_model(model.clone(), |id, path, color, line_width, status| LinkPath { id, path_commands: path, color, line_width, status });
+/// let model = Rc::new(VecModel::<LinkRow>::default());
+/// links.bind_model(model.clone(), |id, path, color, line_width, status| LinkRow { id, path_commands: path, color, line_width, status });
 /// window.set_link_paths(ModelRc::from(model));
 ///
 /// // Now just call update_paths - model syncs automatically

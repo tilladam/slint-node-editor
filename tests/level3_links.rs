@@ -61,6 +61,83 @@ fn test_link_path_between_pins() {
     );
 }
 
+/// The wired `compute-link-path` is what `Link` binds its geometry to, so this
+/// is the box a link element actually takes on the canvas.
+#[test]
+fn test_wired_link_path_is_bounded_to_its_own_curve() {
+    use common::harness::NodeEditorComputations;
+    use slint::ComponentHandle;
+
+    let harness = MinimalTestHarness::new();
+    setup_test_geometry(&harness);
+
+    // Pin 3 sits at (250, 150), pin 4 at (400, 250).
+    let geometry = harness
+        .window
+        .global::<NodeEditorComputations>()
+        .invoke_compute_link_path(3, 4, 0);
+
+    assert!(
+        geometry.commands.starts_with("M "),
+        "commands should be an SVG path, got {:?}",
+        geometry.commands
+    );
+
+    // The box holds both pin centres...
+    assert!(geometry.x <= 250.0 && geometry.x + geometry.width >= 400.0);
+    assert!(geometry.y <= 150.0 && geometry.y + geometry.height >= 250.0);
+
+    // ...and little else. A full-canvas link would report the world size here.
+    assert!(
+        geometry.width < 400.0 && geometry.height < 200.0,
+        "link should be bounded to its curve, got {}x{}",
+        geometry.width,
+        geometry.height
+    );
+}
+
+/// The commands are relative to the box, which is what lets the element sit at
+/// the box instead of spanning the canvas.
+#[test]
+fn test_wired_link_path_commands_are_box_relative() {
+    use common::harness::NodeEditorComputations;
+    use slint::ComponentHandle;
+
+    let harness = MinimalTestHarness::new();
+    setup_test_geometry(&harness);
+
+    let geometry = harness
+        .window
+        .global::<NodeEditorComputations>()
+        .invoke_compute_link_path(3, 4, 0);
+
+    let coords: Vec<f32> = geometry
+        .commands
+        .split_whitespace()
+        .filter_map(|t| t.parse::<f32>().ok())
+        .collect();
+    assert_eq!(
+        coords.len(),
+        8,
+        "expected a cubic, got {:?}",
+        geometry.commands
+    );
+    for pair in coords.chunks(2) {
+        assert!(
+            pair[0] >= -0.01 && pair[0] <= geometry.width + 0.01,
+            "x {} outside 0..{}",
+            pair[0],
+            geometry.width
+        );
+        assert!(
+            pair[1] >= -0.01 && pair[1] <= geometry.height + 0.01,
+            "y {} outside 0..{}",
+            pair[1],
+            geometry.height
+        );
+    }
+}
+
 #[test]
 fn test_link_path_returns_empty_for_missing_pin() {
     let harness = MinimalTestHarness::new();

@@ -268,10 +268,10 @@ callback compute-link-preview-path(
     end-x: length, end-y: length
 ) -> string;
 
-/// Compute SVG path for a link between two pins
+/// Compute a link's curve and the box it fits in, between two pins
 pure callback compute-link-path(
     start-pin-id: int, end-pin-id: int, version: int
-) -> string;
+) -> LinkPath;
 
 /// Request grid update (when pan/zoom changes)
 callback request-grid-update();
@@ -427,13 +427,45 @@ in property <length> node-screen-y; // Required for drag handling
 
 Renders a Bezier curve between two pins. Used internally by `NodeEditor` but can be used for custom rendering.
 
+The element is sized to the curve, not to the canvas. That is what lets a
+partial renderer repaint one link's strip instead of the whole graph — so a
+`LinkPath` whose box does not contain what its `commands` draw leaves stale
+pixels. `Link` pads the box for the stroke itself; the box is the centreline's.
+
 **Properties:**
 ```slint
-in property <string> path-commands;        // SVG path (e.g., "M 0 0 C 50 50 100 100")
+in property <LinkPath> geometry;           // commands relative to x/y, plus the box
 in property <color> link-color: #888;
 in property <length> line-width: 2px;
 in property <bool> selected: false;
 in property <bool> hovered: false;
+```
+
+**`LinkPath`:**
+```slint
+struct LinkPath {
+    commands: string,   // SVG path, relative to x/y (e.g., "M 0 0 C 50 50 100 100")
+    x: length, y: length,
+    width: length, height: length,
+}
+```
+
+Building one in Rust from a curve — `CubicBezier::to_link_path` takes the
+constructor rather than naming the type, because a consumer importing
+`@nodeeditor` through cargo metadata gets the crate's `LinkPath` while one
+passing a library path gets their own generated copy:
+
+```rust
+use slint_node_editor::path::CubicBezier;
+
+let curve = CubicBezier::from_endpoints(sx, sy, ex, ey, 1.0, 50.0);
+curve.to_link_path(|commands, x, y, width, height| LinkPath {
+    commands: commands.into(),
+    x,
+    y,
+    width,
+    height,
+})
 ```
 
 ## Convenience Helpers
@@ -452,7 +484,9 @@ fn main() {
     let ctrl = NodeEditorController::new();
 
     // 1. Hook up computation callbacks
-    window.on_compute_link_path(ctrl.compute_link_path_callback());
+    window.on_compute_link_path(ctrl.compute_link_path_callback(
+        |commands, x, y, width, height| LinkPath { commands: commands.into(), x, y, width, height },
+    ));
     window.on_node_drag_started(ctrl.node_drag_started_callback());
 
     // 2. Hook up geometry tracking

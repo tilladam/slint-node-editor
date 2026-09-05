@@ -6,7 +6,7 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
     selection, wire_node_editor, BasicLinkValidator, CompositeValidator, GraphLogic, LinkData,
-    LinkValidator, MinimapNode, MovableNode, NoDuplicatesValidator, NodeEditorSetup,
+    LinkPath, LinkValidator, MinimapNode, MovableNode, NoDuplicatesValidator, NodeEditorSetup,
     ValidationResult,
 };
 use std::cell::RefCell;

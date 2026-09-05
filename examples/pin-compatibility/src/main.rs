@@ -15,7 +15,7 @@
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    wire_node_editor, BasicLinkValidator, CompositeValidator, GeometryCache, LinkData,
+    wire_node_editor, BasicLinkValidator, CompositeValidator, GeometryCache, LinkData, LinkPath,
     LinkValidator, NodeEditorSetup, SimpleNodeGeometry, ValidationError, ValidationResult,
 };
 use std::rc::Rc;

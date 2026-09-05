@@ -1,24 +1,45 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::{wire_node_editor, LinkData, NodeEditorSetup, NodeGeometry};
+use slint_node_editor::path::CubicBezier;
+use slint_node_editor::{wire_node_editor, LinkData, LinkPath, NodeEditorSetup, NodeGeometry};
 use std::rc::Rc;
 
 slint::include_modules!();
 
 /// Generate an orthogonal (Manhattan) path: Horizontal -> Vertical -> Horizontal
 /// Uses pure world coordinates - zoom is handled by the container's transform-scale
-fn generate_manhattan_path(start_x: f32, start_y: f32, end_x: f32, end_y: f32) -> String {
-    // Calculate midpoint for the vertical segment
+///
+/// A custom shape owes the editor its bounding box as well as its commands:
+/// the `Link` element is sized to the box, so anything drawn outside it is
+/// left stale by partial rendering. The staircase turns at the midpoint in x
+/// and never leaves the rectangle the two endpoints span, so that rectangle is
+/// the box.
+fn generate_manhattan_path(start_x: f32, start_y: f32, end_x: f32, end_y: f32) -> LinkPath {
     let mid_x = (start_x + end_x) / 2.0;
+    let x = start_x.min(end_x);
+    let y = start_y.min(end_y);
 
-    // Construct SVG path command
     // M sx sy -> Move to start
     // L mid_x sy -> Line to first corner
     // L mid_x ey -> Line to second corner
     // L ex ey -> Line to end
-    format!(
-        "M {} {} L {} {} L {} {} L {} {}",
-        start_x, start_y, mid_x, start_y, mid_x, end_y, end_x, end_y
-    )
+    LinkPath {
+        commands: format!(
+            "M {} {} L {} {} L {} {} L {} {}",
+            start_x - x,
+            start_y - y,
+            mid_x - x,
+            start_y - y,
+            mid_x - x,
+            end_y - y,
+            end_x - x,
+            end_y - y
+        )
+        .into(),
+        x,
+        y,
+        width: (end_x - start_x).abs(),
+        height: (end_y - start_y).abs(),
+    }
 }
 
 fn main() {
@@ -99,7 +120,7 @@ fn main() {
             move |start_pin, end_pin, _version| {
                 let w = match w.upgrade() {
                     Some(w) => w,
-                    None => return SharedString::default(),
+                    None => return LinkPath::default(),
                 };
                 let style = w.get_link_style();
                 let bezier_offset = w.get_bezier_min_offset();
@@ -121,24 +142,25 @@ fn main() {
                         let ey = end_rect.1 + end.rel_y;
 
                         if style == "orthogonal" {
-                            generate_manhattan_path(sx, sy, ex, ey).into()
+                            generate_manhattan_path(sx, sy, ex, ey)
                         } else {
                             // Use zoom=1.0 since transform-scale handles zoom
-                            slint_node_editor::generate_bezier_path(
-                                sx,
-                                sy,
-                                ex,
-                                ey,
-                                1.0,
-                                bezier_offset,
-                            )
-                            .into()
+                            let curve =
+                                CubicBezier::from_endpoints(sx, sy, ex, ey, 1.0, bezier_offset);
+                            let (x, y, width, height) = curve.bounds();
+                            LinkPath {
+                                commands: curve.commands_from((x, y)).into(),
+                                x,
+                                y,
+                                width,
+                                height,
+                            }
                         }
                     } else {
-                        SharedString::default()
+                        LinkPath::default()
                     }
                 } else {
-                    SharedString::default()
+                    LinkPath::default()
                 }
             }
         });

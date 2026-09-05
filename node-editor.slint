@@ -45,6 +45,7 @@ import {
     MinimapNode,
     MinimapPosition,
     LinkData,
+    LinkPath,
     LinkStatus,
     LinkStatusColors,
     Minimap,
@@ -52,7 +53,7 @@ import {
     BaseNode,
     Pin,
 } from "node-editor-building-blocks.slint";
-export { PinTypes, ViewportState, DragState, GeometryVersion, NodeEditorInternalCallbacks, LinkCreationState, LinkCreation, SelectionRequest, HoverState, NodeEditorComputations, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, LinkStatus, LinkStatusColors, Minimap, Link, BaseNode, Pin }
+export { PinTypes, ViewportState, DragState, GeometryVersion, NodeEditorInternalCallbacks, LinkCreationState, LinkCreation, SelectionRequest, HoverState, NodeEditorComputations, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, LinkPath, LinkStatus, LinkStatusColors, Minimap, Link, BaseNode, Pin }
 
 /// Modifier key for triggering box selection over nodes/links
 export enum BoxSelectionModifier {
@@ -692,7 +693,10 @@ export component NodeEditor inherits FocusScope {
 
         // Render links from `links` property
         for link in root.links: Link {
-            path-commands: NodeEditorComputations.compute-link-path(link.start-pin-id, link.end-pin-id, GeometryVersion.version);
+            // Bound once, read five times: every binding that named the
+            // callback would evaluate it again, and a GeometryVersion bump
+            // already re-evaluates every link in the graph.
+            geometry: NodeEditorComputations.compute-link-path(link.start-pin-id, link.end-pin-id, GeometryVersion.version);
             link-color: link.status == LinkStatus.running ? LinkStatusColors.running
                       : link.status == LinkStatus.succeeded ? LinkStatusColors.succeeded
                       : link.status == LinkStatus.failed ? LinkStatusColors.failed

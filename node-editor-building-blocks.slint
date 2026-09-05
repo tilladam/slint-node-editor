@@ -96,6 +96,20 @@ export global HoverState {
 
 /// Internal callback registry for BaseNode/Pin → Rust communication.
 /// Wired automatically by `wire_node_editor!` — examples don't touch this.
+/// A link's drawn curve and the box it fits in.
+///
+/// `commands` are relative to `x`/`y` so the element can sit at the box rather
+/// than spanning the canvas. The box is the centreline's: `Link` pads it for
+/// the stroke. A box that does not contain what `commands` draw leaves the
+/// pixels outside it stale under partial rendering.
+export struct LinkPath {
+    commands: string,
+    x: length,
+    y: length,
+    width: length,
+    height: length,
+}
+
 export global NodeEditorInternalCallbacks {
     /// Report node rectangle (world coordinates)
     callback report-node-rect(/* id */ int, /* x */ length, /* y */ length, /* width */ length, /* height */ length);
@@ -124,12 +138,12 @@ export global NodeEditorInternalCallbacks {
 /// Computational callbacks wired by Rust - examples don't touch these!
 /// NodeEditor calls these for expensive operations.
 export global NodeEditorComputations {
-    /// Compute SVG path commands for a link between two pins.
+    /// Compute a link's curve and the box it fits in, between two pins.
     /// The geometry-version parameter triggers re-evaluation when geometry changes.
     pure callback compute-link-path(
         /* start-pin-id */ int,
         /* end-pin-id */ int,
-        /* geometry-version */ int) -> string;
+        /* geometry-version */ int) -> LinkPath;
 
     /// Viewport state changed (zoom or pan)
     callback viewport-changed(
@@ -477,26 +491,42 @@ export component Minimap inherits Rectangle {
     }
 }
 
-/// A bezier link between two pins using SVG path commands.
+/// A bezier link between two pins, sized to its own curve.
+///
+/// The element covers the curve and nothing else. A link spanning the canvas
+/// marks the whole canvas dirty on every change — including a selection flip,
+/// which moves nothing — and that is what stops partial rendering paying for
+/// itself in a graph.
 export component Link inherits Path {
-    in property <string> path-commands;
+    in property <LinkPath> geometry;
     in property <color> link-color: #888888;
     in property <length> line-width: 2px;
     in property <bool> selected: false;
     in property <bool> hovered: false;
 
-    width: 100%;
-    height: 100%;
+    // Half the widest stroke the link can ever take, plus a pixel of
+    // antialiasing slop. Constant across selected/hovered on purpose: sizing
+    // to the current stroke would move the element on hover, dirtying the box
+    // it left as well as the one it arrived at.
+    property <length> stroke-padding: line-width * 0.75 + 1px;
+
+    x: geometry.x - stroke-padding;
+    y: geometry.y - stroke-padding;
+    width: geometry.width + 2 * stroke-padding;
+    height: geometry.height + 2 * stroke-padding;
+
     stroke: selected ? link-color.brighter(50%) : (hovered ? link-color.brighter(25%) : link-color);
     stroke-width: selected ? line-width * 1.5 : (hovered ? line-width * 1.25 : line-width);
     fill: transparent;
 
-    viewbox-x: 0;
-    viewbox-y: 0;
+    // One path unit is one pixel, with the commands' origin sitting
+    // `stroke-padding` inside the element.
+    viewbox-x: -stroke-padding / 1px;
+    viewbox-y: -stroke-padding / 1px;
     viewbox-width: max(self.width / 1px, 1);
     viewbox-height: max(self.height / 1px, 1);
 
-    commands: path-commands;
+    commands: geometry.commands;
 }
 
 /// Base component for all node types in the node editor.

@@ -173,20 +173,28 @@ impl NodeEditorController {
     ///
     /// Computes bezier paths for use inside a scaled container at origin.
     /// Positions are calculated so that after transform-scale, links appear at correct screen position.
-    pub fn compute_link_path_callback(&self) -> impl Fn(i32, i32, i32) -> SharedString {
+    ///
+    /// `make_path` receives box-relative commands and the box, and builds the
+    /// `LinkPath` the callback expects — see
+    /// [`CubicBezier::to_link_path`](crate::path::CubicBezier::to_link_path)
+    /// for why the type is not named here. A link whose pins are not in the
+    /// cache yet yields `T::default()`, an empty path at the origin.
+    pub fn compute_link_path_callback<T: Default>(
+        &self,
+        make_path: impl Fn(String, f32, f32, f32, f32) -> T,
+    ) -> impl Fn(i32, i32, i32) -> T {
         let cache = self.cache.clone();
         let state = self.state.clone();
         move |start_pin, end_pin, _version| {
             let s = state.borrow();
-            cache
-                .borrow()
-                .compute_link_path_world(
-                    start_pin,
-                    end_pin,
-                    s.bezier_offset,
-                )
-                .unwrap_or_default()
-                .into()
+            match cache.borrow().link_curve_world(
+                start_pin,
+                end_pin,
+                s.bezier_offset,
+            ) {
+                Some(curve) => curve.to_link_path(&make_path),
+                None => T::default(),
+            }
         }
     }
 

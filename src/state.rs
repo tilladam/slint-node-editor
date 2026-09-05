@@ -3,7 +3,7 @@ use crate::hit_test::{
     find_link_at, find_pin_at, links_in_selection_box, nodes_in_selection_box, SimpleLinkGeometry,
     SimpleNodeGeometry, SimplePinGeometry, NodeGeometry,
 };
-use crate::path::generate_bezier_path;
+use crate::path::{generate_bezier_path, CubicBezier};
 
 #[derive(Clone, Copy, Debug)]
 pub struct StoredPin {
@@ -197,18 +197,31 @@ where
         ))
     }
 
-    /// Compute bezier path in pure world coordinates (zoom=1.0).
+    /// The curve of a link in pure world coordinates (zoom = 1.0).
     ///
     /// Used when links are rendered inside a transform-scale container
     /// that handles zoom visually. Bezier offset is unscaled.
+    pub fn link_curve_world(
+        &self,
+        start_pin: i32,
+        end_pin: i32,
+        bezier_min_offset: f32,
+    ) -> Option<CubicBezier> {
+        let (sx, sy, ex, ey) = self.resolve_link_endpoints(start_pin, end_pin)?;
+        Some(CubicBezier::from_endpoints(sx, sy, ex, ey, 1.0, bezier_min_offset))
+    }
+
+    /// Compute bezier path in pure world coordinates (zoom=1.0).
     pub fn compute_link_path_world(
         &self,
         start_pin: i32,
         end_pin: i32,
         bezier_min_offset: f32,
     ) -> Option<String> {
-        let (sx, sy, ex, ey) = self.resolve_link_endpoints(start_pin, end_pin)?;
-        Some(generate_bezier_path(sx, sy, ex, ey, 1.0, bezier_min_offset))
+        Some(
+            self.link_curve_world(start_pin, end_pin, bezier_min_offset)?
+                .commands_from((0.0, 0.0)),
+        )
     }
 
     /// Standard handler for pin position reports from Slint

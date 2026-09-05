@@ -1,5 +1,5 @@
 use slint::{Color, Model, ModelRc, SharedString, Timer, TimerMode, VecModel};
-use slint_node_editor::{wire_node_editor, NodeEditorSetup};
+use slint_node_editor::{wire_node_editor, LinkPath, NodeEditorSetup};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;

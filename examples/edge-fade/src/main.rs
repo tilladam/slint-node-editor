@@ -1,6 +1,6 @@
 use slint::{Color, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    wire_node_editor, wire_selection, GraphLogic, LinkData, MovableNode, NodeEditorSetup,
+    wire_node_editor, wire_selection, GraphLogic, LinkData, LinkPath, MovableNode, NodeEditorSetup,
 };
 use std::rc::Rc;
 

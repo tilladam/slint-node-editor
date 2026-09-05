@@ -103,7 +103,7 @@ pub mod tracking;
 // forwards those only into its private inner module), so without this a
 // consumer building a `LinkData` has no name to reach for.
 pub use nodeeditor::{
-    BoxSelectionModifier, LinkCreationState, LinkData, MinimapNode, MinimapPosition,
+    BoxSelectionModifier, LinkCreationState, LinkData, LinkPath, MinimapNode, MinimapPosition,
 };
 
 // Re-export traits and functions
@@ -169,7 +169,15 @@ macro_rules! wire_node_editor {
 
         // Computations
         let computations = $window.global::<NodeEditorComputations>();
-        computations.on_compute_link_path($setup.controller().compute_link_path_callback());
+        computations.on_compute_link_path($setup.controller().compute_link_path_callback(
+            |commands, x, y, width, height| LinkPath {
+                commands: commands.into(),
+                x,
+                y,
+                width,
+                height,
+            },
+        ));
 
         let ctrl = $setup.controller().clone();
         computations
