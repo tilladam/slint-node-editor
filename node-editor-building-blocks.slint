@@ -527,10 +527,23 @@ export component Link inherits Path {
 
     // One path unit is one pixel, with the commands' origin sitting
     // `stroke-padding` inside the element.
-    viewbox-x: -stroke-padding / 1px;
-    viewbox-y: -stroke-padding / 1px;
-    viewbox-width: max(self.width / 1px, 1);
-    viewbox-height: max(self.height / 1px, 1);
+    //
+    // A `Path` fits its viewbox into the element *inset by the stroke width*
+    // and then offsets by half of it, and the default `fit: contain` scales
+    // both axes by the smaller of the two ratios. A viewbox the size of the
+    // element is therefore not 1:1: on a link between pins at the same height
+    // the box is only as tall as the padding, so the vertical ratio is small,
+    // and `contain` applies it to the length as well — a horizontal link comes
+    // out short of both its pins. Sizing the viewbox to the inset makes both
+    // ratios exactly 1 for any stroke width, which is what keeps a selected
+    // link on the same curve as an unselected one.
+    //
+    // The inset stays positive because `stroke-padding` exceeds half of the
+    // widest stroke by the antialiasing slop.
+    viewbox-x: (root.stroke-width / 2 - root.stroke-padding) / 1px;
+    viewbox-y: (root.stroke-width / 2 - root.stroke-padding) / 1px;
+    viewbox-width: (root.width - root.stroke-width) / 1px;
+    viewbox-height: (root.height - root.stroke-width) / 1px;
 
     commands: geometry.commands;
 }
