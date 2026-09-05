@@ -1,8 +1,6 @@
 fn main() {
-    let mut library_paths = std::collections::HashMap::new();
-    library_paths.insert("nodeeditor".into(), "../../node-editor.slint".into());
-
-    let config = slint_build::CompilerConfiguration::default()
-        .with_library_paths(library_paths);
-    slint_build::compile_with_config("ui/ui.slint", config).unwrap();
+    // No library-path plumbing: slint-node-editor declares itself a Slint
+    // library module, so `@nodeeditor` resolves from the dependency's
+    // metadata. This is exactly what a crates.io consumer writes.
+    slint_build::compile("ui/ui.slint").unwrap();
 }

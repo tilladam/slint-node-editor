@@ -52,6 +52,34 @@ pub trait LinkModel {
     }
 }
 
+/// The Slint `LinkData` row is the canonical link type, so the library
+/// implements [`LinkModel`] for it directly.
+///
+/// Before `node-editor.slint` was compiled as a library module, `LinkData` was
+/// generated separately into each consumer crate and every consumer wrote this
+/// impl itself. Now the type is ours, so the orphan rule puts the impl here —
+/// and consumers stop repeating it.
+impl LinkModel for crate::nodeeditor::LinkData {
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn start_pin_id(&self) -> i32 {
+        self.start_pin_id
+    }
+    fn end_pin_id(&self) -> i32 {
+        self.end_pin_id
+    }
+    fn color(&self) -> Color {
+        self.color
+    }
+    fn line_width(&self) -> f32 {
+        self.line_width
+    }
+    fn status(&self) -> i32 {
+        self.status
+    }
+}
+
 /// Simple link data structure implementing [`LinkModel`].
 ///
 /// Use this for basic link storage, or implement [`LinkModel`] on your own

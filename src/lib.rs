@@ -69,6 +69,16 @@
 //! See the [README](https://github.com/tilladam/slint-node-editor)
 //! for detailed documentation and examples.
 
+/// The Slint components, compiled as a library module.
+///
+/// A Slint consumer reaches these through `import { … } from "@nodeeditor";`
+/// and never names this module directly — but the code the Slint compiler
+/// generates on their side resolves to `slint_node_editor::nodeeditor::…`,
+/// so the path has to exist and has to match `rust_module` in `build.rs`.
+pub mod nodeeditor {
+    include!(concat!(env!("OUT_DIR"), "/node-editor.rs"));
+}
+
 pub mod controller;
 pub mod graph;
 pub mod grid;
@@ -81,6 +91,16 @@ pub mod selection;
 pub mod setup;
 pub mod state;
 pub mod tracking;
+
+// Re-export the data types declared in the Slint sources.
+//
+// A consumer's own generated code re-exports the *globals* it imports from
+// `@nodeeditor` but not the structs and enums (slint 1.18's `as_library`
+// forwards those only into its private inner module), so without this a
+// consumer building a `LinkData` has no name to reach for.
+pub use nodeeditor::{
+    BoxSelectionModifier, LinkCreationState, LinkData, MinimapNode, MinimapPosition,
+};
 
 // Re-export traits and functions
 pub use grid::generate_grid_commands;

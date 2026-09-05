@@ -15,7 +15,7 @@
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    wire_node_editor, BasicLinkValidator, CompositeValidator, GeometryCache, LinkModel,
+    wire_node_editor, BasicLinkValidator, CompositeValidator, GeometryCache, LinkData,
     LinkValidator, NodeEditorSetup, SimpleNodeGeometry, ValidationError, ValidationResult,
 };
 use std::rc::Rc;
@@ -140,24 +140,6 @@ fn type_name(data_type: i32) -> &'static str {
         ARRAY => "Array",
         ANY => "Any",
         _ => "Unknown",
-    }
-}
-
-impl LinkModel for LinkData {
-    fn id(&self) -> i32 {
-        self.id
-    }
-    fn start_pin_id(&self) -> i32 {
-        self.start_pin_id
-    }
-    fn end_pin_id(&self) -> i32 {
-        self.end_pin_id
-    }
-    fn color(&self) -> Color {
-        self.color
-    }
-    fn line_width(&self) -> f32 {
-        self.line_width
     }
 }
 

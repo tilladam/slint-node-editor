@@ -21,3 +21,7 @@ target
 #.idea/
 
 .DS_Store
+
+# The smoke fixture resolves fresh; its lockfile is a large, churning
+# duplicate of the workspace graph.
+smoke/downstream/Cargo.lock

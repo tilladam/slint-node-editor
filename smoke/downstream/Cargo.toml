@@ -1,0 +1,19 @@
+# Deliberately NOT a workspace member: this fixture has to see the library the
+# way an outside crate does. `SMOKE_LIBRARY_PATH` points either at this
+# checkout (path mode) or at an extracted `cargo package` tarball.
+[workspace]
+
+[package]
+name = "downstream-smoke"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+slint = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-skia"] }
+slint-node-editor = { path = "../.." }
+
+[build-dependencies]
+# Required on the consumer side too: it turns on the compiler's
+# `experimental-library-module` support, which resolves `@nodeeditor`.
+slint-build = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2", features = ["experimental-module-builds"] }

@@ -5,8 +5,9 @@
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    selection, wire_node_editor, BasicLinkValidator, CompositeValidator, GraphLogic, LinkModel,
-    LinkValidator, MovableNode, NoDuplicatesValidator, NodeEditorSetup, ValidationResult,
+    selection, wire_node_editor, BasicLinkValidator, CompositeValidator, GraphLogic, LinkData,
+    LinkValidator, MinimapNode, MovableNode, NoDuplicatesValidator, NodeEditorSetup,
+    ValidationResult,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -52,21 +53,6 @@ impl MovableNode for FilterNodeData {
     }
     fn set_y(&mut self, y: f32) {
         self.world_y = y;
-    }
-}
-
-impl LinkModel for LinkData {
-    fn id(&self) -> i32 {
-        self.id
-    }
-    fn start_pin_id(&self) -> i32 {
-        self.start_pin_id
-    }
-    fn end_pin_id(&self) -> i32 {
-        self.end_pin_id
-    }
-    fn line_width(&self) -> f32 {
-        self.line_width
     }
 }
 

@@ -3,7 +3,8 @@
 Plan drafted 2026-09-05, against `aa5a12b` (slint pinned to the 1.18 pre-release tip).
 Revised the same day after a Codex second-opinion review; every claim below was
 re-verified against the Slint 1.18 source or by running the command shown.
-Status section below refreshed 2026-09-05 against `ad620cf`.
+Status section below refreshed 2026-09-05 against `f707f45` + the 1.3/1.4/1.5
+commit.
 
 ## Executive summary
 
@@ -29,8 +30,9 @@ Two corrections to the first draft of this plan, both material:
 
 ## Current status
 
-Refreshed 2026-09-05 at `ad620cf`. Nothing in Phase 1 or Phase 2 has been done
-yet — the work below is what has landed *around* the release, not release work.
+Refreshed 2026-09-05. **Phase 1's component-distribution core (1.3, 1.4, 1.5)
+has landed**, validated against the git pin rather than the registry — see
+"Library modules are not blocked on the tag" below. Phase 2 remains blocked.
 
 ### Landed
 
@@ -43,10 +45,13 @@ yet — the work below is what has landed *around* the release, not release work
 | `761fa3b` | Imports use the bare `@nodeeditor` form |
 | `eda18d8` | Minimap kept in sync with the graph |
 | `ad620cf` | Regression tests for the minimap |
+| `f707f45` | This plan brought up to date |
+| *(this commit)* | 1.3 + 1.4 + 1.5: library modules, packaged file set, smoke fixture |
 
-Health at `ad620cf`: `cargo test --workspace` 354 passed / 0 failed,
-`cargo clippy --workspace --all-targets` clean, `cargo package --list` works and
-`cargo package` still fails only on the missing `version` key for `slint`.
+Health after 1.3/1.4/1.5: `cargo test --workspace` 354 passed / 0 failed,
+`cargo clippy --workspace --all-targets` clean, `./smoke/run.sh` green,
+`cargo package --list` correct, and `cargo package` still fails only on the
+missing `version` key for `slint`.
 
 Runtime behaviour was verified over the Slint MCP server against the running
 `advanced` example: node drag, selection, link creation by pin drag, delete with
@@ -54,7 +59,8 @@ link cascade, in-node widgets, and the `@nodeeditor` imports resolving at all.
 
 ### Open, unblocked today
 
-- Phase 1 in full (1.1 – 1.7). None of it started.
+- 1.1 (metadata), 1.2 (README registry form + intra-doc links), 1.6 (CI),
+  1.7 (docs.rs). 1.3, 1.4 and 1.5 are done.
 - `filter_node.slint` text overlap: `'Ctrl'` x=[432,448] collides with
   `'Active'` x=[440,473]; `'In'` and `'Type:'` touch. Measured, not eyeballed.
 
@@ -96,6 +102,12 @@ Each measured, not assumed. Items marked ⚠️ corrected an earlier assumption.
 | ⚠️ `cargo package --list` is not a packaging check | Same tree: `--list` → exit 0, `cargo package` → exit 101 |
 | Post-PR-#5 code still compiles against 1.17.1 | `cargo publish --dry-run` against 1.17.1 → exit 0 |
 | `categories` slugs are valid | crates.io API → `GUI`, `Visualization` |
+| ⚠️ Library modules work at the **git pin**, not only at the tag | `experimental-module-builds` at `api/rs/build/Cargo.toml:45`, `as_library` at `api/rs/build/lib.rs:249`, both at `2bb5a20`. 1.3/1.4/1.5 were built and validated against it |
+| ⚠️ `as_library` needs MSRV ≥ 1.77 | It emits `cargo::metadata=…`; with `rust-version = "1.70"` cargo refuses: *"the `cargo::` syntax … was added in Rust 1.77.0"*. Forced the MSRV bump early |
+| ⚠️ The publisher must expose the generated code as a Rust module | Consumer codegen emits `pub use slint_node_editor::nodeeditor::NodeEditor` (`generator/rust.rs:181-190`), so `src/lib.rs` needs `include!` under a module matching `rust_module` |
+| ⚠️ Library-imported **structs and enums** are not re-exported to consumers | `type_exports` covers local types only; `LinkData`/`MinimapNode` land in the consumer's private `slint_generated*` module. Worked around by re-exporting them from our crate root |
+| ⚠️ Consumers get `experimental-module-builds` by feature unification | Fixture with the feature *removed* still resolved `@nodeeditor`: build-dep features unify, so our build-dep enables it for them. Reliable but implicit — the fixture still declares it explicitly |
+| The smoke fixture actually fails when the mechanism breaks | Negative control: dropping `links = "nodeeditor"` → fixture build script fails. Restored, green again |
 
 ## The central decision: library modules
 
@@ -195,52 +207,65 @@ homepage   = "https://github.com/tilladam/slint-node-editor"  # was: https://sli
 
 Gate this with `RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps`.
 
-### 1.3 Restructure `build.rs` for dual duty
+### 1.3 Restructure `build.rs` for dual duty — ✅ done
 
-`build.rs` currently exists only to compile `tests/ui/test.slint` for the
-integration tests, and is excluded from the package by accident. Under library
-modules it must **ship** and must do two jobs:
+Landed, and it needed four things the first draft did not list:
 
-1. Always: `as_library("nodeeditor")` on `node-editor.slint`, so the metadata is
-   emitted for consumers.
-2. Only when the test sources are present (i.e. in a git checkout, not in the
-   published tarball): compile `tests/ui/test.slint`.
+1. **`links = "nodeeditor"` in `[package]`.** Cargo emits `DEP_*` only for
+   packages that declare `links`; without it `as_library`'s metadata goes
+   nowhere and the lookup at `typeloader.rs:1141` finds nothing.
+2. **`experimental-module-builds` on the `slint-build` build-dependency.**
+3. **`src/lib.rs` must expose the generated code.** Consumer codegen resolves to
+   `slint_node_editor::nodeeditor::<Component>`, so the crate carries
+   `pub mod nodeeditor { include!(concat!(env!("OUT_DIR"), "/node-editor.rs")); }`
+   matching `rust_module("nodeeditor")` in `build.rs`. Note the explicit
+   `include!` rather than `slint::include_modules!()`: both `compile_with_config`
+   calls set `SLINT_INCLUDE_GENERATED` and the last one wins, which the test
+   harness relies on.
+4. **The MSRV had to move to 1.92 now**, not in 2.2 — see the verified-facts
+   table. 1.70 made `as_library` fail outright.
 
-Guard step 2 on the file's existence so the packaged crate does not try to
-compile a test UI it does not ship. Add `build.rs` to `include`.
+The test-UI compile is guarded on `tests/ui/test.slint` existing, so the
+packaged crate does not try to build a test UI it does not ship.
 
-### 1.4 Stop shipping the test UI
+**Two consequences worth knowing about.** Both are behaviour changes, not
+cosmetics:
 
-`include` uses `"*.slint"`. Cargo applies gitignore glob semantics, so a pattern
-with no `/` matches **at any depth** — `tests/ui/test.slint` is currently
-packaged. Root-anchor it:
+- *Library structs and enums do not reach consumers.* Slint 1.18 forwards
+  library-imported structs and enums only into the consumer's private
+  `slint_generated*` module, so `LinkData` and `MinimapNode` were suddenly
+  unnameable. The crate root now re-exports `BoxSelectionModifier`,
+  `LinkCreationState`, `LinkData`, `MinimapNode` and `MinimapPosition`. This is
+  an upstream gap; if it is fixed, the re-exports become redundant but harmless.
+- *`impl LinkModel for LinkData` moved into the library.* Both the type and the
+  trait are ours now, so the orphan rule forbids consumers writing it. Two
+  examples had a copy each; the canonical impl in `src/graph.rs` reads `color`
+  and `status` off the row, which the example copies did not. Nothing observes
+  the difference today — those two accessors are only read by `LinkManager`,
+  and no example pairs it with `LinkData` — but a consumer that does will now
+  get the row's own colour and status instead of white and "no status".
 
-```toml
-include = [
-    "src/**/*",
-    "/*.slint",     # was "*.slint" — root only
-    "build.rs",     # now required (see 1.3)
-    "Cargo.toml",
-    "README.md",
-    "LICENSE-MIT",
-    "LICENSE-APACHE",
-]
-```
+### 1.4 Stop shipping the test UI — ✅ done
 
-Verified with `cargo package --list`: drops `tests/ui/test.slint`, retains
-`node-editor.slint` and `node-editor-building-blocks.slint`.
+`include` is root-anchored (`/*.slint`) and ships `build.rs`, which 1.3 requires.
+`cargo package --list` confirms: `tests/ui/test.slint` gone, both root `.slint`
+files and `build.rs` present, `smoke/` excluded.
 
-### 1.5 Build the downstream smoke fixture
+### 1.5 Build the downstream smoke fixture — ✅ done
 
-This is the check that would have caught the gap in the first draft. Create a
-minimal consumer crate, outside the workspace, that depends on the **packaged**
-crate and compiles a `.slint` file importing `@nodeeditor`. It must:
+`smoke/downstream` is a crate outside the workspace; `./smoke/run.sh` builds it.
+It compiles `import { NodeEditor, BaseNode, Pin, PinTypes, LinkData } from
+"@nodeeditor";` and constructs a `LinkData` in Rust, so it covers both halves of
+the contract. Verified to fail when `links` is removed.
 
-- extract the tarball produced by `cargo package`,
-- depend on the extracted directory by path,
-- actually compile an `import { NodeEditor } from "@nodeeditor";`.
+Two modes. `path` (the default) builds against this checkout and works today.
+`packaged` extracts the `cargo package` tarball first and is blocked on 2.1 —
+`cargo package` needs the `version` key on `slint`. **Path mode does not prove
+the packaged file set is sufficient**; run `packaged` before publishing.
 
-Without this, no amount of `cargo publish --dry-run` proves the components work.
+All nine examples were also stripped of their `with_library_paths` plumbing.
+They now resolve `@nodeeditor` exactly as an outside consumer does, which makes
+the whole example suite a second, broader smoke test.
 
 ### 1.6 Fix the CI coverage
 
@@ -267,9 +292,9 @@ all-features = true
 
 ### 2.1 Swap the git pins to registry versions
 
-There are five `rev = "..."` strings, all in the root `Cargo.toml` (lines 25, 35,
-51, 52, 53). Every other crate in the workspace inherits with
-`{ workspace = true }`, so those five are the only edits.
+There are seven `rev = "..."` strings: five in the root `Cargo.toml` and two in
+`smoke/downstream/Cargo.toml`, which is deliberately outside the workspace and
+so inherits nothing. Every other crate inherits with `{ workspace = true }`.
 
 ```toml
 [dependencies]
@@ -288,8 +313,9 @@ i-slint-backend-testing = "1.18"
 ```
 
 `i-slint-backend-testing` moved into `[workspace.dependencies]` in `ad620cf` so
-the root and `examples/advanced` share one entry. That changed where the rev
-lives, not how many there are — it was five before and it is five now.
+the root and `examples/advanced` share one entry. The smoke fixture added the
+two outside the workspace; it must move to `version = "1.18"` in the same pass
+or `packaged` mode will resolve a different slint than the crate under test.
 
 Two changes from the first draft:
 
@@ -310,9 +336,12 @@ just bloat — so test against both the minimum (1.18.0) and the latest allowed
 This also retires the parked item from the 1.18 bump: the crate stops being
 pinned to a moving pre-release branch tip.
 
-### 2.2 Raise the MSRV to 1.92
+### 2.2 Raise the MSRV to 1.92 — ✅ applied early, still needs verifying
 
-`rust-version = "1.70"` is false advertising — slint 1.18 declares 1.92.
+The bump already landed with 1.3: `as_library` emits `cargo::metadata=…`, which
+cargo rejects below 1.77, so 1.70 blocked the work outright. 1.92 is the honest
+floor because slint 1.18 declares it. What remains here is the *verification* on
+a pinned toolchain and the release-note wording.
 
 ⚠️ A 22-release jump that will exclude consumers on older toolchains. Forced by
 slint, not by our code; state it in the release notes.
@@ -380,16 +409,25 @@ Worth a sentence in the README rather than a license change.
 ## Points of risk
 
 1. **The experimental dependency is the biggest one.** `as_library` may change
-   or be removed (issue #154). Consumers must opt into an experimental compiler
-   feature. If upstream changes it, published 0.1.0 breaks and needs a new
-   release. This is the accepted cost of the chosen approach.
+   or be removed (issue #154). If upstream changes it, published 0.1.0 breaks
+   and needs a new release. This is the accepted cost of the chosen approach.
+   One part of the cost turned out smaller than feared: consumers do *not* have
+   to enable `experimental-module-builds` themselves — cargo unifies build-dep
+   features, so our build-dependency turns it on for them (measured). Implicit
+   rather than guaranteed, so the README should still tell them to declare it.
 2. **The dash constraint is silent.** A hyphenated library name fails to resolve
    with no useful error. If the import mysteriously fails, check this first.
 3. **The 1.18 API is not final.** The pin is a moving branch tip; Phase 2 assumes
    the tag stays compatible with `2bb5a20` — likely but unverified.
-4. **The 1.17.1 rehearsal validated packaging only**, and not even the `.slint`
-   files. A fresh dry-run plus the smoke fixture after 2.1 is mandatory.
-5. **Publishing is irreversible.** 0.1.0 and the name can never be reused.
+4. **The smoke fixture has only run in `path` mode.** It proves the components
+   resolve and compile; it does *not* prove the packaged file set is
+   sufficient, because `cargo package` cannot run until 2.1. Running
+   `./smoke/run.sh packaged` after 2.1 is mandatory.
+5. **We now depend on two undocumented details of `as_library`**: that library
+   structs/enums need re-exporting by hand, and that build-dep feature
+   unification carries the experimental flag to consumers. Either could change
+   without notice.
+6. **Publishing is irreversible.** 0.1.0 and the name can never be reused.
 
 ## Alternatives considered and rejected
 

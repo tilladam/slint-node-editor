@@ -1,5 +1,5 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::{wire_node_editor, NodeEditorSetup, NodeGeometry};
+use slint_node_editor::{wire_node_editor, LinkData, NodeEditorSetup, NodeGeometry};
 use std::rc::Rc;
 
 slint::include_modules!();

@@ -3,7 +3,7 @@
 // Tests widget scaling behavior at various zoom levels with three complex nodes.
 
 use slint::{Color, ModelRc, SharedString, VecModel};
-use slint_node_editor::{wire_node_editor, NodeEditorSetup};
+use slint_node_editor::{wire_node_editor, LinkData, NodeEditorSetup};
 use std::rc::Rc;
 
 slint::include_modules!();

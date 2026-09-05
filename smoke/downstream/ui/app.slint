@@ -1,0 +1,24 @@
+// The whole point of the fixture: a consumer that has never heard of this
+// checkout resolves `@nodeeditor` purely from the dependency's metadata.
+import { NodeEditor, BaseNode, Pin, PinTypes, LinkData } from "@nodeeditor";
+
+export component App inherits Window {
+    width: 400px;
+    height: 300px;
+
+    in property <[LinkData]> links;
+
+    NodeEditor {
+        links: root.links;
+
+        BaseNode {
+            node-id: 1;
+            world-x: 10px;
+            world-y: 10px;
+            Pin {
+                pin-id: 2;
+                pin-type: PinTypes.output;
+            }
+        }
+    }
+}

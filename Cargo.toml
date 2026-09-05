@@ -1,6 +1,7 @@
 [package]
 name = "slint-node-editor"
 version = "0.1.0"
+links = "nodeeditor"
 edition = "2021"
 authors = ["Till Adam <till.adam@kdab.com>"]
 license = "MIT OR Apache-2.0"
@@ -11,10 +12,11 @@ documentation = "https://docs.rs/slint-node-editor"
 keywords = ["gui", "node-editor", "graph", "slint", "visual-programming"]
 categories = ["gui", "visualization"]
 readme = "README.md"
-rust-version = "1.70"
+rust-version = "1.92"
 include = [
     "src/**/*",
-    "*.slint",
+    "/*.slint",
+    "build.rs",
     "Cargo.toml",
     "README.md",
     "LICENSE-MIT",
@@ -32,7 +34,7 @@ layout = ["rust-sugiyama"]
 i-slint-backend-testing = { workspace = true }
 
 [build-dependencies]
-slint-build = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2" }
+slint-build = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2", features = ["experimental-module-builds"] }
 
 [workspace]
 members = [

@@ -4,8 +4,8 @@ use std::rc::Rc;
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    sugiyama_layout, wire_node_editor, wire_selection, Direction, GraphLogic, MovableNode,
-    NodeEditorSetup, SugiyamaConfig,
+    sugiyama_layout, wire_node_editor, wire_selection, Direction, GraphLogic, LinkData,
+    MovableNode, NodeEditorSetup, SugiyamaConfig,
 };
 
 slint::include_modules!();
