@@ -1,147 +1,16 @@
-/// Generate SVG path command for a bezier link between two points
+/// Below this many pixels between endpoints the link degenerates to a straight
+/// segment: a horizontal-biased curve over so short a span reads as a zig-zag.
+/// The offset ramps in over the span from here to 4× here, so the transition
+/// out of the fallback is seamless.
+const STRAIGHT_THRESHOLD: f32 = 20.0;
+
+/// The cubic bezier a link is drawn as.
 ///
-/// Creates a horizontal-biased cubic bezier curve suitable for node connections.
-/// Control points extend horizontally from start and end points.
-///
-/// # Arguments
-/// * `start_x`, `start_y` - Start point (pin center)
-/// * `end_x`, `end_y` - End point (pin center)
-/// * `zoom` - Current zoom level (affects control point offset)
-/// * `min_offset` - Minimum control point offset (default: 50.0)
-///
-/// # Returns
-/// SVG path command string (e.g., "M 10 20 C 60 20 90 80 140 80")
-pub fn generate_bezier_path(
-    start_x: f32,
-    start_y: f32,
-    end_x: f32,
-    end_y: f32,
-    zoom: f32,
-    min_offset: f32,
-) -> String {
-    // If distance is very small, use a straight line to avoid zig-zags
-    let dx = end_x - start_x;
-    let dy = end_y - start_y;
-    let dist_sq = dx * dx + dy * dy;
-    let threshold = 20.0 * zoom;
-
-    if dist_sq < threshold * threshold {
-        return format!("M {} {} L {} {}", start_x, start_y, end_x, end_y);
-    }
-
-    // Calculate control point offset (horizontal bezier)
-    let dist = dist_sq.sqrt();
-    let dx_abs = dx.abs();
-    let full_offset = (dx_abs * 0.5).max(min_offset * zoom);
-
-    // Smoothly ramp up offset based on distance so the transition from the
-    // linear fallback is seamless. At the threshold the offset is ~0 (nearly
-    // linear) and it reaches the full value at 4× the threshold.
-    let ramp = ((dist - threshold) / (3.0 * threshold)).clamp(0.0, 1.0);
-    let offset = full_offset * ramp;
-
-    // Control points extend horizontally, following the direction of dx
-    let sign = if dx >= 0.0 { 1.0 } else { -1.0 };
-    let ctrl1_x = start_x + sign * offset;
-    let ctrl1_y = start_y;
-    let ctrl2_x = end_x - sign * offset;
-    let ctrl2_y = end_y;
-
-    // Generate SVG path: M (move to), C (cubic bezier)
-    format!(
-        "M {} {} C {} {} {} {} {} {}",
-        start_x, start_y, ctrl1_x, ctrl1_y, ctrl2_x, ctrl2_y, end_x, end_y
-    )
-}
-
-/// Generate SVG path command for a partial bezier link (for animation)
-///
-/// Uses de Casteljau's algorithm to compute the sub-curve from t=0 to t=progress.
-/// This creates a "growing" animation effect where the curve snakes from start to end.
-///
-/// # Arguments
-/// * `start_x`, `start_y` - Start point (pin center)
-/// * `end_x`, `end_y` - End point (pin center)
-/// * `zoom` - Current zoom level (affects control point offset)
-/// * `min_offset` - Minimum control point offset (default: 50.0)
-/// * `progress` - Animation progress from 0.0 to 1.0
-///
-/// # Returns
-/// SVG path command string for the partial curve
-pub fn generate_partial_bezier_path(
-    start_x: f32,
-    start_y: f32,
-    end_x: f32,
-    end_y: f32,
-    zoom: f32,
-    min_offset: f32,
-    progress: f32,
-) -> String {
-    // Clamp progress to valid range
-    let t = progress.clamp(0.0, 1.0);
-
-    if t <= 0.0 {
-        // No curve visible yet - just return a point
-        return format!("M {} {} L {} {}", start_x, start_y, start_x, start_y);
-    }
-
-    if t >= 1.0 {
-        // Full curve - use standard function
-        return generate_bezier_path(start_x, start_y, end_x, end_y, zoom, min_offset);
-    }
-
-    // If distance is very small, use a straight line
-    let dx_full = end_x - start_x;
-    let dy_full = end_y - start_y;
-    let dist_sq = dx_full * dx_full + dy_full * dy_full;
-    let threshold = 20.0 * zoom;
-
-    if dist_sq < threshold * threshold {
-        let curr_x = start_x + dx_full * t;
-        let curr_y = start_y + dy_full * t;
-        return format!("M {} {} L {} {}", start_x, start_y, curr_x, curr_y);
-    }
-
-    // Calculate full bezier control points
-    let dist = dist_sq.sqrt();
-    let dx_abs = dx_full.abs();
-    let full_offset = (dx_abs * 0.5).max(min_offset * zoom);
-    let ramp = ((dist - threshold) / (3.0 * threshold)).clamp(0.0, 1.0);
-    let offset = full_offset * ramp;
-
-    let sign = if dx_full >= 0.0 { 1.0 } else { -1.0 };
-    let p0 = (start_x, start_y);
-    let p1 = (start_x + sign * offset, start_y);
-    let p2 = (end_x - sign * offset, end_y);
-    let p3 = (end_x, end_y);
-
-    // De Casteljau's algorithm to split at t
-    // Level 1: lerp between adjacent points
-    let q0 = lerp_point(p0, p1, t);
-    let q1 = lerp_point(p1, p2, t);
-    let q2 = lerp_point(p2, p3, t);
-
-    // Level 2: lerp between level 1 points
-    let r0 = lerp_point(q0, q1, t);
-    let r1 = lerp_point(q1, q2, t);
-
-    // Level 3: the point on the curve at t
-    let s = lerp_point(r0, r1, t);
-
-    // The partial curve from 0 to t uses:
-    // P0' = P0, P1' = Q0, P2' = R0, P3' = S
-    format!(
-        "M {} {} C {} {} {} {} {} {}",
-        p0.0, p0.1, q0.0, q0.1, r0.0, r0.1, s.0, s.1
-    )
-}
-
-/// Linear interpolation between two points
-fn lerp_point(a: (f32, f32), b: (f32, f32), t: f32) -> (f32, f32) {
-    (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t)
-}
-
-/// Cubic bezier curve for distance calculations
+/// Horizontal-biased: each control point shares its endpoint's `y` and is
+/// offset along `x`, which is what makes a link leave a pin sideways. These
+/// four points are the single description of the curve — the drawn commands,
+/// the bounding box and the hit test all read them, so a click lands on the
+/// stroke the eye sees.
 pub struct CubicBezier {
     pub p0: (f32, f32), // Start point
     pub p1: (f32, f32), // Control point 1
@@ -150,13 +19,13 @@ pub struct CubicBezier {
 }
 
 impl CubicBezier {
-    /// Create a bezier from endpoints using the same logic as generate_bezier_path
+    /// Build the curve between two pin centres.
     ///
     /// # Arguments
-    /// * `start_x`, `start_y` - Start point
-    /// * `end_x`, `end_y` - End point
-    /// * `zoom` - Current zoom level
-    /// * `min_offset` - Minimum control point offset (default: 50.0)
+    /// * `start_x`, `start_y` - Start point (pin center)
+    /// * `end_x`, `end_y` - End point (pin center)
+    /// * `zoom` - Current zoom level (scales the threshold and the offset)
+    /// * `min_offset` - Minimum control point offset (typically 50.0)
     pub fn from_endpoints(
         start_x: f32,
         start_y: f32,
@@ -168,9 +37,11 @@ impl CubicBezier {
         let dx = end_x - start_x;
         let dy = end_y - start_y;
         let dist_sq = dx * dx + dy * dy;
-        let threshold = 10.0 * zoom;
+        let threshold = STRAIGHT_THRESHOLD * zoom;
 
         if dist_sq < threshold * threshold {
+            // Control points collapsed onto their endpoints: the cubic *is* the
+            // segment, so nothing downstream needs a second shape to handle.
             return CubicBezier {
                 p0: (start_x, start_y),
                 p1: (start_x, start_y),
@@ -180,17 +51,85 @@ impl CubicBezier {
         }
 
         let dist = dist_sq.sqrt();
-        let dx_abs = dx.abs();
-        let full_offset = (dx_abs * 0.5).max(min_offset * zoom);
+        let full_offset = (dx.abs() * 0.5).max(min_offset * zoom);
         let ramp = ((dist - threshold) / (3.0 * threshold)).clamp(0.0, 1.0);
         let offset = full_offset * ramp;
 
+        // Control points extend horizontally, following the direction of dx
         let sign = if dx >= 0.0 { 1.0 } else { -1.0 };
         CubicBezier {
             p0: (start_x, start_y),
             p1: (start_x + sign * offset, start_y),
             p2: (end_x - sign * offset, end_y),
             p3: (end_x, end_y),
+        }
+    }
+
+    /// Whether the curve collapsed to the straight-line fallback.
+    pub fn is_straight(&self) -> bool {
+        self.p1 == self.p0 && self.p2 == self.p3
+    }
+
+    /// SVG path commands for the curve, with coordinates relative to `origin`.
+    ///
+    /// Pass `(0.0, 0.0)` for absolute coordinates; pass the origin of
+    /// [`bounds`](Self::bounds) to get commands that fit inside that box.
+    pub fn commands_from(&self, origin: (f32, f32)) -> String {
+        let (ox, oy) = origin;
+        if self.is_straight() {
+            return format!(
+                "M {} {} L {} {}",
+                self.p0.0 - ox,
+                self.p0.1 - oy,
+                self.p3.0 - ox,
+                self.p3.1 - oy
+            );
+        }
+        format!(
+            "M {} {} C {} {} {} {} {} {}",
+            self.p0.0 - ox,
+            self.p0.1 - oy,
+            self.p1.0 - ox,
+            self.p1.1 - oy,
+            self.p2.0 - ox,
+            self.p2.1 - oy,
+            self.p3.0 - ox,
+            self.p3.1 - oy
+        )
+    }
+
+    /// The axis-aligned box containing the curve, as `(x, y, width, height)`.
+    ///
+    /// A cubic lies within the convex hull of its control points, so the
+    /// extremes of the four bound it without subdividing. This is the
+    /// centreline's box: a stroke spills half its width past it in every
+    /// direction, and whoever knows the stroke width pads for that.
+    pub fn bounds(&self) -> (f32, f32, f32, f32) {
+        let xs = [self.p0.0, self.p1.0, self.p2.0, self.p3.0];
+        let ys = [self.p0.1, self.p1.1, self.p2.1, self.p3.1];
+        let min_x = xs.iter().copied().fold(f32::INFINITY, f32::min);
+        let max_x = xs.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let min_y = ys.iter().copied().fold(f32::INFINITY, f32::min);
+        let max_y = ys.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        (min_x, min_y, max_x - min_x, max_y - min_y)
+    }
+
+    /// The sub-curve from `t=0` to `t=t`, by de Casteljau subdivision.
+    pub fn split_at(&self, t: f32) -> CubicBezier {
+        let q0 = lerp_point(self.p0, self.p1, t);
+        let q1 = lerp_point(self.p1, self.p2, t);
+        let q2 = lerp_point(self.p2, self.p3, t);
+
+        let r0 = lerp_point(q0, q1, t);
+        let r1 = lerp_point(q1, q2, t);
+
+        let s = lerp_point(r0, r1, t);
+
+        CubicBezier {
+            p0: self.p0,
+            p1: q0,
+            p2: r0,
+            p3: s,
         }
     }
 
@@ -213,6 +152,77 @@ impl CubicBezier {
 
         (x, y)
     }
+}
+
+/// Generate SVG path command for a bezier link between two points
+///
+/// Creates a horizontal-biased cubic bezier curve suitable for node connections.
+/// Control points extend horizontally from start and end points.
+///
+/// # Arguments
+/// * `start_x`, `start_y` - Start point (pin center)
+/// * `end_x`, `end_y` - End point (pin center)
+/// * `zoom` - Current zoom level (affects control point offset)
+/// * `min_offset` - Minimum control point offset (default: 50.0)
+///
+/// # Returns
+/// SVG path command string (e.g., "M 10 20 C 60 20 90 80 140 80")
+pub fn generate_bezier_path(
+    start_x: f32,
+    start_y: f32,
+    end_x: f32,
+    end_y: f32,
+    zoom: f32,
+    min_offset: f32,
+) -> String {
+    CubicBezier::from_endpoints(start_x, start_y, end_x, end_y, zoom, min_offset)
+        .commands_from((0.0, 0.0))
+}
+
+/// Generate SVG path command for a partial bezier link (for animation)
+///
+/// Creates a "growing" effect where the curve snakes from start to end.
+///
+/// # Arguments
+/// * `start_x`, `start_y` - Start point (pin center)
+/// * `end_x`, `end_y` - End point (pin center)
+/// * `zoom` - Current zoom level (affects control point offset)
+/// * `min_offset` - Minimum control point offset (default: 50.0)
+/// * `progress` - Animation progress from 0.0 to 1.0
+///
+/// # Returns
+/// SVG path command string for the partial curve
+pub fn generate_partial_bezier_path(
+    start_x: f32,
+    start_y: f32,
+    end_x: f32,
+    end_y: f32,
+    zoom: f32,
+    min_offset: f32,
+    progress: f32,
+) -> String {
+    let t = progress.clamp(0.0, 1.0);
+    let curve = CubicBezier::from_endpoints(start_x, start_y, end_x, end_y, zoom, min_offset);
+
+    if t >= 1.0 {
+        return curve.commands_from((0.0, 0.0));
+    }
+
+    if t <= 0.0 || curve.is_straight() {
+        // Grow a straight fallback at constant speed. Subdividing its cubic
+        // form would ease in and out along a segment that has no curvature for
+        // the easing to follow.
+        let x = start_x + (end_x - start_x) * t;
+        let y = start_y + (end_y - start_y) * t;
+        return format!("M {} {} L {} {}", start_x, start_y, x, y);
+    }
+
+    curve.split_at(t).commands_from((0.0, 0.0))
+}
+
+/// Linear interpolation between two points
+fn lerp_point(a: (f32, f32), b: (f32, f32), t: f32) -> (f32, f32) {
+    (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t)
 }
 
 /// Calculate squared distance from a point to a line segment
@@ -507,7 +517,11 @@ mod tests {
 
         for point in points {
             let dist = distance_to_bezier(point, &bezier, 20);
-            assert!(dist >= 0.0, "Distance should be non-negative for {:?}", point);
+            assert!(
+                dist >= 0.0,
+                "Distance should be non-negative for {:?}",
+                point
+            );
         }
     }
 
@@ -518,6 +532,167 @@ mod tests {
 
         // Point on start should be very close
         assert!(dist < 1.0);
+    }
+
+    // ========================================================================
+    // The drawn curve, the box and the hit test are one curve
+    // ========================================================================
+
+    #[test]
+    fn test_from_endpoints_matches_generated_path() {
+        // A span short enough to sit inside the old 10-vs-20 threshold gap:
+        // from_endpoints used to fall through to a curve here while the drawn
+        // path was a straight line.
+        for (sx, sy, ex, ey) in [
+            (0.0, 0.0, 15.0, 0.0),
+            (0.0, 0.0, 25.0, 0.0),
+            (10.0, 20.0, 100.0, 80.0),
+            (100.0, 0.0, 0.0, 50.0),
+        ] {
+            let curve = CubicBezier::from_endpoints(sx, sy, ex, ey, 1.0, 50.0);
+            assert_eq!(
+                curve.commands_from((0.0, 0.0)),
+                generate_bezier_path(sx, sy, ex, ey, 1.0, 50.0),
+                "curve and drawn path disagree for ({sx},{sy})->({ex},{ey})"
+            );
+        }
+    }
+
+    #[test]
+    fn test_short_link_is_straight() {
+        let curve = CubicBezier::from_endpoints(0.0, 0.0, 5.0, 0.0, 1.0, 50.0);
+        assert!(curve.is_straight());
+        assert!(!CubicBezier::from_endpoints(0.0, 0.0, 25.0, 0.0, 1.0, 50.0).is_straight());
+    }
+
+    // ========================================================================
+    // CubicBezier::bounds() - the box a bounded link element takes
+    // ========================================================================
+
+    #[test]
+    fn test_bounds_contains_the_curve() {
+        let curve = CubicBezier::from_endpoints(0.0, 0.0, 200.0, 120.0, 1.0, 50.0);
+        let (x, y, w, h) = curve.bounds();
+
+        for i in 0..=50 {
+            let (px, py) = curve.eval(i as f32 / 50.0);
+            assert!(
+                px >= x - 0.001 && px <= x + w + 0.001,
+                "x {px} outside {x}..{}",
+                x + w
+            );
+            assert!(
+                py >= y - 0.001 && py <= y + h + 0.001,
+                "y {py} outside {y}..{}",
+                y + h
+            );
+        }
+    }
+
+    #[test]
+    fn test_bounds_of_horizontal_link_has_zero_height() {
+        // Both control points share their endpoint's y, so a link between pins
+        // at the same height is flat — the caller has to pad for the stroke.
+        let curve = CubicBezier::from_endpoints(0.0, 50.0, 300.0, 50.0, 1.0, 50.0);
+        let (_, y, _, h) = curve.bounds();
+        assert_eq!(y, 50.0);
+        assert_eq!(h, 0.0);
+    }
+
+    #[test]
+    fn test_bounds_spans_the_control_points_not_just_the_endpoints() {
+        // A near-vertical link still leaves its pins sideways by `min_offset`,
+        // so its box is far wider than the two endpoints.
+        let curve = CubicBezier::from_endpoints(100.0, 0.0, 110.0, 300.0, 1.0, 50.0);
+        let (x, _, w, _) = curve.bounds();
+        assert!(
+            x < 100.0,
+            "box should start left of the start point, got {x}"
+        );
+        assert!(
+            x + w > 110.0,
+            "box should end right of the end point, got {}",
+            x + w
+        );
+        assert!(w > 50.0, "box should be at least the offset wide, got {w}");
+    }
+
+    #[test]
+    fn test_bounds_of_straight_link_is_the_segment() {
+        let curve = CubicBezier::from_endpoints(10.0, 20.0, 15.0, 24.0, 1.0, 50.0);
+        assert_eq!(curve.bounds(), (10.0, 20.0, 5.0, 4.0));
+    }
+
+    // ========================================================================
+    // commands_from() - relative coordinates
+    // ========================================================================
+
+    #[test]
+    fn test_commands_from_bounds_origin_are_box_relative() {
+        let curve = CubicBezier::from_endpoints(100.0, 40.0, 300.0, 160.0, 1.0, 50.0);
+        let (x, y, w, h) = curve.bounds();
+        let commands = curve.commands_from((x, y));
+
+        let coords: Vec<f32> = commands
+            .split_whitespace()
+            .filter_map(|t| t.parse::<f32>().ok())
+            .collect();
+        assert_eq!(coords.len(), 8);
+        for pair in coords.chunks(2) {
+            assert!(
+                pair[0] >= -0.001 && pair[0] <= w + 0.001,
+                "x {} outside 0..{w}",
+                pair[0]
+            );
+            assert!(
+                pair[1] >= -0.001 && pair[1] <= h + 0.001,
+                "y {} outside 0..{h}",
+                pair[1]
+            );
+        }
+    }
+
+    // ========================================================================
+    // split_at() - the animation sub-curve
+    // ========================================================================
+
+    #[test]
+    fn test_split_at_traces_the_same_curve() {
+        let curve = CubicBezier::from_endpoints(0.0, 0.0, 200.0, 100.0, 1.0, 50.0);
+        let half = curve.split_at(0.5);
+
+        assert_eq!(half.p0, curve.p0);
+        // The sub-curve's end is the full curve's midpoint, and its own
+        // midpoint is the full curve at a quarter.
+        let end = half.eval(1.0);
+        let mid = curve.eval(0.5);
+        assert!((end.0 - mid.0).abs() < 0.01 && (end.1 - mid.1).abs() < 0.01);
+
+        let quarter = curve.eval(0.25);
+        let half_mid = half.eval(0.5);
+        assert!((half_mid.0 - quarter.0).abs() < 0.01 && (half_mid.1 - quarter.1).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_partial_path_grows_from_the_start() {
+        let full = generate_partial_bezier_path(0.0, 0.0, 200.0, 100.0, 1.0, 50.0, 1.0);
+        assert_eq!(
+            full,
+            generate_bezier_path(0.0, 0.0, 200.0, 100.0, 1.0, 50.0)
+        );
+
+        let none = generate_partial_bezier_path(0.0, 0.0, 200.0, 100.0, 1.0, 50.0, 0.0);
+        assert_eq!(none, "M 0 0 L 0 0");
+
+        let part = generate_partial_bezier_path(0.0, 0.0, 200.0, 100.0, 1.0, 50.0, 0.5);
+        assert!(part.starts_with("M 0 0 C"));
+        assert_ne!(part, full);
+    }
+
+    #[test]
+    fn test_partial_path_of_short_link_stays_straight() {
+        let part = generate_partial_bezier_path(0.0, 0.0, 10.0, 0.0, 1.0, 50.0, 0.5);
+        assert_eq!(part, "M 0 0 L 5 0");
     }
 
     // ========================================================================
