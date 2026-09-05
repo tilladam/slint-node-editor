@@ -6,8 +6,8 @@ edition = "2021"
 authors = ["Till Adam <till.adam@kdab.com>"]
 license = "MIT OR Apache-2.0"
 description = "A flexible, generic Slint component library for building visual graph editors"
-repository = "https://github.com/slint-ui/slint"
-homepage = "https://slint.dev"
+repository = "https://github.com/tilladam/slint-node-editor"
+homepage = "https://github.com/tilladam/slint-node-editor"
 documentation = "https://docs.rs/slint-node-editor"
 keywords = ["gui", "node-editor", "graph", "slint", "visual-programming"]
 categories = ["gui", "visualization"]
@@ -29,6 +29,9 @@ rust-sugiyama = { version = "0.4", optional = true }
 
 [features]
 layout = ["rust-sugiyama"]
+
+[package.metadata.docs.rs]
+all-features = true
 
 [dev-dependencies]
 i-slint-backend-testing = { workspace = true }

@@ -122,7 +122,7 @@ impl GeometryTracker<SimpleNodeGeometry> {
     /// # Note
     ///
     /// This method is only available for `GeometryTracker<SimpleNodeGeometry>`.
-    /// For custom node types, use [`node_rect_callback_with`] instead.
+    /// For custom node types, use [`Self::node_rect_callback_with`] instead.
     pub fn node_rect_callback(&self) -> impl Fn(i32, f32, f32, f32, f32) + Clone {
         let cache = self.cache.clone();
         move |id, x, y, width, height| {

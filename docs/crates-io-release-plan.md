@@ -3,7 +3,8 @@
 Plan drafted 2026-09-05, against `aa5a12b` (slint pinned to the 1.18 pre-release tip).
 Revised the same day after a Codex second-opinion review; every claim below was
 re-verified against the Slint 1.18 source or by running the command shown.
-Status section below refreshed 2026-09-05 against `505b7e5`.
+Status section below refreshed 2026-09-05. **Phase 1 is complete** except for
+one item that cannot run until the `v1.18.0` tag lands.
 
 ## Executive summary
 
@@ -38,9 +39,10 @@ Three corrections to earlier drafts, all material:
 
 ## Current status
 
-Refreshed 2026-09-05. **Phase 1's component-distribution core (1.3, 1.4, 1.5)
-has landed**, validated against the git pin rather than the registry — see
-"Library modules are not blocked on the tag" below. Phase 2 remains blocked.
+Refreshed 2026-09-05. **All of Phase 1 has landed** — 1.3/1.4/1.5 first, then
+1.1/1.2/1.6/1.7 — validated against the git pin rather than the registry. The
+single exception is `cargo package --locked` in CI, which cannot pass until
+`slint` has a `version` key (2.1). Phase 2 remains blocked on the tag.
 
 ### Landed
 
@@ -56,6 +58,8 @@ has landed**, validated against the git pin rather than the registry — see
 | `f707f45` | This plan brought up to date |
 | `b08d1ec` | **1.3 + 1.4 + 1.5** — components distributed as a library module |
 | `505b7e5` | Smoke test proves the shipped file set; wired into CI |
+| `aad9123` | This plan brought up to date after the library-module work |
+| *(pending)* | **1.1 + 1.2 + 1.6 + 1.7** — metadata, docs, CI gates, docs.rs |
 
 Health at `505b7e5`: `cargo test --workspace` 354 passed / 0 failed,
 `cargo clippy --workspace --all-targets` clean, `./smoke/run.sh` and
@@ -75,16 +79,15 @@ link cascade, in-node widgets, and the `@nodeeditor` imports resolving at all.
 
 ### Open, unblocked today
 
-- 1.1 (metadata) and 1.7 (docs.rs) — both trivial and unstarted.
-- 1.2 (README registry form + intra-doc links) and the rest of 1.6 (packaging
-  check, rustdoc gate, MSRV job). The smoke half of 1.6 is done.
-- 1.3, 1.4 and 1.5 are done.
+- Nothing in Phase 1. 1.1 – 1.7 are done bar the packaging check (below).
 - `filter_node.slint` text overlap: `'Ctrl'` x=[432,448] collides with
   `'Active'` x=[440,473]; `'In'` and `'Type:'` touch. Measured, not eyeballed.
 
 ### Open, blocked
 
 - Phase 2 (2.1 – 2.3) and Phase 3, on the `v1.18.0` tag.
+- The `cargo package --locked` CI step (last piece of 1.6) and
+  `./smoke/run.sh packaged`, both on the same `version` key.
 
 ### Open, needs a reproduction first
 
@@ -126,6 +129,7 @@ Each measured, not assumed. Items marked ⚠️ corrected an earlier assumption.
 | ⚠️ Library-imported **structs and enums** are not re-exported to consumers | `type_exports` covers local types only; `LinkData`/`MinimapNode` land in the consumer's private `slint_generated*` module. Worked around by re-exporting them from our crate root |
 | ⚠️ Consumers get `experimental-module-builds` by feature unification | Fixture with the feature *removed* still resolved `@nodeeditor`: build-dep features unify, so our build-dep enables it for them. Reliable but implicit — the fixture still declares it explicitly |
 | The smoke fixture actually fails when the mechanism breaks | Two negative controls: dropping `links = "nodeeditor"` → fixture build script fails; withholding `node-editor-building-blocks.slint` from the staged file set → *"Cannot find requested import"*. Both restored, green again |
+| MSRV 1.92 is measured, not assumed | `cargo +1.92 check --workspace --all-targets --all-features` → clean. CI keeps it honest with a pinned-toolchain job |
 | The **shipped** file set is self-sufficient | `./smoke/run.sh included` builds an out-of-workspace consumer against a copy of exactly what `cargo package --list` reports, and `node-editor.slint`'s own import of the building-blocks file resolves inside it |
 
 ## The central decision: library modules
@@ -217,11 +221,11 @@ to the bare form ahead of time, so this is no longer a blocker for Phase 2.
 `PinTypes`, `BaseNode`, `Pin`, `Link`, `Minimap`, `LinkData` and the rest, and it
 declares `NodeEditor` and `BoxSelectionModifier` itself.
 
-## Phase 1 — do now (not blocked on 1.18)
+## Phase 1 — done (was never blocked on 1.18)
 
-### 1.1 Fix the wrong metadata
+### 1.1 Fix the wrong metadata — ✅ done
 
-`Cargo.toml` points at upstream Slint's repo, not this one. Both fields render
+`Cargo.toml` pointed at upstream Slint's repo, not this one. Both fields render
 prominently on the crates.io page.
 
 ```toml
@@ -229,21 +233,29 @@ repository = "https://github.com/tilladam/slint-node-editor"  # was: slint-ui/sl
 homepage   = "https://github.com/tilladam/slint-node-editor"  # was: https://slint.dev
 ```
 
-### 1.2 Fix the documentation inconsistencies
+### 1.2 Fix the documentation inconsistencies — ✅ done
 
 - ✅ **Done:** `src/lib.rs:69` linked to `github.com/slint-ui/slint/tree/master/…`
   — the wrong repository entirely; now points at `tilladam/slint-node-editor`.
 - ✅ **Done:** `src/lib.rs:18` wrote the import **without** the `@` prefix while
-  `README.md` wrote it **with**; both now read `@nodeeditor/node-editor.slint`.
-- `README.md:46-53` documents a `path = "path/to/slint-node-editor"` dependency.
-  Replace with the registry form.
-- The `NodeEditor` / `BaseNode` / `Pin` / `Link` / `Minimap` intra-doc links in
-  `src/lib.rs` do not resolve. They are now *fixable* rather than impossible:
-  1.3 made them real Rust symbols, so point them at `nodeeditor::NodeEditor`
-  and friends rather than dropping the brackets. (`LinkManager::update_paths`
-  is separately unresolved and unrelated.)
+  `README.md` wrote it **with**. Both now read the bare `@nodeeditor` — an
+  earlier revision of this line said `@nodeeditor/node-editor.slint`, which was
+  never what the code says and would not resolve under library modules anyway.
+- ✅ **Done:** `README.md` documented a `path = "…"` dependency and a
+  `with_library_paths` build script. Both are gone: the quick-start now shows
+  the registry form, a two-line `build.rs`, the 1.92 requirement, and where the
+  Rust re-exports of `LinkData` and friends live.
+- ✅ **Done, and the earlier note here was half wrong.** It claimed 1.3 made all
+  five component links real Rust symbols. Only `NodeEditor` is: the generated
+  module's public list is `NodeEditor` plus the structs, enums and globals —
+  `BaseNode`, `Pin`, `Link` and `Minimap` are sub-components with no Rust item
+  at all. So `NodeEditor` links to `nodeeditor::NodeEditor` and the other four
+  are plain backticks, under a line saying they exist only in `.slint`.
+- ✅ **Done:** four unrelated unresolved links (`LinkManager` in `graph.rs`,
+  `update_paths` twice in `links.rs`, `node_rect_callback_with` in
+  `tracking.rs`) now name real paths. Nine warnings, zero left.
 
-Gate this with `RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps`.
+Gated in CI with `RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps`.
 
 ### 1.3 Restructure `build.rs` for dual duty — ✅ done
 
@@ -324,19 +336,25 @@ All nine examples were also stripped of their `with_library_paths` plumbing.
 They now resolve `@nodeeditor` exactly as an outside consumer does, which makes
 the whole example suite a second, broader smoke test.
 
-### 1.6 Fix the CI coverage
+### 1.6 Fix the CI coverage — ✅ done bar one blocked step
 
-`.github/workflows/rust.yml` runs only `cargo build` and `cargo test`. Note that
+`.github/workflows/rust.yml` ran only `cargo build` and `cargo test`. Note that
 `cargo package --list` is **not** a packaging check — it exits 0 on a tree where
-`cargo package` exits 101. Add:
+`cargo package` exits 101.
 
-- `cargo package --locked` (the real check),
-- ✅ **done:** the 1.5 smoke fixture — `./smoke/run.sh included` runs on every
-  push. Switch it to `packaged` once 2.1 lands,
-- `RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps`,
-- an MSRV job on a pinned toolchain (see 2.2).
+- ✅ The 1.5 smoke fixture: `./smoke/run.sh included` on every push. Switch it
+  to `packaged` once 2.1 lands.
+- ✅ `RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps`, in the
+  build job so it reuses the warm target dir.
+- ✅ An MSRV job on a pinned 1.92 toolchain. It runs `check`, not `test`: the
+  question is whether the declared minimum compiles, and stable already runs
+  the suite. `cargo +1.92 test` stays a manual pre-publish gate (2.3).
+  Verified locally — 1.92 is measured now, not just copied from slint.
+- ⛔ `cargo package --locked`, the real packaging check. **Blocked**: it exits
+  101 until `slint` carries a `version` key. Add it in the same pass as 2.1,
+  alongside flipping the smoke step to `packaged`.
 
-### 1.7 docs.rs configuration
+### 1.7 docs.rs configuration — ✅ done
 
 The `layout` feature is off by default, so `rust-sugiyama`-gated items would be
 invisible on docs.rs:

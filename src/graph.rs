@@ -5,7 +5,7 @@ use std::fmt;
 
 /// Trait for link data to support graph topology and rendering operations.
 ///
-/// Implement this trait for your link data type to use with [`LinkManager`]
+/// Implement this trait for your link data type to use with [`crate::LinkManager`]
 /// and other graph operations.
 ///
 /// # Example

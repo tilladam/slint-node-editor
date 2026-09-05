@@ -11,9 +11,7 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
     - name: Install Linux dependencies
@@ -24,9 +22,34 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
-    # The check `cargo publish --dry-run` cannot do: a dry-run compiles only the
-    # Rust library and never parses a .slint file, so a broken component or an
-    # unresolvable library name passes it. `included` builds an out-of-workspace
-    # consumer against exactly the files `include` would ship.
+    # The check `cargo publish --dry-run` cannot do. A dry-run does now parse
+    # our .slint files (build.rs ships), but it still never checks that a
+    # *consumer* can resolve `@nodeeditor`. `included` builds an
+    # out-of-workspace consumer against exactly the files `include` would ship.
     - name: Downstream smoke test
       run: ./smoke/run.sh included
+    # Shares this job's warm target dir rather than paying for another full
+    # build of the dependency graph.
+    - name: Documentation
+      run: cargo doc --all-features --no-deps
+      env:
+        RUSTDOCFLAGS: -D warnings
+
+  msrv:
+    # rust-version in Cargo.toml is 1.92, forced by slint 1.18. Without this
+    # job that number is a claim rather than a fact, since the build job runs
+    # whatever stable happens to be.
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Linux dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libfontconfig1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
+    - name: Install the pinned toolchain
+      run: rustup toolchain install 1.92 --profile minimal
+    # `check`, not `test`: the question here is whether it compiles on the
+    # declared minimum, and stable already runs the suite. `cargo +1.92 test`
+    # stays a manual pre-publish gate (release plan 2.3).
+    - name: Check on the declared MSRV
+      run: cargo +1.92 check --workspace --all-targets --all-features

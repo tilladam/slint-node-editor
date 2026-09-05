@@ -26,11 +26,15 @@
 //!
 //! ## Core Components
 //!
-//! - [`NodeEditor`] - Main graph editor component
-//! - [`BaseNode`] - Base component for creating custom nodes
-//! - [`Pin`] - Connection point component
-//! - [`Link`] - Bezier curve link component
-//! - [`Minimap`] - Bird's-eye view component
+//! These are Slint components, imported from `@nodeeditor`. Only the top-level
+//! editor has a generated Rust counterpart ([`nodeeditor::NodeEditor`]); the
+//! rest exist solely in `.slint`.
+//!
+//! - `NodeEditor` - Main graph editor component
+//! - `BaseNode` - Base component for creating custom nodes
+//! - `Pin` - Connection point component
+//! - `Link` - Bezier curve link component
+//! - `Minimap` - Bird's-eye view component
 //!
 //! ## Accessibility
 //!

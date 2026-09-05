@@ -48,11 +48,18 @@ https://github.com/user-attachments/assets/f0e8d69c-19da-4acf-b3e1-ea7e6c1324d8
 ```toml
 # In your Cargo.toml
 [dependencies]
-slint = "1.x"  # Required
+slint = "1.18"
+slint-node-editor = "0.1"
 
-[dependencies.slint-node-editor]
-path = "path/to/slint-node-editor"
+[build-dependencies]
+# `experimental-module-builds` is what lets the Slint compiler resolve the
+# `@nodeeditor` import below. You get it transitively today, because cargo
+# unifies build-dependency features and slint-node-editor enables it — but
+# declare it anyway, so your build does not depend on that.
+slint-build = { version = "1.18", features = ["experimental-module-builds"] }
 ```
+
+Requires Rust 1.92, which is Slint 1.18's minimum, not ours.
 
 ### 2. Import Core Components
 
@@ -63,17 +70,25 @@ import { NodeEditor, BaseNode, Pin, Link, LinkData, PinTypes } from "@nodeeditor
 
 ### 3. Configure build.rs
 
-To use the `@nodeeditor` import prefix, you must register it in your `build.rs`:
+Nothing special — `@nodeeditor` resolves from the dependency's own metadata:
 
 ```rust
 fn main() {
-    let mut library_paths = std::collections::HashMap::new();
-    library_paths.insert("nodeeditor".into(), "path/to/slint-node-editor/node-editor.slint".into());
-
-    let config = slint_build::CompilerConfiguration::default()
-        .with_library_paths(library_paths);
-    slint_build::compile_with_config("ui/main.slint", config).unwrap();
+    slint_build::compile("ui/main.slint").unwrap();
 }
+```
+
+The components ship as a [Slint library
+module](https://github.com/slint-ui/slint/issues/154). That mechanism is
+marked experimental upstream and may change; if it does, this crate needs a new
+release, and pinning `slint-node-editor` to an exact version is the safe move.
+
+Data types declared in the `.slint` sources — `LinkData`, `MinimapNode`,
+`MinimapPosition`, `LinkCreationState`, `BoxSelectionModifier` — are re-exported
+from the Rust crate, so reach for them there:
+
+```rust
+use slint_node_editor::LinkData;
 ```
 
 ### 4. Create a Simple Node

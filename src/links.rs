@@ -152,7 +152,7 @@ where
 
     /// Bind to a Slint model for automatic synchronization.
     ///
-    /// After binding, every call to [`update_paths`] automatically
+    /// After binding, every call to [`Self::update_paths`] automatically
     /// updates the Slint model.
     ///
     /// # Arguments
@@ -169,7 +169,7 @@ where
 
     /// Add a link to the manager.
     ///
-    /// The link's visual path will be computed on the next call to [`update_paths`].
+    /// The link's visual path will be computed on the next call to [`Self::update_paths`].
     pub fn add(&mut self, link: L) {
         self.links.push(link);
     }
