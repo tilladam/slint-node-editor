@@ -3,26 +3,34 @@
 Plan drafted 2026-09-05, against `aa5a12b` (slint pinned to the 1.18 pre-release tip).
 Revised the same day after a Codex second-opinion review; every claim below was
 re-verified against the Slint 1.18 source or by running the command shown.
-Status section below refreshed 2026-09-05 against `f707f45` + the 1.3/1.4/1.5
-commit.
+Status section below refreshed 2026-09-05 against `505b7e5`.
 
 ## Executive summary
 
 Publishing this crate is **not** primarily a dependency-pinning problem. It is a
 component-distribution problem.
 
-The crate's whole value is the `.slint` components, and **a crates.io consumer
-currently has no way to import them.** `README.md:53` tells consumers to pass a
-*checkout path* to `with_library_paths`; a registry consumer has no such path.
-Solving that — via Slint 1.18's library-module mechanism — is the real work, and
-it changes `build.rs`, `Cargo.toml`, the README, and the public import syntax.
+The crate's whole value is the `.slint` components, and a crates.io consumer
+had **no way to import them**: `README.md:53` told them to pass a *checkout
+path* to `with_library_paths`, which a registry consumer does not have.
 
-Two corrections to the first draft of this plan, both material:
+✅ **Solved in `b08d1ec`.** `node-editor.slint` is compiled with Slint 1.18's
+`as_library`, so a consumer writes `import { NodeEditor } from "@nodeeditor";`
+and needs no `build.rs` of their own. It changed `build.rs`, `Cargo.toml` and
+`src/lib.rs`; the README is the remaining piece (1.2). What is left of this
+plan is ordinary release hygiene plus the wait for the `v1.18.0` tag.
 
-- The earlier "the publish flow works end to end" claim was **wrong**. Because
-  `build.rs` is excluded from the package, `cargo publish --dry-run` compiles
-  only the Rust library — **neither packaged `.slint` file is ever parsed.** A
-  syntactically broken `node-editor.slint` would publish successfully today.
+Three corrections to earlier drafts, all material:
+
+- The first draft's "the publish flow works end to end" claim was **wrong**:
+  with `build.rs` excluded from the package, `cargo publish --dry-run` compiled
+  only the Rust library and **never parsed a `.slint` file**, so a broken
+  `node-editor.slint` would have published cleanly.
+- ⚠️ **That is no longer true, and the fix was a side effect rather than the
+  goal.** 1.3 made `build.rs` ship, so a `--verify` run now executes it and
+  parses both `.slint` files. A dry-run has become a real syntax check. It
+  still does *not* check that a *consumer* can resolve `@nodeeditor` — that is
+  what `smoke/run.sh` is for, and it remains mandatory.
 - "Git dependencies are the blocker" was **imprecise**. Cargo accepts
   `{ git, rev, version }` together and strips the git source when packaging;
   this was tested and packaged 21 files successfully. The blocker is the missing
@@ -46,12 +54,20 @@ has landed**, validated against the git pin rather than the registry — see
 | `eda18d8` | Minimap kept in sync with the graph |
 | `ad620cf` | Regression tests for the minimap |
 | `f707f45` | This plan brought up to date |
-| *(this commit)* | 1.3 + 1.4 + 1.5: library modules, packaged file set, smoke fixture |
+| `b08d1ec` | **1.3 + 1.4 + 1.5** — components distributed as a library module |
+| `505b7e5` | Smoke test proves the shipped file set; wired into CI |
 
-Health after 1.3/1.4/1.5: `cargo test --workspace` 354 passed / 0 failed,
-`cargo clippy --workspace --all-targets` clean, `./smoke/run.sh` green,
-`cargo package --list` correct, and `cargo package` still fails only on the
-missing `version` key for `slint`.
+Health at `505b7e5`: `cargo test --workspace` 354 passed / 0 failed,
+`cargo clippy --workspace --all-targets` clean, `./smoke/run.sh` and
+`./smoke/run.sh included` both green, `cargo package --list` correct, and
+`cargo package` still fails only on the missing `version` key for `slint`.
+
+A Codex review of both commits reported no actionable findings. Note what that
+does *and does not* cover: its sandbox has no network, so it could not build the
+Skia-backed smoke fixture — the verdict covers the Rust library and the test
+suite, not the library-module resolution path. That path was verified here
+directly, with two negative controls (removing `links`; withholding
+`node-editor-building-blocks.slint`), both of which fail as they should.
 
 Runtime behaviour was verified over the Slint MCP server against the running
 `advanced` example: node drag, selection, link creation by pin drag, delete with
@@ -59,8 +75,10 @@ link cascade, in-node widgets, and the `@nodeeditor` imports resolving at all.
 
 ### Open, unblocked today
 
-- 1.1 (metadata), 1.2 (README registry form + intra-doc links), 1.6 (CI),
-  1.7 (docs.rs). 1.3, 1.4 and 1.5 are done.
+- 1.1 (metadata) and 1.7 (docs.rs) — both trivial and unstarted.
+- 1.2 (README registry form + intra-doc links) and the rest of 1.6 (packaging
+  check, rustdoc gate, MSRV job). The smoke half of 1.6 is done.
+- 1.3, 1.4 and 1.5 are done.
 - `filter_node.slint` text overlap: `'Ctrl'` x=[432,448] collides with
   `'Active'` x=[440,473]; `'In'` and `'Type:'` touch. Measured, not eyeballed.
 
@@ -89,12 +107,12 @@ Each measured, not assumed. Items marked ⚠️ corrected an earlier assumption.
 
 | Fact | Evidence |
 |---|---|
-| A dry-run never parses our `.slint` files | `build.rs` excluded ⇒ no Slint compilation during `--verify` |
+| ~~A dry-run never parses our `.slint` files~~ — **no longer true after 1.3** | `build.rs` was excluded ⇒ no Slint compilation during `--verify`. It now ships, so `--verify` runs it and parses both files. A dry-run is a syntax check again — but still not a resolution check |
 | ⚠️ Git deps alone do not block packaging | `{ git, rev, version = "1.17.1" }` → `cargo package` → *"Packaged 21 files, 388.0KiB"* |
 | The name `slint-node-editor` is free | crates.io API → `crate does not exist` |
 | slint 1.18 is not on crates.io yet | crates.io API → `max_version: 1.17.1` |
 | slint 1.18 requires **Rust 1.92** | `rust-version = "1.92"`, `pre-release/1.18` workspace `Cargo.toml:83` |
-| We currently *claim* Rust 1.70 | `Cargo.toml:14` |
+| ~~We currently *claim* Rust 1.70~~ — **fixed in 1.3** | Was `Cargo.toml:14`; now `rust-version = "1.92"`, forced by `as_library` (see below) |
 | ⚠️ `compat-1-18` is the mandatory 1.18 baseline, not `compat-1-2` | `"Mandatory feature: required to keep the compatibility with Slint 1.18"` documents **`compat-1-18`**; `compat-1-2 = ["compat-1-18", linuxkms libseat, libinput]` |
 | Library modules exist in 1.18 | `as_library()` at `api/rs/build/lib.rs:249`; consumer lookup at `internal/compiler/typeloader.rs:1141-1173` |
 | Both sides are experimental | `#[cfg(feature = "experimental-module-builds")]` (publisher), `#[cfg(feature = "experimental-library-module")]` (consumer). Tracking issue slint-ui/slint#154 |
@@ -107,7 +125,8 @@ Each measured, not assumed. Items marked ⚠️ corrected an earlier assumption.
 | ⚠️ The publisher must expose the generated code as a Rust module | Consumer codegen emits `pub use slint_node_editor::nodeeditor::NodeEditor` (`generator/rust.rs:181-190`), so `src/lib.rs` needs `include!` under a module matching `rust_module` |
 | ⚠️ Library-imported **structs and enums** are not re-exported to consumers | `type_exports` covers local types only; `LinkData`/`MinimapNode` land in the consumer's private `slint_generated*` module. Worked around by re-exporting them from our crate root |
 | ⚠️ Consumers get `experimental-module-builds` by feature unification | Fixture with the feature *removed* still resolved `@nodeeditor`: build-dep features unify, so our build-dep enables it for them. Reliable but implicit — the fixture still declares it explicitly |
-| The smoke fixture actually fails when the mechanism breaks | Negative control: dropping `links = "nodeeditor"` → fixture build script fails. Restored, green again |
+| The smoke fixture actually fails when the mechanism breaks | Two negative controls: dropping `links = "nodeeditor"` → fixture build script fails; withholding `node-editor-building-blocks.slint` from the staged file set → *"Cannot find requested import"*. Both restored, green again |
+| The **shipped** file set is self-sufficient | `./smoke/run.sh included` builds an out-of-workspace consumer against a copy of exactly what `cargo package --list` reports, and `node-editor.slint`'s own import of the building-blocks file resolves inside it |
 
 ## The central decision: library modules
 
@@ -115,10 +134,19 @@ Each measured, not assumed. Items marked ⚠️ corrected an earlier assumption.
 `links`). This matches upstream's intended design and requires no `build.rs`
 from consumers — they just write `import { NodeEditor } from "@nodeeditor";`.
 
-The cost, stated plainly: **every consumer must enable an experimental Slint
-compiler feature**, and the API is documented as *"experimental and may change
+✅ **Implemented in `b08d1ec`.**
+
+The cost, stated plainly: the API is documented as *"experimental and may change
 or be removed in the future."* If it changes, our published crate breaks for
 downstream users and needs a new release.
+
+One part of that cost turned out smaller than this plan first claimed. It said
+*every consumer must enable an experimental Slint compiler feature*. Measured:
+they do not. Cargo unifies build-dependency features, so our own build-dep
+switches `experimental-module-builds` on for them — a fixture with the feature
+deliberately removed still resolved `@nodeeditor`. That is implicit rather than
+guaranteed, so the README should still tell consumers to declare it, and the
+fixture declares it.
 
 ### The library name must not contain dashes
 
@@ -162,8 +190,16 @@ links = "nodeeditor"          # NOT "slint-node-editor" — would never resolve
 ```rust
 // build.rs
 let config = slint_build::CompilerConfiguration::new()
-    .as_library("nodeeditor");
+    .as_library("nodeeditor")
+    .rust_module("nodeeditor");   // must match the module in src/lib.rs
 slint_build::compile_with_config("node-editor.slint", config).unwrap();
+```
+
+```rust
+// src/lib.rs — consumer codegen resolves to slint_node_editor::nodeeditor::*
+pub mod nodeeditor {
+    include!(concat!(env!("OUT_DIR"), "/node-editor.rs"));
+}
 ```
 
 ```slint
@@ -401,15 +437,17 @@ name.
 Ordered, and none of them optional:
 
 1. Working tree clean and committed; no `--allow-dirty`.
-2. crates.io credentials present and account owns the name (`cargo owner --list`
+2. `./smoke/run.sh packaged` green (see risk 4).
+3. crates.io credentials present and account owns the name (`cargo owner --list`
    after first publish).
-3. `cargo publish --locked`.
-4. Tag the exact published commit (`v0.1.0`) and push the tag.
-5. Write release notes covering the MSRV jump and the experimental-feature
-   requirement for consumers.
-6. **After** publication, verify against the real registry: fresh `cargo add
+4. `cargo publish --locked`.
+5. Tag the exact published commit (`v0.1.0`) and push the tag.
+6. Write release notes covering the MSRV jump (1.70 → 1.92, forced by slint,
+   not by our code) and the experimental library-module mechanism. Consumers do
+   not have to enable `experimental-module-builds` themselves, but should.
+7. **After** publication, verify against the real registry: fresh `cargo add
    slint-node-editor` in a scratch project, confirm the docs.rs build succeeded,
-   and re-run the smoke fixture against the published crate.
+   and point `smoke/run.sh` at the published crate rather than a local path.
 
 ## Licensing — decided: keep `MIT OR Apache-2.0`
 
@@ -448,10 +486,12 @@ Worth a sentence in the README rather than a license change.
    with no useful error. If the import mysteriously fails, check this first.
 3. **The 1.18 API is not final.** The pin is a moving branch tip; Phase 2 assumes
    the tag stays compatible with `2bb5a20` — likely but unverified.
-4. **The smoke fixture has only run in `path` mode.** It proves the components
-   resolve and compile; it does *not* prove the packaged file set is
-   sufficient, because `cargo package` cannot run until 2.1. Running
-   `./smoke/run.sh packaged` after 2.1 is mandatory.
+4. **The smoke fixture has not run in `packaged` mode.** `path` and `included`
+   are both green, and `included` covers the substance: it builds against a
+   copy of exactly what `cargo package --list` reports. What remains unproven
+   is only a divergence between cargo's `include` filter and the tarball cargo
+   actually writes. Small, but it is the last unchecked step — run
+   `./smoke/run.sh packaged` after 2.1, before publishing.
 5. **We now depend on two undocumented details of `as_library`**: that library
    structs/enums need re-exporting by hand, and that build-dep feature
    unification carries the experimental flag to consumers. Either could change
