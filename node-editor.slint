@@ -104,6 +104,22 @@ export component NodeEditor inherits FocusScope {
         ViewportState.pan-y = root.pan-y;
     }
 
+    // BaseNode and Pin update the Rust cache before incrementing request-version.
+    // Flush once on the next event-loop turn so one model row or layout batch
+    // cannot trigger a full link recomputation for every changed property.
+    property <int> geometry-request-watch: GeometryVersion.request-version;
+    changed geometry-request-watch => {
+        geometry-flush-timer.start();
+    }
+    geometry-flush-timer := Timer {
+        interval: 0ms;
+        running: false;
+        triggered => {
+            self.stop();
+            GeometryVersion.version += 1;
+        }
+    }
+
     // === World content size ===
     /// Size of the world-content container (nodes and links live here).
     /// Must be large enough to contain all graph content at zoom=1.
@@ -297,19 +313,19 @@ export component NodeEditor inherits FocusScope {
     in-out property <int> geometry-version: 0;
 
     // === Geometry Reporting Functions ===
-    // These functions auto-increment geometry-version before calling the callbacks.
-    // Use these instead of calling the callbacks directly.
+    // These functions schedule a coalesced geometry-version increment after
+    // calling the callbacks. Use these instead of calling the callbacks directly.
 
-    /// Report node rectangle change. Auto-increments geometry-version.
+    /// Report node rectangle change. Schedules a link refresh after the callback.
     public function report-node-rect(id: int, x: length, y: length, w: length, h: length) {
-        GeometryVersion.version += 1;
         root.node-rect-changed(id, x, y, w, h);
+        GeometryVersion.request-version += 1;
     }
 
-    /// Report pin position change. Auto-increments geometry-version.
+    /// Report pin position change. Schedules a link refresh after the callback.
     public function report-pin-position(pin-id: int, node-id: int, pin-type: int, rel-x: length, rel-y: length) {
-        GeometryVersion.version += 1;
         root.pin-position-changed(pin-id, node-id, pin-type, rel-x, rel-y);
+        GeometryVersion.request-version += 1;
     }
 
 

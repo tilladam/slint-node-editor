@@ -5,7 +5,141 @@
 mod common;
 
 use common::harness::MinimalTestHarness;
-use slint::{Color, Model, SharedString};
+use slint::{Color, ComponentHandle, Model, SharedString};
+
+fn realize(harness: &MinimalTestHarness) {
+    harness.window.show().unwrap();
+    flush_geometry(harness);
+}
+
+fn flush_geometry(harness: &MinimalTestHarness) {
+    // The first turn runs geometry change handlers and arms the zero-delay
+    // coalescing timer; the second fires it and re-evaluates link bindings.
+    harness.pump_events();
+    harness.pump_events();
+}
+
+#[test]
+fn test_programmatic_node_geometry_refreshes_link_binding_once() {
+    let harness = MinimalTestHarness::new();
+    realize(&harness);
+
+    let initial_version = harness.window.get_geometry_version();
+    let initial_geometry = harness.window.get_observed_link_geometry();
+    let mut node = harness.nodes.row_data(0).unwrap();
+    node.x += 70.0;
+    harness.nodes.set_row_data(0, node);
+    flush_geometry(&harness);
+
+    let x_moved_geometry = harness.window.get_observed_link_geometry();
+    assert_eq!(harness.ctrl.cache().borrow().node_rects[&1].x, 170.0);
+    assert_ne!(x_moved_geometry, initial_geometry);
+    assert_eq!(harness.window.get_geometry_version(), initial_version + 1);
+    assert_eq!(
+        harness.ctrl.cache().borrow().find_pin_at(314.0, 150.0, 2.0),
+        3
+    );
+    assert_eq!(
+        harness.ctrl.cache().borrow().find_pin_at(244.0, 150.0, 2.0),
+        0
+    );
+
+    let version_before_y_move = harness.window.get_geometry_version();
+    let mut node = harness.nodes.row_data(0).unwrap();
+    node.y += 30.0;
+    harness.nodes.set_row_data(0, node);
+    flush_geometry(&harness);
+
+    let y_moved_geometry = harness.window.get_observed_link_geometry();
+    assert_eq!(harness.ctrl.cache().borrow().node_rects[&1].y, 130.0);
+    assert_ne!(y_moved_geometry, x_moved_geometry);
+    assert_eq!(
+        harness.window.get_geometry_version(),
+        version_before_y_move + 1
+    );
+
+    let version_before_width = harness.window.get_geometry_version();
+    harness.window.set_test_node_width(190.0);
+    flush_geometry(&harness);
+
+    let width_geometry = harness.window.get_observed_link_geometry();
+    let node_rect = harness.ctrl.cache().borrow().node_rects[&1];
+    assert_eq!(node_rect.width, 190.0);
+    assert_ne!(width_geometry, y_moved_geometry);
+    assert_eq!(
+        harness.window.get_geometry_version(),
+        version_before_width + 1
+    );
+
+    let version_before_height = harness.window.get_geometry_version();
+    harness.window.set_test_node_height(130.0);
+    flush_geometry(&harness);
+
+    let height_geometry = harness.window.get_observed_link_geometry();
+    assert_eq!(harness.ctrl.cache().borrow().node_rects[&1].height, 130.0);
+    assert_ne!(height_geometry, width_geometry);
+    assert_eq!(
+        harness.window.get_geometry_version(),
+        version_before_height + 1
+    );
+}
+
+#[test]
+fn test_drag_commit_refreshes_link_binding() {
+    let harness = MinimalTestHarness::new();
+    realize(&harness);
+
+    let initial_version = harness.window.get_geometry_version();
+    let initial_geometry = harness.window.get_observed_link_geometry();
+    harness.end_node_drag(1, 40.0, 25.0);
+    flush_geometry(&harness);
+
+    assert_ne!(
+        harness.window.get_observed_link_geometry(),
+        initial_geometry
+    );
+    assert_eq!(harness.window.get_geometry_version(), initial_version + 1);
+}
+
+#[test]
+fn test_batch_node_updates_flush_one_link_refresh() {
+    let harness = MinimalTestHarness::new();
+    realize(&harness);
+
+    let initial_version = harness.window.get_geometry_version();
+    for row in 0..harness.nodes.row_count() {
+        let mut node = harness.nodes.row_data(row).unwrap();
+        node.x += 50.0 + row as f32 * 10.0;
+        node.y += 20.0;
+        harness.nodes.set_row_data(row, node);
+    }
+    flush_geometry(&harness);
+
+    assert_eq!(harness.window.get_geometry_version(), initial_version + 1);
+}
+
+#[test]
+fn test_direct_geometry_seed_refreshes_through_public_contract() {
+    let harness = MinimalTestHarness::new();
+    realize(&harness);
+
+    let initial_version = harness.window.get_geometry_version();
+    let initial_geometry = harness.window.get_observed_link_geometry();
+    harness
+        .ctrl
+        .seed_node_world_rect(1, 180.0, 140.0, 150.0, 100.0);
+
+    // Direct seeding is intentionally batchable and therefore does not know
+    // about the Slint component. The documented refresh call publishes it.
+    assert_eq!(harness.window.get_geometry_version(), initial_version);
+    harness.window.invoke_refresh_links();
+
+    assert_ne!(
+        harness.window.get_observed_link_geometry(),
+        initial_geometry
+    );
+    assert_eq!(harness.window.get_geometry_version(), initial_version + 1);
+}
 
 /// Helper to set up geometry in the cache for testing.
 fn setup_test_geometry(harness: &MinimalTestHarness) {

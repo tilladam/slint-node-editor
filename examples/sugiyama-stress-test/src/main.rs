@@ -157,16 +157,12 @@ fn main() {
                     w.set_pan_x(-(min_x - margin) * zoom);
                     w.set_pan_y(-(min_y - margin) * zoom);
                 }
-
-                let geom_ver = w.global::<GeometryVersion>();
-                geom_ver.set_version(geom_ver.get_version() + 1);
             }
         }
     });
 
     window.on_scramble_requested({
         let nodes = nodes.clone();
-        let w = w.clone();
         move || {
             for i in 0..nodes.row_count() {
                 if let Some(mut node) = nodes.row_data(i) {
@@ -174,11 +170,6 @@ fn main() {
                     node.y = 50.0 + random_f32() * 500.0;
                     nodes.set_row_data(i, node);
                 }
-            }
-
-            if let Some(w) = w.upgrade() {
-                let geom_ver = w.global::<GeometryVersion>();
-                geom_ver.set_version(geom_ver.get_version() + 1);
             }
         }
     });

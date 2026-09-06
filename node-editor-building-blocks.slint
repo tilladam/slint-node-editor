@@ -44,11 +44,14 @@ export global DragState {
 }
 
 /// Geometry version counter for link path invalidation.
-/// BaseNode/Pin increment this automatically when geometry changes.
-/// NodeEditor binds to it for live link updates.
+/// BaseNode/Pin request invalidation automatically when geometry changes;
+/// NodeEditor coalesces the requests and advances the version.
 export global GeometryVersion {
-    /// Counter incremented on every geometry change
+    /// Counter consumed by link bindings. NodeEditor advances it once after
+    /// flushing all geometry reports queued in the current event-loop turn.
     in-out property <int> version: 0;
+    /// Internal request counter written after a geometry report reaches Rust.
+    in-out property <int> request-version: 0;
 }
 
 /// Link creation lifecycle states.
@@ -608,19 +611,25 @@ export component BaseNode inherits Rectangle {
     background: transparent;
     clip: false;
 
+    // Cache updates happen synchronously through the callback. Request route
+    // invalidation only afterwards so link bindings never observe stale cache
+    // data. NodeEditor coalesces requests from x/y/size and pin changes.
+    function report-geometry() {
+        if node-id != 0 {
+            NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+            GeometryVersion.request-version += 1;
+        }
+    }
+
     // Report rect on changes (in WORLD coordinates - without offset).
     // Guard against node-id == 0 (Slint default before parent binds the real ID).
     // Negative IDs are valid (e.g. viewport-anchored edge ports).
     init => {
-        if (node-id != 0) {
-            NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
-        }
+        root.report-geometry();
     }
 
     changed node-id => {
-        if (node-id != 0) {
-            NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
-        }
+        root.report-geometry();
     }
 
     changed world-x => {
@@ -635,26 +644,18 @@ export component BaseNode inherits Rectangle {
         }
     }
     changed node-width => {
-        if (node-id != 0) {
-            NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
-        }
+        root.report-geometry();
     }
     changed node-height => {
-        if (node-id != 0) {
-            NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
-        }
+        root.report-geometry();
     }
 
     // Watch world-pos-x/y for live link updates during multi-node drag
     changed world-pos-x => {
-        if (node-id != 0) {
-            NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
-        }
+        root.report-geometry();
     }
     changed world-pos-y => {
-        if (node-id != 0) {
-            NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
-        }
+        root.report-geometry();
     }
 
     // === Hover ===
@@ -807,8 +808,7 @@ export component BaseNode inherits Rectangle {
                     DragState.drag-offset-x = current-drag-offset-x;
                     DragState.drag-offset-y = current-drag-offset-y;
                     // Update geometry for live link updates
-                    GeometryVersion.version += 1;
-                    NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
+                    root.report-geometry();
                 }
             }
         }
@@ -846,49 +846,36 @@ export component Pin inherits Rectangle {
     background: touch.has-hover ? hover-color : base-color;
     border-radius: pin-radius;
 
-    init => {
-        if (pin-id > 0) {
-            GeometryVersion.version += 1;
+    // Pin reports during a node drag update the cache, while BaseNode owns the
+    // single route refresh for that frame. Outside a drag, request a coalesced
+    // refresh after the cache callback returns.
+    function report-geometry() {
+        if pin-id > 0 {
             NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
+            if (!DragState.is-dragging) {
+                GeometryVersion.request-version += 1;
+            }
         }
     }
-    // Bump the geometry version so links re-route when a pin settles to a new
-    // position (e.g. a card resizing to its real size after a relayout). But NOT
-    // while a node is being dragged: consumers that report live world-space pin
-    // centres get a center-x/center-y change every drag frame, and each bump
-    // re-evaluates ALL link paths (every link is a world-sized Path) — doing that
-    // per frame makes dragging crawl on a software renderer. During a drag the
-    // dragged node's own move already repaints it; edges snap to the dropped
-    // position via the end-of-drag bump. report-pin-position still fires so the
-    // consumer's pin cache stays current for that release bump.
+
+    init => {
+        root.report-geometry();
+    }
+    // Re-route when a pin settles to a new position (for example, after its node
+    // resizes), but do not request separately while a node is being dragged.
+    // BaseNode already schedules the route refresh for that frame; the pin only
+    // needs to keep its cached relative position current.
     changed pin-id => {
-        if (pin-id > 0) {
-            if (!DragState.is-dragging) {
-                GeometryVersion.version += 1;
-            }
-            NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
-        }
+        root.report-geometry();
     }
     changed center-x => {
-        if (pin-id > 0) {
-            if (!DragState.is-dragging) {
-                GeometryVersion.version += 1;
-            }
-            NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
-        }
+        root.report-geometry();
     }
     changed center-y => {
-        if (pin-id > 0) {
-            if (!DragState.is-dragging) {
-                GeometryVersion.version += 1;
-            }
-            NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
-        }
+        root.report-geometry();
     }
     changed refresh-trigger => {
-        if (pin-id > 0) {
-            NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
-        }
+        root.report-geometry();
     }
 
     touch := TouchArea {

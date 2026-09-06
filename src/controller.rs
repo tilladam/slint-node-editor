@@ -231,7 +231,9 @@ impl NodeEditorController {
     ///
     /// Use this to pre-populate the geometry cache for nodes that haven't been
     /// rendered by Slint yet (e.g. off-screen nodes whose link endpoints are
-    /// visible). The coordinates must be in world space.
+    /// visible). The coordinates must be in world space. Direct seeding bypasses
+    /// the component geometry-reporting lifecycle; after seeding a batch, call
+    /// `NodeEditor.refresh-links()` once to invalidate existing route bindings.
     pub fn seed_node_world_rect(&self, id: i32, x: f32, y: f32, w: f32, h: f32) {
         self.cache
             .borrow_mut()

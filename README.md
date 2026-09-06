@@ -373,10 +373,10 @@ callback pin-position-changed(
 **Functions (Helper API):**
 
 ```slint
-/// Report node rectangle change. Auto-increments geometry-version.
+/// Report node rectangle change. Schedules a coalesced link refresh after the callback.
 function report-node-rect(id: int, x: length, y: length, w: length, h: length);
 
-/// Report pin position change. Auto-increments geometry-version.
+/// Report pin position change. Schedules a coalesced link refresh after the callback.
 function report-pin-position(pin-id: int, node-id: int, pin-type: int, rel-x: length, rel-y: length);
 
 /// Start link creation from a pin

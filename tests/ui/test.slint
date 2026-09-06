@@ -11,6 +11,7 @@ import {
     GeometryVersion,
     NodeEditorInternalCallbacks,
     NodeEditorComputations,
+    LinkPath,
 } from "@nodeeditor";
 
 export struct NodeData {
@@ -27,8 +28,10 @@ export { LinkData, GeometryVersion, NodeEditorInternalCallbacks, NodeEditorCompu
 
 component SimpleNode inherits BaseNode {
     in property <string> title: "Node";
-    node-width: 150px;
-    node-height: 100px;
+    in property <length> configured-width: 150px;
+    in property <length> configured-height: 100px;
+    node-width: configured-width;
+    node-height: configured-height;
 
     Rectangle {
         width: 100%;
@@ -84,6 +87,9 @@ export component MainWindow inherits Window {
     in-out property <length> pan-x <=> editor.pan-x;
     in-out property <length> pan-y <=> editor.pan-y;
     in property <int> geometry-version: GeometryVersion.version;
+    in property <length> test-node-width: 150px;
+    in property <length> test-node-height: 100px;
+    out property <LinkPath> observed-link-geometry: NodeEditorComputations.compute-link-path(3, 4, GeometryVersion.version);
 
     // Core callbacks to Rust
     callback request-grid-update <=> editor.request-grid-update;
@@ -117,6 +123,8 @@ export component MainWindow inherits Window {
             title: data.title;
             world-x: data.x * 1px;
             world-y: data.y * 1px;
+            configured-width: root.test-node-width;
+            configured-height: root.test-node-height;
             viewport-width: editor.width;
             viewport-height: editor.height;
             selected: data.selected;
