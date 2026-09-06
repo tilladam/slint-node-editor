@@ -4,7 +4,7 @@ This document tracks work against the findings in
 [code-review-2026-09-06.md](code-review-2026-09-06.md). Update it when a finding
 is started, completed, reopened, or intentionally deferred.
 
-Last updated: 2026-09-06 through R8.
+Last updated: 2026-09-06 through R9.
 
 ## Status
 
@@ -23,8 +23,8 @@ Last updated: 2026-09-06 through R8.
 | R5 | P1 | Complete | 2. Interaction and public contract | `5a4b483` | The quick start is a tested downstream crate using exact git dependencies; its docs cover generated members, ownership, callback replacement, units, IDs, and lifecycle. |
 | R6 | P2 | Complete | 1. Correctness | `28eeaa3` | Link validation now returns canonical output/input endpoints before topology rules run; the advanced and pin-compatibility examples create links from those validated endpoints. |
 | R7 | P2 | Complete | 2. Interaction and public contract | `e6e9aa5` | A modifier-only editor overlay owns forced marquees across every surface; node and pin fallbacks share the configuration, and all transient interactions have cancellation paths. |
-| R8 | P2 | Complete | 1. Correctness | This commit | Pin picking scans all eligible candidates for the nearest and resolves exact distance ties by lowest pin ID, independent of insertion order. |
-| R9 | P2 | Open | 2. Interaction and public contract | — | Normalize layout inputs and make result ordering deterministic. |
+| R8 | P2 | Complete | 1. Correctness | `b63767e` | Pin picking scans all eligible candidates for the nearest and resolves exact distance ties by lowest pin ID, independent of insertion order. |
+| R9 | P2 | Complete | 2. Interaction and public contract | This commit | Raw and cache layouts canonicalize unique nodes and valid edges, return node-ID order, and pack deterministically ordered components without overlap on the perpendicular axis. |
 | R10 | P1 | Open | 2. Interaction and public contract | — | Replace self-confirming tests with tests through promised interfaces. |
 | R11 | P2 | In progress | 5. Scale and optional UX | `1542652` | Unselected nodes no longer subscribe to the global drag start/end toggle through their world-position bindings; frame baselines and broader update localization remain open. |
 | R12 | P1 roadmap | Open | 4. Embeddability | — | Implement structural accessibility and configurable keyboard policy. |
@@ -33,9 +33,9 @@ Last updated: 2026-09-06 through R8.
 | R15 | P1 release | Open | 3. Release hardening | — | Complete packaging gates and document the currently usable dependency source. |
 | R16 | P3 | Open | 3. Release hardening | — | Clean up examples and make maintenance checks reliable teaching material. |
 
-Overall: **8 of 16 findings complete**. Correctness batch: **5 of 5
-findings complete**. Interaction and public contract batch: **3 of 5 findings
-complete**. The next item by review order is **R9**.
+Overall: **9 of 16 findings complete**. Correctness batch: **5 of 5
+findings complete**. Interaction and public contract batch: **4 of 5 findings
+complete**. The next item by review order is **R10**.
 
 ## Completed work
 
@@ -167,7 +167,7 @@ Completed in `e6e9aa5`.
 
 ### R8 — pick the nearest pin deterministically
 
-Completed in this commit.
+Completed in `b63767e`.
 
 - `find_pin_at` now scans every candidate within the radius and compares
   squared distances, avoiding unnecessary square roots.
@@ -178,6 +178,22 @@ Completed in this commit.
   existing hidden-pin behavior while retaining both as link route endpoints.
 - Regression tests cover overlapping hit radii, reversed input order,
   equidistant pins, hidden pins, disabled pins, and screen-space lookup.
+
+### R9 — normalize layout inputs and make ordering intentional
+
+Completed in this commit.
+
+- A single first-wins node table now supplies IDs, validated dimensions,
+  algorithm vertices, reverse lookup, and component bounds. Invalid dimensions
+  are omitted before edges are resolved.
+- Nodes and retained edges are sorted by ID, while duplicate edges, self-loops,
+  and unknown endpoints are ignored consistently by raw and cache entry points.
+- Components are ordered by their lowest node ID. Top-to-bottom layouts pack
+  components along x; left-to-right layouts pack them along y. Returned
+  positions are sorted by node ID.
+- Regression tests cover conflicting duplicate sizes, invalid dimensions,
+  noisy edges, equivalent input permutations, cache insertion order, isolated
+  nodes, and non-overlap of disconnected components in both directions.
 
 ## In-progress work
 
@@ -253,6 +269,14 @@ After R7:
 After R8:
 
 - `cargo test --workspace --all-features --locked`: **420 tests passed** plus
+  **14 executable doctests passed**.
+- `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`:
+  passed.
+- `git diff --check`: passed.
+
+After R9:
+
+- `cargo test --workspace --all-features --locked`: **425 tests passed** plus
   **14 executable doctests passed**.
 - `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`:
   passed.

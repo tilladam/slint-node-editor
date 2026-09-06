@@ -614,6 +614,17 @@ All coordinates in these callbacks are world-space `f32` values. When using
 live `BaseNode` and `Pin` components, `wire_node_editor!` already installs the
 equivalent lifecycle and a second tracker is unnecessary.
 
+### Sugiyama Layout
+
+The optional `layout` feature provides `sugiyama_layout` for node-ID edges and
+`sugiyama_layout_from_cache` for pin-ID edges resolved through a
+`GeometryCache`. Both entry points produce the same canonical result: the
+first size for each node ID wins, valid nodes and edges are ordered by ID,
+and duplicate edges, self-loops, and edges with missing endpoints are ignored.
+Nodes with non-finite or non-positive dimensions are omitted. Disconnected
+components are ordered by their lowest node ID and packed along the axis
+perpendicular to the layout direction without overlap.
+
 ## Examples
 
 All examples are located in the `examples/` directory and can be run from the root using `cargo run -p <name>`:

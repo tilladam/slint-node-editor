@@ -9,7 +9,7 @@
 //!
 //! Requires the `layout` feature to be enabled.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::hit_test::NodeGeometry;
 use crate::state::GeometryCache;
@@ -63,55 +63,59 @@ pub struct SugiyamaConfig {
 /// Node IDs can be any `i32` values — they are mapped to sequential `u32` indices
 /// internally for `rust-sugiyama` and translated back before returning.
 ///
-/// Duplicate node IDs in `node_sizes` are ignored (first occurrence wins).
+/// Duplicate node IDs in `node_sizes` are ignored (first occurrence wins),
+/// then nodes are ordered by ID. Nodes whose width or height is non-finite or
+/// not positive are omitted. Edges with an omitted or unknown endpoint,
+/// self-loops, and duplicate edges are ignored; retained edges are ordered by
+/// their node-ID pair. Results are returned in ascending node-ID order.
 pub fn sugiyama_layout(
     edges: &[(i32, i32)],
     node_sizes: &[(i32, (f64, f64))],
     config: &SugiyamaConfig,
 ) -> Vec<NodePosition> {
-    if node_sizes.is_empty() {
+    let horizontal = config.direction == Direction::LeftToRight;
+
+    // Preserve the documented first occurrence, then let BTreeMap provide the
+    // canonical node-ID order used by every downstream table.
+    let mut nodes_by_id = BTreeMap::new();
+    for &(node_id, size) in node_sizes {
+        nodes_by_id.entry(node_id).or_insert(size);
+    }
+    nodes_by_id.retain(|_, (width, height)| {
+        width.is_finite() && *width > 0.0 && height.is_finite() && *height > 0.0
+    });
+    let nodes: Vec<(i32, (f64, f64))> = nodes_by_id.into_iter().collect();
+    if nodes.is_empty() {
         return Vec::new();
     }
 
-    let horizontal = config.direction == Direction::LeftToRight;
+    let id_to_idx: BTreeMap<i32, u32> = nodes
+        .iter()
+        .enumerate()
+        .map(|(idx, &(node_id, _))| (node_id, idx as u32))
+        .collect();
 
-    // Build mapping: node_id -> sequential u32 index (first occurrence wins)
-    let mut id_to_idx: HashMap<i32, u32> = HashMap::new();
-    // Reverse mapping: idx -> node_id (dense, so Vec is sufficient)
-    let mut idx_to_id: Vec<i32> = Vec::with_capacity(node_sizes.len());
-
-    for &(node_id, _) in node_sizes {
-        if let std::collections::hash_map::Entry::Vacant(e) = id_to_idx.entry(node_id) {
-            e.insert(idx_to_id.len() as u32);
-            idx_to_id.push(node_id);
-        }
-    }
-
-    // Convert node sizes to rust-sugiyama format: (index, (width, height))
     // For horizontal layout, swap width/height so the algorithm spaces layers
     // along what will become the x-axis.
-    let vertices: Vec<(u32, (f64, f64))> = node_sizes
+    let vertices: Vec<(u32, (f64, f64))> = nodes
         .iter()
-        .filter_map(|&(node_id, (w, h))| {
-            let idx = *id_to_idx.get(&node_id)?;
-            // Only include first occurrence (idx must match position)
-            if idx_to_id[idx as usize] == node_id {
-                let size = if horizontal { (h, w) } else { (w, h) };
-                Some((idx, size))
+        .enumerate()
+        .map(|(idx, &(_, (width, height)))| {
+            let size = if horizontal {
+                (height, width)
             } else {
-                None
-            }
+                (width, height)
+            };
+            (idx as u32, size)
         })
         .collect();
 
-    // Convert edges to sequential indices, skipping any with unknown node IDs
     let mapped_edges: Vec<(u32, u32)> = edges
         .iter()
-        .filter_map(|&(src, dst)| {
-            let src_idx = id_to_idx.get(&src)?;
-            let dst_idx = id_to_idx.get(&dst)?;
-            Some((*src_idx, *dst_idx))
-        })
+        .filter(|(src, dst)| src != dst)
+        .filter_map(|&(src, dst)| Some((*id_to_idx.get(&src)?, *id_to_idx.get(&dst)?)))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
         .collect();
 
     // Configure rust-sugiyama
@@ -127,8 +131,15 @@ pub fn sugiyama_layout(
     }
 
     // Run layout — returns Vec<(Vec<(usize, (f64, f64))>, f64, f64)> (subgraphs)
-    let subgraphs =
+    let mut subgraphs =
         rust_sugiyama::from_vertices_and_edges(&vertices, &mapped_edges, &sg_config);
+    subgraphs.sort_by_key(|(layout, _, _)| {
+        layout
+            .iter()
+            .filter_map(|(idx, _)| nodes.get(*idx).map(|(node_id, _)| *node_id))
+            .min()
+            .unwrap_or(i32::MAX)
+    });
 
     // Collect results from all subgraphs, translating indices back to node IDs.
     // For horizontal layout, swap x/y so layers run left-to-right.
@@ -139,7 +150,7 @@ pub fn sugiyama_layout(
     } else {
         10.0
     };
-    let mut results = Vec::with_capacity(idx_to_id.len());
+    let mut results = Vec::with_capacity(nodes.len());
     let mut perpendicular_offset = 0.0_f64;
 
     for (layout, _width, _height) in &subgraphs {
@@ -149,32 +160,36 @@ pub fn sugiyama_layout(
 
         let start = results.len();
         for &(idx, (x, y)) in layout {
-            if let Some(&node_id) = idx_to_id.get(idx) {
+            if let Some(&(node_id, (node_width, node_height))) = nodes.get(idx) {
                 let (px, py) = if horizontal { (y, x) } else { (x, y) };
                 results.push(NodePosition { id: node_id, x: px, y: py });
 
-                // Perpendicular axis is y for both directions
-                // Look up node height to get the full extent
-                let node_h = id_to_idx
-                    .get(&node_id)
-                    .and_then(|&i| vertices.get(i as usize))
-                    .map(|&(_, (w, h))| if horizontal { w } else { h })
-                    .unwrap_or(0.0);
-                min_perp = min_perp.min(py);
-                max_perp = max_perp.max(py + node_h);
+                let (perpendicular_position, perpendicular_size) = if horizontal {
+                    (py, node_height)
+                } else {
+                    (px, node_width)
+                };
+                min_perp = min_perp.min(perpendicular_position);
+                max_perp = max_perp.max(perpendicular_position + perpendicular_size);
             }
         }
 
         if start < results.len() {
-            // Shift this subgraph so its top edge sits at the running offset
+            // Shift this subgraph so its perpendicular leading edge sits at
+            // the running offset.
             let shift = perpendicular_offset - min_perp;
             for pos in &mut results[start..] {
-                pos.y += shift;
+                if horizontal {
+                    pos.y += shift;
+                } else {
+                    pos.x += shift;
+                }
             }
             perpendicular_offset += max_perp - min_perp + spacing;
         }
     }
 
+    results.sort_by_key(|position| position.id);
     results
 }
 
@@ -184,8 +199,10 @@ pub fn sugiyama_layout(
 /// by link models. Pin IDs are resolved to node IDs via `cache.pin_positions`,
 /// and node dimensions are read from `cache.node_rects`.
 ///
-/// Duplicate edges (multiple pins between the same node pair) are deduplicated
-/// before being passed to the layout algorithm.
+/// Unknown pins are ignored. Resolved edges then use the raw layout policy:
+/// missing node endpoints, self-loops, and duplicate node pairs are ignored.
+/// Cache `HashMap` iteration cannot affect the result because the raw layout
+/// canonicalizes nodes and edges before invoking the algorithm.
 ///
 /// Returns a [`NodePosition`] for each laid-out node.
 pub fn sugiyama_layout_from_cache<N>(
@@ -196,20 +213,15 @@ pub fn sugiyama_layout_from_cache<N>(
 where
     N: NodeGeometry + Copy,
 {
-    // Resolve pin IDs to node IDs, deduplicating via HashSet then collecting
-    // to a Vec for the slice-based sugiyama_layout API.
+    // Resolve known pin IDs to node IDs. The raw API owns canonical edge
+    // filtering so both entry points have the same self-loop/duplicate policy.
     let node_edges: Vec<(i32, i32)> = edges
         .iter()
         .filter_map(|&(start_pin, end_pin)| {
             let src_node = cache.pin_positions.get(&start_pin)?.node_id;
             let dst_node = cache.pin_positions.get(&end_pin)?.node_id;
-            if src_node == dst_node {
-                return None; // skip self-loops
-            }
             Some((src_node, dst_node))
         })
-        .collect::<HashSet<_>>()
-        .into_iter()
         .collect();
 
     // Extract node sizes from cache
@@ -228,6 +240,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     /// Helper to collect positions into a HashMap for easy lookup.
     fn pos_map(positions: Vec<NodePosition>) -> HashMap<i32, (f64, f64)> {
@@ -296,11 +309,80 @@ mod tests {
 
     #[test]
     fn test_duplicate_node_ids_first_wins() {
-        // Two entries for node 1 with different sizes — first should win
-        let sizes = vec![(1, (100.0, 50.0)), (1, (200.0, 100.0))];
-        let result = sugiyama_layout(&[], &sizes, &SugiyamaConfig::default());
+        let base_sizes = vec![(1, (100.0, 50.0)), (2, (60.0, 30.0))];
+        let duplicate_sizes = vec![
+            (1, (100.0, 50.0)),
+            (1, (500.0, 400.0)),
+            (2, (60.0, 30.0)),
+        ];
+
+        assert_eq!(
+            sugiyama_layout(&[], &duplicate_sizes, &SugiyamaConfig::default()),
+            sugiyama_layout(&[], &base_sizes, &SugiyamaConfig::default())
+        );
+    }
+
+    #[test]
+    fn invalid_node_dimensions_are_omitted() {
+        let sizes = vec![
+            (1, (100.0, 50.0)),
+            (2, (0.0, 50.0)),
+            (3, (100.0, -1.0)),
+            (4, (f64::NAN, 50.0)),
+            (5, (100.0, f64::INFINITY)),
+            // First occurrence wins even when it is invalid.
+            (2, (100.0, 50.0)),
+        ];
+
+        let result = sugiyama_layout(&[(1, 2)], &sizes, &SugiyamaConfig::default());
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].id, 1);
+        assert!(result[0].x.is_finite());
+        assert!(result[0].y.is_finite());
+    }
+
+    #[test]
+    fn raw_layout_ignores_duplicate_self_and_unknown_edges() {
+        let sizes = vec![
+            (1, (80.0, 40.0)),
+            (2, (80.0, 40.0)),
+            (3, (80.0, 40.0)),
+        ];
+        let expected = sugiyama_layout(&[(1, 2)], &sizes, &SugiyamaConfig::default());
+        let noisy = sugiyama_layout(
+            &[(1, 2), (1, 2), (1, 1), (3, 3), (1, 999), (999, 2)],
+            &sizes,
+            &SugiyamaConfig::default(),
+        );
+
+        assert_eq!(noisy, expected);
+    }
+
+    #[test]
+    fn equivalent_input_permutations_have_identical_positions_and_order() {
+        let sizes = vec![
+            (30, (70.0, 35.0)),
+            (10, (80.0, 40.0)),
+            (40, (90.0, 45.0)),
+            (20, (60.0, 30.0)),
+        ];
+        let mut reversed_sizes = sizes.clone();
+        reversed_sizes.reverse();
+        let edges = vec![(10, 20), (10, 30), (20, 40), (30, 40)];
+        let mut reversed_edges = edges.clone();
+        reversed_edges.reverse();
+
+        for direction in [Direction::TopToBottom, Direction::LeftToRight] {
+            let config = SugiyamaConfig { direction, ..Default::default() };
+            let expected = sugiyama_layout(&edges, &sizes, &config);
+            let actual = sugiyama_layout(&reversed_edges, &reversed_sizes, &config);
+
+            assert_eq!(actual, expected);
+            assert_eq!(
+                actual.iter().map(|position| position.id).collect::<Vec<_>>(),
+                vec![10, 20, 30, 40]
+            );
+        }
     }
 
     #[test]
@@ -397,26 +479,64 @@ mod tests {
     }
 
     #[test]
-    fn test_isolated_nodes_do_not_overlap() {
-        // Three isolated nodes (no edges) — should not all land at the same position
+    fn test_isolated_nodes_are_packed_on_the_perpendicular_axis() {
         let sizes = vec![
             (1, (100.0, 50.0)),
             (2, (100.0, 50.0)),
             (3, (100.0, 50.0)),
         ];
-        let result = sugiyama_layout(&[], &sizes, &SugiyamaConfig::default());
-        assert_eq!(result.len(), 3);
 
-        let pos = pos_map(result);
-        // All three should have distinct y values (stacked along perpendicular axis)
-        let ys: Vec<f64> = pos.values().map(|p| p.1).collect();
-        for i in 0..ys.len() {
-            for j in (i + 1)..ys.len() {
-                assert!(
-                    (ys[i] - ys[j]).abs() > 1.0,
-                    "isolated nodes should not overlap: y[{}]={}, y[{}]={}",
-                    i, ys[i], j, ys[j]
-                );
+        let top_to_bottom = sugiyama_layout(&[], &sizes, &SugiyamaConfig::default());
+        assert!(top_to_bottom.windows(2).all(|pair| pair[0].x + 110.0 <= pair[1].x));
+        assert!(top_to_bottom.windows(2).all(|pair| pair[0].y == pair[1].y));
+
+        let left_to_right = sugiyama_layout(
+            &[],
+            &sizes,
+            &SugiyamaConfig { direction: Direction::LeftToRight, ..Default::default() },
+        );
+        assert!(left_to_right.windows(2).all(|pair| pair[0].y + 60.0 <= pair[1].y));
+        assert!(left_to_right.windows(2).all(|pair| pair[0].x == pair[1].x));
+    }
+
+    #[test]
+    fn disconnected_components_do_not_overlap_in_either_direction() {
+        let sizes = vec![
+            (1, (100.0, 30.0)),
+            (2, (60.0, 80.0)),
+            (3, (120.0, 40.0)),
+            (4, (50.0, 90.0)),
+        ];
+        let edges = vec![(1, 2), (3, 4)];
+
+        for direction in [Direction::TopToBottom, Direction::LeftToRight] {
+            let positions = pos_map(sugiyama_layout(
+                &edges,
+                &sizes,
+                &SugiyamaConfig { direction, ..Default::default() },
+            ));
+            for left_id in [1, 2] {
+                for right_id in [3, 4] {
+                    let (left_x, left_y) = positions[&left_id];
+                    let (right_x, right_y) = positions[&right_id];
+                    let (_, (left_width, left_height)) = sizes
+                        .iter()
+                        .find(|(id, _)| *id == left_id)
+                        .copied()
+                        .unwrap();
+                    let (_, (right_width, right_height)) = sizes
+                        .iter()
+                        .find(|(id, _)| *id == right_id)
+                        .copied()
+                        .unwrap();
+                    assert!(
+                        left_x + left_width <= right_x
+                            || right_x + right_width <= left_x
+                            || left_y + left_height <= right_y
+                            || right_y + right_height <= left_y,
+                        "components overlap in {direction:?}: {left_id} and {right_id}"
+                    );
+                }
             }
         }
     }
@@ -592,5 +712,42 @@ mod tests {
 
         // In left-to-right, source should be left of target
         assert!(pos[&1].0 < pos[&2].0, "source should be left of target in LTR layout");
+    }
+
+    #[test]
+    fn cache_insertion_and_edge_order_do_not_change_layout() {
+        let nodes = vec![
+            (30, 0.0, 0.0, 70.0, 35.0),
+            (10, 0.0, 0.0, 80.0, 40.0),
+            (40, 0.0, 0.0, 90.0, 45.0),
+            (20, 0.0, 0.0, 60.0, 30.0),
+        ];
+        let pins = vec![
+            (101, 10, 2, 80.0, 20.0),
+            (201, 20, 1, 0.0, 15.0),
+            (102, 10, 2, 80.0, 20.0),
+            (301, 30, 1, 0.0, 17.5),
+            (202, 20, 2, 60.0, 15.0),
+            (401, 40, 1, 0.0, 22.5),
+            (302, 30, 2, 70.0, 17.5),
+            (402, 40, 1, 0.0, 22.5),
+        ];
+        let mut reversed_nodes = nodes.clone();
+        reversed_nodes.reverse();
+        let mut reversed_pins = pins.clone();
+        reversed_pins.reverse();
+        let cache = make_cache(&nodes, &pins);
+        let reversed_cache = make_cache(&reversed_nodes, &reversed_pins);
+        let edges = vec![(101, 201), (102, 301), (202, 401), (302, 402)];
+        let mut reversed_edges = edges.clone();
+        reversed_edges.reverse();
+
+        for direction in [Direction::TopToBottom, Direction::LeftToRight] {
+            let config = SugiyamaConfig { direction, ..Default::default() };
+            assert_eq!(
+                sugiyama_layout_from_cache(&reversed_cache, &reversed_edges, &config),
+                sugiyama_layout_from_cache(&cache, &edges, &config)
+            );
+        }
     }
 }
