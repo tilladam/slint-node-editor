@@ -3,8 +3,10 @@
 Plan drafted 2026-09-05, against `aa5a12b` (slint pinned to the 1.18 pre-release tip).
 Revised the same day after a Codex second-opinion review; every claim below was
 re-verified against the Slint 1.18 source or by running the command shown.
-Status section below refreshed 2026-09-05. **Phase 1 is complete** except for
-one item that cannot run until the `v1.18.0` tag lands.
+Status section below refreshed 2026-09-06 against `bc825bc`. **Phase 1 is
+complete** except for one item that cannot run until the `v1.18.0` tag lands.
+Link geometry was reworked after Phase 1 closed, which changes the
+consumer-visible API — see "Breaking changes to carry into the release notes".
 
 ## Executive summary
 
@@ -59,12 +61,25 @@ single exception is `cargo package --locked` in CI, which cannot pass until
 | `b08d1ec` | **1.3 + 1.4 + 1.5** — components distributed as a library module |
 | `505b7e5` | Smoke test proves the shipped file set; wired into CI |
 | `aad9123` | This plan brought up to date after the library-module work |
-| *(pending)* | **1.1 + 1.2 + 1.6 + 1.7** — metadata, docs, CI gates, docs.rs |
+| `efd572d` | **1.1 + 1.2 + 1.6 + 1.7** — metadata, docs, CI gates, docs.rs |
+| `189c94d` | Filter node's pin labels no longer overlap its content |
+| `fa864fd` | One curve for the drawing, the box and the hit test |
+| `382cf72` | A link element is sized to its own curve, not to the canvas |
+| `fb26740` | A link's box is padded in device pixels, not world ones |
+| `bc825bc` | The link's path viewbox is 1:1, not `contain`-scaled |
 
-Health at `505b7e5`: `cargo test --workspace` 354 passed / 0 failed,
-`cargo clippy --workspace --all-targets` clean, `./smoke/run.sh` and
-`./smoke/run.sh included` both green, `cargo package --list` correct, and
-`cargo package` still fails only on the missing `version` key for `slint`.
+Health at `bc825bc`: `cargo test --workspace` 372 passed / 0 failed,
+`cargo clippy --workspace --all-targets --all-features` clean,
+`RUSTDOCFLAGS="-D warnings" cargo doc` clean, `./smoke/run.sh included` green,
+`cargo package --list` correct (no `tests/` or `smoke/` files; `build.rs` and
+both root `.slint` files present), and `cargo package` still fails only on the
+missing `version` key for `slint`.
+
+CI is green on GitHub and both jobs really run: the `msrv` job compiled the
+graph on a pinned 1.92, and the build job's smoke step spent ~2 minutes
+building the out-of-workspace consumer before printing `smoke: ok`. Worth
+stating because a script that exits 0 without doing anything looks identical
+at the summary level.
 
 A Codex review of both commits reported no actionable findings. Note what that
 does *and does not* cover: its sandbox has no network, so it could not build the
@@ -89,6 +104,16 @@ link cascade, in-node widgets, and the `@nodeeditor` imports resolving at all.
 
 ### Fixed since
 
+- Link rendering, in four commits (`fa864fd` … `bc825bc`). A `Link` was a
+  `Path` sized to the whole 100000×100000px world container, so Slint's
+  partial renderer repainted the window for any change to any link. Sizing the
+  element to the curve's own box fixed that and exposed two further bugs: the
+  padding was measured in world units when antialiasing and hairlines are
+  screen quantities, and the viewbox was `contain`-scaled rather than 1:1.
+  Separately, the hit test and the renderer had disagreed about the curve —
+  different short-link thresholds, and the threshold divides the ramp — so
+  clicks on links 10–20px long were measured against a curve nobody drew.
+
 - `filter_node.slint` text overlap. `pin-area-width` was 24px while the labels
   inside it are offset 16px and `Rectangle` does not clip, so `Ctrl` ran 8px
   into `Active`. `Out` was separately constrained to 8px and truncated. Six
@@ -110,6 +135,34 @@ link cascade, in-node widgets, and the `@nodeeditor` imports resolving at all.
   showed the position stable rather than mid-animation. A single clean run on
   1.17 is not enough to blame 1.18. Unexplained; needs a repro before it is
   worth chasing.
+
+### Breaking changes to carry into the release notes
+
+Free to make right now — nothing is published — but they are the
+consumer-visible surface, so Phase 3 step 6 has to name them.
+
+| Was | Is |
+|---|---|
+| `Link.path-commands: string` | `Link.geometry: LinkPath` |
+| `compute-link-path -> string` | `compute-link-path -> LinkPath` |
+| `compute_link_path_callback()` | `compute_link_path_callback(constructor)` |
+
+Two consequences for anyone writing against this:
+
+- `wire_node_editor!` now needs `LinkPath` in scope at the call site, as it
+  already needed the globals.
+- A custom path generator owes a bounding box as well as commands, and one
+  whose box does not contain what it draws leaves stale pixels.
+
+The callback takes a *constructor* rather than naming `LinkPath`, and that is a
+direct consequence of the library-module work: a consumer importing through
+cargo metadata gets the crate's re-exported `LinkPath`, while one passing a
+library path gets their own generated copy. Both shapes exist in this repo —
+the examples are the first, the test harness the second — so the library cannot
+name either type and has to be handed the constructor.
+
+`LinkPath` was added to the crate-root re-exports alongside `LinkData`, for the
+same reason (see 1.3).
 
 ### Decided
 
@@ -144,6 +197,8 @@ Each measured, not assumed. Items marked ⚠️ corrected an earlier assumption.
 | The smoke fixture actually fails when the mechanism breaks | Two negative controls: dropping `links = "nodeeditor"` → fixture build script fails; withholding `node-editor-building-blocks.slint` from the staged file set → *"Cannot find requested import"*. Both restored, green again |
 | MSRV 1.92 is measured, not assumed | `cargo +1.92 check --workspace --all-targets --all-features` → clean. CI keeps it honest with a pinned-toolchain job |
 | The **shipped** file set is self-sufficient | `./smoke/run.sh included` builds an out-of-workspace consumer against a copy of exactly what `cargo package --list` reports, and `node-editor.slint`'s own import of the building-blocks file resolves inside it |
+| ⚠️ A `Path` viewbox sized to its element is **not** 1:1 | It fits the viewbox into the element *inset by the stroke width* and `fit: contain` takes the smaller ratio for both axes. Harmless at 99998/100000 (canvas-sized element); at 4/6 (a horizontal link's own box) it draws the curve a third short and moves it on selection. Size the viewbox to the inset |
+| ⚠️ Slint dirties an item's whole bounding box on any change | A canvas-sized `Link` therefore repainted the whole window for a selection flip, which moves nothing. Measured in the embedding app: 100% of the window per gesture frame vs 0.13% for a chrome hover in the same scene |
 
 ## The central decision: library modules
 
@@ -474,8 +529,11 @@ Ordered, and none of them optional:
 4. `cargo publish --locked`.
 5. Tag the exact published commit (`v0.1.0`) and push the tag.
 6. Write release notes covering the MSRV jump (1.70 → 1.92, forced by slint,
-   not by our code) and the experimental library-module mechanism. Consumers do
-   not have to enable `experimental-module-builds` themselves, but should.
+   not by our code), the experimental library-module mechanism (consumers do
+   not have to enable `experimental-module-builds` themselves, but should), and
+   the link-geometry API — see "Breaking changes to carry into the release
+   notes". For 0.1.0 the last is a description of the surface rather than a
+   migration note, since there is no prior release to migrate from.
 7. **After** publication, verify against the real registry: fresh `cargo add
    slint-node-editor` in a scratch project, confirm the docs.rs build succeeded,
    and point `smoke/run.sh` at the published crate rather than a local path.
