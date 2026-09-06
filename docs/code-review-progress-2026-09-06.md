@@ -4,7 +4,7 @@ This document tracks work against the findings in
 [code-review-2026-09-06.md](code-review-2026-09-06.md). Update it when a finding
 is started, completed, reopened, or intentionally deferred.
 
-Last updated: 2026-09-06 through R6.
+Last updated: 2026-09-06 through R7.
 
 ## Status
 
@@ -22,20 +22,20 @@ Last updated: 2026-09-06 through R6.
 | R4 | P1 | Complete | 2. Interaction and public contract | `0b454a9` | Globals are canonical for computations and building-block events; component configuration synchronizes with the controller; public geometry functions use the lifecycle; obsolete members were removed or documented as host conveniences. |
 | R5 | P1 | Complete | 2. Interaction and public contract | `5a4b483` | The quick start is a tested downstream crate using exact git dependencies; its docs cover generated members, ownership, callback replacement, units, IDs, and lifecycle. |
 | R6 | P2 | Complete | 1. Correctness | `28eeaa3` | Link validation now returns canonical output/input endpoints before topology rules run; the advanced and pin-compatibility examples create links from those validated endpoints. |
-| R7 | P2 | Open | 2. Interaction and public contract | — | Apply gesture ownership and configured modifiers consistently. |
+| R7 | P2 | Complete | 2. Interaction and public contract | This commit | A modifier-only editor overlay owns forced marquees across every surface; node and pin fallbacks share the configuration, and all transient interactions have cancellation paths. |
 | R8 | P2 | Open | 1. Correctness | — | Pick the nearest eligible pin with a deterministic tie rule. |
 | R9 | P2 | Open | 2. Interaction and public contract | — | Normalize layout inputs and make result ordering deterministic. |
 | R10 | P1 | Open | 2. Interaction and public contract | — | Replace self-confirming tests with tests through promised interfaces. |
-| R11 | P2 | In progress | 5. Scale and optional UX | This commit | Unselected nodes no longer subscribe to the global drag start/end toggle through their world-position bindings; frame baselines and broader update localization remain open. |
+| R11 | P2 | In progress | 5. Scale and optional UX | `1542652` | Unselected nodes no longer subscribe to the global drag start/end toggle through their world-position bindings; frame baselines and broader update localization remain open. |
 | R12 | P1 roadmap | Open | 4. Embeddability | — | Implement structural accessibility and configurable keyboard policy. |
 | R13 | P2 roadmap | Open | 4. Embeddability | — | Introduce instance-scoped editor context. |
 | R14 | P2 | Open | 3/4 | — | Simplify ownership, typing, and the public Rust integration surface. |
 | R15 | P1 release | Open | 3. Release hardening | — | Complete packaging gates and document the currently usable dependency source. |
 | R16 | P3 | Open | 3. Release hardening | — | Clean up examples and make maintenance checks reliable teaching material. |
 
-Overall: **6 of 16 findings complete**. Correctness batch: **4 of 5
-findings complete**. Interaction and public contract batch: **2 of 5 findings
-complete**. The next item by review order is **R7**.
+Overall: **7 of 16 findings complete**. Correctness batch: **4 of 5
+findings complete**. Interaction and public contract batch: **3 of 5 findings
+complete**. The next item by review order is **R8**.
 
 ## Completed work
 
@@ -146,6 +146,25 @@ Completed in `28eeaa3`.
 - The pin-compatibility example now applies type compatibility and duplicate
   checks to normalized endpoints and uses the returned endpoints for creation.
 
+### R7 — arbitrate gestures consistently across surfaces
+
+Completed in this commit.
+
+- A topmost TouchArea is enabled only while the configured marquee modifier is
+  held. It gives forced box selection one owner over the background, links,
+  nodes, pins, and controls embedded inside consumer nodes.
+- `BaseNode` and `Pin` use the same published modifier configuration as a
+  fallback when focus was outside the editor during the modifier key press.
+  Control and Command/Meta share the `ctrl` setting.
+- With no reserved gesture, normal link selection, node dragging, pin linking,
+  and embedded-control input continue unchanged.
+- Pointer cancellation, outside release, focus loss, hiding, disabling, and
+  the public pre-removal hook reset marquee, drag, and link state. Cancellation
+  does not commit a marquee or allow the remaining pointer sequence to restart
+  a node drag.
+- Interaction tests cover all four settings over all five surfaces and each
+  cancellation path.
+
 ## In-progress work
 
 ### R11 — measure the whole frame and make updates local
@@ -207,6 +226,14 @@ After the initial R11 update-locality fix:
 
 - `cargo test --workspace --all-features --locked`: **406 tests passed** plus
   **14 executable doctests passed**.
+- `git diff --check`: passed.
+
+After R7:
+
+- `cargo test --workspace --all-features --locked`: **417 tests passed** plus
+  **14 executable doctests passed**.
+- `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`:
+  passed.
 - `git diff --check`: passed.
 
 The original review's packaging, formatting, platform, accessibility, and

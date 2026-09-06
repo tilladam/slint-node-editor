@@ -43,6 +43,48 @@ export global DragState {
     in-out property <length> drag-offset-y: 0px;
 }
 
+/// Modifier key for triggering box selection over interactive graph content.
+export enum BoxSelectionModifier {
+    /// No modifier reserves pointer gestures; empty canvas can still marquee.
+    none,
+    /// Control or Command enables box selection anywhere.
+    ctrl,
+    /// Alt enables box selection anywhere.
+    alt,
+    /// Shift enables box selection anywhere and extends the selection.
+    shift,
+}
+
+/// Gesture configuration published by NodeEditor for consumer-defined nodes
+/// and their pins.
+export global NodeEditorGestureConfig {
+    in-out property <BoxSelectionModifier> box-selection-modifier: BoxSelectionModifier.ctrl;
+
+    pure public function forces-box-selection(control: bool, alt: bool, shift: bool, meta: bool) -> bool {
+        return (self.box-selection-modifier == BoxSelectionModifier.ctrl && (control || meta))
+            || (self.box-selection-modifier == BoxSelectionModifier.alt && alt)
+            || (self.box-selection-modifier == BoxSelectionModifier.shift && shift);
+    }
+}
+
+/// Forwarded marquee lifecycle for BaseNode and Pin. The normal path uses a
+/// NodeEditor-owned overlay; this path covers a modifier pressed while focus
+/// was outside the editor.
+export enum BoxSelectionGestureState { idle, started, updating, complete }
+export global BoxSelectionGesture {
+    in-out property <int> version: 0;
+    in-out property <BoxSelectionGestureState> state: BoxSelectionGestureState.idle;
+    in-out property <length> x: 0px;
+    in-out property <length> y: 0px;
+    in-out property <bool> extends-selection: false;
+}
+
+/// Incremented whenever an owner loses its pointer grab or the host explicitly
+/// cancels the editor. Every gesture participant resets its local state.
+export global InteractionCancellation {
+    in-out property <int> version: 0;
+}
+
 /// Geometry version counter for link path invalidation.
 /// BaseNode/Pin request invalidation automatically when geometry changes;
 /// NodeEditor coalesces the requests and advances the version.
@@ -138,6 +180,8 @@ export global NodeEditorInternalCallbacks {
     callback start-node-drag(/* node-id */ int, /* already-selected */ bool, /* world-x */ length, /* world-y */ length);
     /// Update node drag
     callback update-node-drag(/* delta-x */ length, /* delta-y */ length);
+    /// Clear host-side state for a node drag that did not reach its normal end.
+    callback cancel-node-drag();
     /// End node drag. Carries the dragged node so the commit is self-contained:
     /// the host moves the dragged node, plus whatever else its rows show as
     /// selected. Nothing depends on when the press-time selection intent landed.
@@ -153,6 +197,7 @@ export global NodeEditorInternalCallbacks {
             DragState.dragged-node-id = 0;
             DragState.drag-offset-x = 0px;
             DragState.drag-offset-y = 0px;
+            InteractionCancellation.version += 1;
         }
         if LinkCreation.state != LinkCreationState.idle {
             LinkCreation.state = LinkCreationState.idle;
@@ -179,6 +224,7 @@ export global NodeEditorInternalCallbacks {
 
     /// Clear projected state before replacing the current graph.
     public function reset-graph() {
+        InteractionCancellation.version += 1;
         HoverState.hovered-node-id = 0;
         DragState.is-dragging = false;
         DragState.dragged-node-id = 0;
@@ -646,6 +692,7 @@ export component BaseNode inherits Rectangle {
     property <length> persistent-offset-y: 0px;
     property <int> reported-node-id: 0;
     property <int> projection-version: GeometryVersion.projection-version;
+    property <int> interaction-cancellation-watch: InteractionCancellation.version;
     // === Node Size ===
     // Set these to match your node's visual dimensions.
     in property <length> node-width: 150px;
@@ -713,6 +760,9 @@ export component BaseNode inherits Rectangle {
 
     changed projection-version => {
         root.report-geometry();
+    }
+    changed interaction-cancellation-watch => {
+        drag-area.cancel-gesture();
     }
 
     changed world-x => {
@@ -801,11 +851,21 @@ export component BaseNode inherits Rectangle {
         property <length> screen-mouse-x: self.absolute-position.x + self.mouse-x * ViewportState.zoom;
         property <length> screen-mouse-y: self.absolute-position.y + self.mouse-y * ViewportState.zoom;
 
-        // True for the duration of a press whose gesture should not produce
-        // any node behavior (no selection change, no drag, no double-click).
-        // Currently set for Ctrl/Cmd+left-click, which is reserved for
-        // canvas-level box selection.
-        property <bool> press-inert: false;
+        // True while this area forwards the configured marquee gesture to the
+        // owning NodeEditor instead of selecting or dragging the node.
+        property <bool> forwarding-box-selection: false;
+        // Set by shared cancellation so the remainder of the current pointer
+        // sequence cannot restart a drag or turn into a click.
+        property <bool> press-cancelled: false;
+
+        function cancel-gesture() {
+            is-dragging = false;
+            forwarding-box-selection = false;
+            press-cancelled = true;
+            current-drag-offset-x = 0px;
+            current-drag-offset-y = 0px;
+            selection-intent-sent = false;
+        }
 
         pointer-event(event) => {
             if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
@@ -813,15 +873,26 @@ export component BaseNode inherits Rectangle {
                 // so `moved` and `up` never observe stale values.
                 shift-held = event.modifiers.shift;
                 is-dragging = false;
+                press-cancelled = false;
                 start-abs-x = screen-mouse-x;
                 start-abs-y = screen-mouse-y;
                 current-drag-offset-x = 0px;
                 current-drag-offset-y = 0px;
                 was-selected-on-press = selected;
                 selection-intent-sent = false;
-                press-inert = event.modifiers.control;
+                forwarding-box-selection = NodeEditorGestureConfig.forces-box-selection(
+                    event.modifiers.control,
+                    event.modifiers.alt,
+                    event.modifiers.shift,
+                    event.modifiers.meta);
 
-                if !press-inert {
+                if forwarding-box-selection {
+                    BoxSelectionGesture.x = screen-mouse-x;
+                    BoxSelectionGesture.y = screen-mouse-y;
+                    BoxSelectionGesture.extends-selection = event.modifiers.shift;
+                    BoxSelectionGesture.state = BoxSelectionGestureState.started;
+                    BoxSelectionGesture.version += 1;
+                } else {
                     // Only select immediately if shift is held (multi-select toggle)
                     // or if node is not already selected. Otherwise defer selection
                     // until release to distinguish click from drag.
@@ -834,7 +905,14 @@ export component BaseNode inherits Rectangle {
                 }
             }
             if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
-                if !press-inert {
+                if press-cancelled {
+                    press-cancelled = false;
+                } else if forwarding-box-selection {
+                    BoxSelectionGesture.x = screen-mouse-x;
+                    BoxSelectionGesture.y = screen-mouse-y;
+                    BoxSelectionGesture.state = BoxSelectionGestureState.complete;
+                    BoxSelectionGesture.version += 1;
+                } else {
                     if is-dragging {
                         // Transfer drag offset to persistent before ending drag
                         root.persistent-offset-x += current-drag-offset-x;
@@ -866,12 +944,20 @@ export component BaseNode inherits Rectangle {
                         }
                     }
                 }
-                press-inert = false;
+                forwarding-box-selection = false;
+            }
+            if event.kind == PointerEventKind.cancel {
+                InteractionCancellation.version += 1;
             }
         }
 
         moved => {
-            if self.pressed && !press-inert {
+            if self.pressed && !press-cancelled && forwarding-box-selection {
+                BoxSelectionGesture.x = screen-mouse-x;
+                BoxSelectionGesture.y = screen-mouse-y;
+                BoxSelectionGesture.state = BoxSelectionGestureState.updating;
+                BoxSelectionGesture.version += 1;
+            } else if self.pressed && !press-cancelled {
                 if !is-dragging {
                     if abs(screen-mouse-x - start-abs-x) > drag-threshold || abs(screen-mouse-y - start-abs-y) > drag-threshold {
                         is-dragging = true;
@@ -922,6 +1008,7 @@ export component Pin inherits Rectangle {
     in property <int> refresh-trigger: 0;
     property <int> reported-pin-id: 0;
     property <int> projection-version: GeometryVersion.projection-version;
+    property <int> interaction-cancellation-watch: InteractionCancellation.version;
 
     property <length> pin-radius: base-size / 2;
 
@@ -984,10 +1071,20 @@ export component Pin inherits Rectangle {
     changed projection-version => {
         root.report-geometry();
     }
+    changed interaction-cancellation-watch => {
+        touch.forwarding-box-selection = false;
+    }
 
     touch := TouchArea {
+        property <bool> forwarding-box-selection: false;
+
         moved => {
-            if LinkCreation.state != LinkCreationState.idle {
+            if forwarding-box-selection {
+                BoxSelectionGesture.x = node-screen-x + (parent-offset-x + root.x + self.mouse-x) * ViewportState.zoom;
+                BoxSelectionGesture.y = node-screen-y + (parent-offset-y + root.y + self.mouse-y) * ViewportState.zoom;
+                BoxSelectionGesture.state = BoxSelectionGestureState.updating;
+                BoxSelectionGesture.version += 1;
+            } else if LinkCreation.state != LinkCreationState.idle {
                 // Include parent-offset in screen coordinate calculation so examples don't need zoom math
                 LinkCreation.current-x = node-screen-x + (parent-offset-x + root.x + self.mouse-x) * ViewportState.zoom;
                 LinkCreation.current-y = node-screen-y + (parent-offset-y + root.y + self.mouse-y) * ViewportState.zoom;
@@ -997,21 +1094,44 @@ export component Pin inherits Rectangle {
         }
         pointer-event(event) => {
             if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
-                // Set LinkCreation state to start link creation (NodeEditor watches this)
-                // Pin position within node must be scaled by zoom since we're inside a scaled container
-                LinkCreation.start-pin-id = pin-id;
-                LinkCreation.current-x = node-screen-x + (parent-offset-x + root.x + self.x + self.width / 2) * ViewportState.zoom;
-                LinkCreation.current-y = node-screen-y + (parent-offset-y + root.y + self.y + self.height / 2) * ViewportState.zoom;
-                LinkCreation.state = LinkCreationState.started;
-                LinkCreation.version += 1;
-            } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
-                // If we're currently creating a link (started from another pin), complete it
-                if LinkCreation.state != LinkCreationState.idle {
-                    LinkCreation.current-x = node-screen-x + (parent-offset-x + root.x + self.mouse-x) * ViewportState.zoom;
-                    LinkCreation.current-y = node-screen-y + (parent-offset-y + root.y + self.mouse-y) * ViewportState.zoom;
-                    LinkCreation.state = LinkCreationState.complete;
+                forwarding-box-selection = NodeEditorGestureConfig.forces-box-selection(
+                    event.modifiers.control,
+                    event.modifiers.alt,
+                    event.modifiers.shift,
+                    event.modifiers.meta);
+                if forwarding-box-selection {
+                    BoxSelectionGesture.x = node-screen-x + (parent-offset-x + root.x + self.mouse-x) * ViewportState.zoom;
+                    BoxSelectionGesture.y = node-screen-y + (parent-offset-y + root.y + self.mouse-y) * ViewportState.zoom;
+                    BoxSelectionGesture.extends-selection = event.modifiers.shift;
+                    BoxSelectionGesture.state = BoxSelectionGestureState.started;
+                    BoxSelectionGesture.version += 1;
+                } else {
+                    // Set LinkCreation state to start link creation (NodeEditor watches this)
+                    // Pin position within node must be scaled by zoom since we're inside a scaled container
+                    LinkCreation.start-pin-id = pin-id;
+                    LinkCreation.current-x = node-screen-x + (parent-offset-x + root.x + self.x + self.width / 2) * ViewportState.zoom;
+                    LinkCreation.current-y = node-screen-y + (parent-offset-y + root.y + self.y + self.height / 2) * ViewportState.zoom;
+                    LinkCreation.state = LinkCreationState.started;
                     LinkCreation.version += 1;
                 }
+            } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                if forwarding-box-selection {
+                    BoxSelectionGesture.x = node-screen-x + (parent-offset-x + root.x + self.mouse-x) * ViewportState.zoom;
+                    BoxSelectionGesture.y = node-screen-y + (parent-offset-y + root.y + self.mouse-y) * ViewportState.zoom;
+                    BoxSelectionGesture.state = BoxSelectionGestureState.complete;
+                    BoxSelectionGesture.version += 1;
+                    forwarding-box-selection = false;
+                } else {
+                    // If we're currently creating a link (started from another pin), complete it
+                    if LinkCreation.state != LinkCreationState.idle {
+                        LinkCreation.current-x = node-screen-x + (parent-offset-x + root.x + self.mouse-x) * ViewportState.zoom;
+                        LinkCreation.current-y = node-screen-y + (parent-offset-y + root.y + self.mouse-y) * ViewportState.zoom;
+                        LinkCreation.state = LinkCreationState.complete;
+                        LinkCreation.version += 1;
+                    }
+                }
+            } else if event.kind == PointerEventKind.cancel {
+                InteractionCancellation.version += 1;
             }
         }
     }

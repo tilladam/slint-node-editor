@@ -37,6 +37,11 @@ import {
     HoverState,
     NodeEditorEvents,
     NodeEditorComputations,
+    BoxSelectionModifier,
+    NodeEditorGestureConfig,
+    BoxSelectionGestureState,
+    BoxSelectionGesture,
+    InteractionCancellation,
     NodeStyleDefaults,
     MinimapNode,
     MinimapPosition,
@@ -49,19 +54,7 @@ import {
     BaseNode,
     Pin,
 } from "node-editor-building-blocks.slint";
-export { PinTypes, ViewportState, DragState, GeometryVersion, NodeEditorInternalCallbacks, LinkCreationState, LinkCreation, SelectionRequest, HoverState, NodeEditorEvents, NodeEditorComputations, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, LinkPath, LinkStatus, LinkStatusColors, Minimap, Link, BaseNode, Pin }
-
-/// Modifier key for triggering box selection over nodes/links
-export enum BoxSelectionModifier {
-    /// No modifier - box selection only works on empty areas
-    none,
-    /// Ctrl key enables box selection anywhere
-    ctrl,
-    /// Alt key enables box selection anywhere
-    alt,
-    /// Shift key enables box selection anywhere (note: shift is also used for extend-selection)
-    shift,
-}
+export { PinTypes, ViewportState, DragState, GeometryVersion, NodeEditorInternalCallbacks, LinkCreationState, LinkCreation, SelectionRequest, HoverState, NodeEditorEvents, NodeEditorComputations, NodeStyleDefaults, BoxSelectionModifier, MinimapNode, MinimapPosition, LinkData, LinkPath, LinkStatus, LinkStatusColors, Minimap, Link, BaseNode, Pin }
 
 /// Pure Slint node editor composite component.
 ///
@@ -100,6 +93,10 @@ export component NodeEditor inherits FocusScope {
         ViewportState.pan-y = root.pan-y;
         NodeEditorComputations.grid-spacing = root.grid-spacing;
         NodeEditorComputations.bezier-min-offset = root.bezier-min-offset;
+        NodeEditorGestureConfig.box-selection-modifier = root.box-selection-modifier;
+        // Evaluate the watcher once so subsequent cancellation version changes
+        // run their handler even if no visual binding reads the property.
+        root.last-applied-cancellation-version = root.interaction-cancellation-watch;
     }
 
     // BaseNode and Pin update the Rust cache before incrementing request-version.
@@ -240,6 +237,12 @@ export component NodeEditor inherits FocusScope {
     in property <BoxSelectionModifier> box-selection-modifier: BoxSelectionModifier.ctrl;
 
     // === Internal state ===
+    property <bool> control-held: false;
+    property <bool> alt-held: false;
+    property <bool> shift-held: false;
+    property <bool> meta-held: false;
+    property <bool> modifier-forces-box-select: NodeEditorGestureConfig.forces-box-selection(
+        control-held, alt-held, shift-held, meta-held);
     property <bool> internal-is-context-menu-dragging: false;
     property <bool> internal-is-panning: false;
     property <length> pan-start-mouse-x;
@@ -252,6 +255,7 @@ export component NodeEditor inherits FocusScope {
     property <length> box-start-y;
     property <length> box-current-x;
     property <length> box-current-y;
+    property <bool> internal-box-selection-forced: false;
 
     property <bool> internal-is-creating-link: false;
     property <int> internal-link-start-pin: 0;
@@ -259,6 +263,66 @@ export component NodeEditor inherits FocusScope {
     property <length> internal-link-start-y;
     property <length> internal-link-end-x;
     property <length> internal-link-end-y;
+
+    // Observe cancellation and fallback marquee requests from consumer-defined
+    // BaseNode and Pin instances.
+    property <int> interaction-cancellation-watch: InteractionCancellation.version;
+    changed interaction-cancellation-watch => {
+        if root.last-applied-cancellation-version != InteractionCancellation.version {
+            root.apply-interaction-cancellation();
+        }
+    }
+    property <int> last-applied-cancellation-version: 0;
+    property <int> box-selection-gesture-watch: BoxSelectionGesture.version;
+    changed box-selection-gesture-watch => {
+        if BoxSelectionGesture.state == BoxSelectionGestureState.started {
+            root.begin-box-selection(
+                BoxSelectionGesture.x,
+                BoxSelectionGesture.y,
+                BoxSelectionGesture.extends-selection,
+                true);
+        } else if BoxSelectionGesture.state == BoxSelectionGestureState.updating {
+            root.update-box-selection(BoxSelectionGesture.x, BoxSelectionGesture.y);
+        } else if BoxSelectionGesture.state == BoxSelectionGestureState.complete {
+            root.finish-box-selection(BoxSelectionGesture.x, BoxSelectionGesture.y);
+            BoxSelectionGesture.state = BoxSelectionGestureState.idle;
+        }
+    }
+
+    // Capture modifier state without consuming the host's key events. This
+    // enables the marquee overlay before pointer hit-testing reaches an
+    // embedded control.
+    capture-key-pressed(event) => {
+        root.control-held = event.modifiers.control;
+        root.alt-held = event.modifiers.alt;
+        root.shift-held = event.modifiers.shift;
+        root.meta-held = event.modifiers.meta;
+        return reject;
+    }
+    capture-key-released(event) => {
+        root.control-held = event.modifiers.control;
+        root.alt-held = event.modifiers.alt;
+        root.shift-held = event.modifiers.shift;
+        root.meta-held = event.modifiers.meta;
+        return reject;
+    }
+    focus-lost(_) => {
+        root.control-held = false;
+        root.alt-held = false;
+        root.shift-held = false;
+        root.meta-held = false;
+        root.cancel-interactions();
+    }
+    changed visible => {
+        if !root.visible {
+            root.cancel-interactions();
+        }
+    }
+    changed enabled => {
+        if !root.enabled {
+            root.cancel-interactions();
+        }
+    }
 
     // === Callbacks TO Application (for computation) ===
     /// Compute link at position (world coordinates), returns link ID or -1
@@ -405,6 +469,65 @@ export component NodeEditor inherits FocusScope {
         root.selection-cleared();
     }
 
+    /// Begin a marquee in screen coordinates. Selection changes are deferred
+    /// until commit so cancellation preserves the host's current selection.
+    function begin-box-selection(x: length, y: length, extends-selection: bool, forced: bool) {
+        root.internal-is-box-selecting = true;
+        root.internal-box-selection-forced = forced;
+        root.box-start-x = x;
+        root.box-start-y = y;
+        root.box-current-x = x;
+        root.box-current-y = y;
+        background-ta.box-select-extends = extends-selection;
+    }
+
+    function update-box-selection(x: length, y: length) {
+        if root.internal-is-box-selecting {
+            root.box-current-x = x;
+            root.box-current-y = y;
+        }
+    }
+
+    function finish-box-selection(x: length, y: length) {
+        if root.internal-is-box-selecting {
+            root.box-current-x = x;
+            root.box-current-y = y;
+            root.internal-is-box-selecting = false;
+            root.internal-box-selection-forced = false;
+            root.box-selection-committed(
+                (root.selection-x - root.pan-x) / root.zoom,
+                (root.selection-y - root.pan-y) / root.zoom,
+                root.selection-width / root.zoom,
+                root.selection-height / root.zoom,
+                background-ta.box-select-extends);
+        }
+    }
+
+    function apply-interaction-cancellation() {
+        root.last-applied-cancellation-version = InteractionCancellation.version;
+        root.internal-is-context-menu-dragging = false;
+        root.internal-is-panning = false;
+        root.internal-is-box-selecting = false;
+        root.internal-box-selection-forced = false;
+        root.cancel-link-creation();
+        LinkCreation.state = LinkCreationState.idle;
+        LinkCreation.start-pin-id = 0;
+        DragState.is-dragging = false;
+        DragState.dragged-node-id = 0;
+        DragState.drag-offset-x = 0px;
+        DragState.drag-offset-y = 0px;
+        BoxSelectionGesture.state = BoxSelectionGestureState.idle;
+        NodeEditorInternalCallbacks.cancel-node-drag();
+    }
+
+    /// Cancel every transient pointer interaction. Hosts should call this
+    /// before conditionally removing an editor; hiding or disabling it invokes
+    /// the same path automatically.
+    public function cancel-interactions() {
+        InteractionCancellation.version += 1;
+        root.apply-interaction-cancellation();
+    }
+
     // === Trigger updates on viewport changes ===
     changed pan-x => {
         ViewportState.pan-x = root.pan-x;
@@ -442,6 +565,9 @@ export component NodeEditor inherits FocusScope {
         NodeEditorComputations.configuration-changed(
             root.grid-spacing / 1px, root.bezier-min-offset);
         GeometryVersion.version += 1;
+    }
+    changed box-selection-modifier => {
+        NodeEditorGestureConfig.box-selection-modifier = root.box-selection-modifier;
     }
     
     // Watch LinkCreation global for pin-initiated link creation
@@ -545,8 +671,6 @@ export component NodeEditor inherits FocusScope {
 
             // Cached link hit-test result to avoid redundant compute-link-at calls
             property <int> link-at-cursor: -1;
-            // Whether a box-selection modifier key is currently held
-            property <bool> modifier-forces-box-select: false;
             // Shift state captured at marquee start — the release event that
             // commits the box carries no modifiers of its own.
             property <bool> box-select-extends: false;
@@ -592,23 +716,18 @@ export component NodeEditor inherits FocusScope {
                         // Check if box selection should start:
                         // - Modifier key forces box selection even over links
                         // - Empty area allows box selection if box-selection-on-empty is true
-                        modifier-forces-box-select =
-                            (root.box-selection-modifier == BoxSelectionModifier.ctrl && event.modifiers.control)
-                            || (root.box-selection-modifier == BoxSelectionModifier.alt && event.modifiers.alt)
-                            || (root.box-selection-modifier == BoxSelectionModifier.shift && event.modifiers.shift);
+                        let modifier-forces-box-select = NodeEditorGestureConfig.forces-box-selection(
+                            event.modifiers.control,
+                            event.modifiers.alt,
+                            event.modifiers.shift,
+                            event.modifiers.meta);
 
                         if modifier-forces-box-select || (root.box-selection-on-empty && link-at-cursor < 0) {
-                            // Start box selection
-                            root.internal-is-box-selecting = true;
-                            box-select-extends = event.modifiers.shift;
-                            root.box-start-x = self.mouse-x;
-                            root.box-start-y = self.mouse-y;
-                            root.box-current-x = self.mouse-x;
-                            root.box-current-y = self.mouse-y;
-                            // Clear existing selection unless shift held
-                            if !event.modifiers.shift {
-                                root.clear-selection();
-                            }
+                            root.begin-box-selection(
+                                self.mouse-x,
+                                self.mouse-y,
+                                event.modifiers.shift,
+                                modifier-forces-box-select);
                         } else if link-at-cursor >= 0 {
                             // Clicked on a link - select it
                             root.select-link(link-at-cursor, event.modifiers.shift);
@@ -629,19 +748,14 @@ export component NodeEditor inherits FocusScope {
                         root.internal-is-panning = false;
                     }
                     if root.internal-is-box-selecting && event.button == PointerEventButton.left {
-                        root.internal-is-box-selecting = false;
-                        // Report the marquee in world coordinates (world = (screen - pan) / zoom);
-                        // the application hit-tests it and owns what gets selected.
-                        root.box-selection-committed(
-                            (root.selection-x - root.pan-x) / root.zoom,
-                            (root.selection-y - root.pan-y) / root.zoom,
-                            root.selection-width / root.zoom,
-                            root.selection-height / root.zoom,
-                            box-select-extends);
+                        root.finish-box-selection(self.mouse-x, self.mouse-y);
                     }
                     if root.internal-is-creating-link && event.button == PointerEventButton.left {
                         root.complete-link-creation();
                     }
+                }
+                if event.kind == PointerEventKind.cancel {
+                    root.cancel-interactions();
                 }
                 if event.kind == PointerEventKind.move {
                     if root.internal-is-context-menu-dragging {
@@ -660,8 +774,7 @@ export component NodeEditor inherits FocusScope {
                     root.pan-y = root.pan-start-offset-y + (self.mouse-y - root.pan-start-mouse-y);
                 }
                 if root.internal-is-box-selecting {
-                    root.box-current-x = self.mouse-x;
-                    root.box-current-y = self.mouse-y;
+                    root.update-box-selection(self.mouse-x, self.mouse-y);
                 }
                 if root.internal-is-creating-link {
                     root.update-link-end(self.mouse-x, self.mouse-y);
@@ -788,6 +901,62 @@ export component NodeEditor inherits FocusScope {
         update-pan(new-pan-x, new-pan-y) => {
             root.pan-x = new-pan-x;
             root.pan-y = new-pan-y;
+        }
+    }
+
+    // Enabled only while the configured modifier is held (or until a forced
+    // marquee releases). Its topmost position gives one owner the left-button
+    // gesture over links, consumer nodes, pins, and embedded controls. With no
+    // reserved modifier it is disabled, so normal child input is untouched.
+    forced-box-ta := TouchArea {
+        width: 100%;
+        height: 100%;
+        enabled: root.modifier-forces-box-select || root.internal-box-selection-forced;
+
+        scroll-event(_) => { return reject; }
+
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                if event.button == PointerEventButton.left {
+                    root.begin-box-selection(
+                        self.mouse-x,
+                        self.mouse-y,
+                        event.modifiers.shift,
+                        true);
+                } else if event.button == PointerEventButton.middle {
+                    root.internal-is-panning = true;
+                    root.pan-start-mouse-x = self.mouse-x;
+                    root.pan-start-mouse-y = self.mouse-y;
+                    root.pan-start-offset-x = root.pan-x;
+                    root.pan-start-offset-y = root.pan-y;
+                } else if event.button == PointerEventButton.right {
+                    root.context-menu-x = self.mouse-x;
+                    root.context-menu-y = self.mouse-y;
+                    root.internal-is-context-menu-dragging = true;
+                    root.context-menu-requested();
+                }
+            } else if event.kind == PointerEventKind.up {
+                if event.button == PointerEventButton.left {
+                    root.finish-box-selection(self.mouse-x, self.mouse-y);
+                } else if event.button == PointerEventButton.middle {
+                    root.internal-is-panning = false;
+                } else if event.button == PointerEventButton.right && root.internal-is-context-menu-dragging {
+                    root.internal-is-context-menu-dragging = false;
+                    root.context-menu-released(self.mouse-x, self.mouse-y);
+                }
+            } else if event.kind == PointerEventKind.cancel {
+                root.cancel-interactions();
+            } else if event.kind == PointerEventKind.move && root.internal-is-context-menu-dragging {
+                root.context-menu-dragged(self.mouse-x, self.mouse-y);
+            }
+        }
+
+        moved => {
+            if root.internal-is-panning {
+                root.pan-x = root.pan-start-offset-x + (self.mouse-x - root.pan-start-mouse-x);
+                root.pan-y = root.pan-start-offset-y + (self.mouse-y - root.pan-start-mouse-y);
+            }
+            root.update-box-selection(self.mouse-x, self.mouse-y);
         }
     }
 

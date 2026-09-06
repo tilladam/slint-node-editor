@@ -178,6 +178,8 @@ macro_rules! wire_node_editor {
         gc.on_remove_node_from_cache($setup.remove_node());
         gc.on_remove_pin_from_cache($setup.remove_pin());
         gc.on_reset_graph_cache($setup.reset_graph());
+        gc.on_start_node_drag($setup.start_node_drag());
+        gc.on_cancel_node_drag($setup.cancel_node_drag());
         gc.on_end_node_drag($setup.end_node_drag());
 
         // Computations

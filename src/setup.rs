@@ -117,12 +117,28 @@ where
         move || ctrl.reset_graph()
     }
 
+    /// Callback for `NodeEditorInternalCallbacks.on_start_node_drag`.
+    pub fn start_node_drag(&self) -> impl Fn(i32, bool, f32, f32) + 'static {
+        let ctrl = self.controller.clone();
+        move |node_id, _already_selected, _world_x, _world_y| {
+            ctrl.handle_node_drag_started(node_id);
+        }
+    }
+
+    /// Callback for a node drag cancelled before its normal end.
+    pub fn cancel_node_drag(&self) -> impl Fn() + 'static {
+        let ctrl = self.controller.clone();
+        move || ctrl.handle_node_drag_finished()
+    }
+
     /// Callback for `NodeEditorInternalCallbacks.on_end_node_drag`.
     ///
     /// Calls your drag-commit closure once, with the node the user dragged.
     pub fn end_node_drag(&self) -> impl Fn(i32, f32, f32) + 'static {
+        let ctrl = self.controller.clone();
         let on_committed = self.on_drag_committed.clone();
         move |node_id, delta_x, delta_y| {
+            ctrl.handle_node_drag_finished();
             on_committed(node_id, delta_x, delta_y);
         }
     }

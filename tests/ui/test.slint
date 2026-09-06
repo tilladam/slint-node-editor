@@ -1,8 +1,11 @@
 // Test UI for integration testing
 // Extends minimal example with all callbacks exposed for testing
 
+import { Button } from "std-widgets.slint";
+
 import {
     NodeEditor,
+    BoxSelectionModifier,
     BaseNode,
     Pin,
     PinTypes,
@@ -28,9 +31,10 @@ export struct NodeData {
 }
 
 // Re-export for Rust
-export { LinkData, GeometryVersion, DragState, HoverState, LinkCreation, LinkCreationState, NodeEditorInternalCallbacks, NodeEditorComputations }
+export { BoxSelectionModifier, LinkData, GeometryVersion, DragState, HoverState, LinkCreation, LinkCreationState, NodeEditorInternalCallbacks, NodeEditorComputations }
 
 component SimpleNode inherits BaseNode {
+    callback embedded-control-clicked();
     in property <string> title: "Node";
     in property <length> configured-width: 150px;
     in property <length> configured-height: 100px;
@@ -78,6 +82,15 @@ component SimpleNode inherits BaseNode {
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
     }
+
+    Button {
+        x: 50px;
+        y: 10px;
+        width: 60px;
+        height: 28px;
+        text: "Action";
+        clicked => { root.embedded-control-clicked(); }
+    }
 }
 
 export component MainWindow inherits Window {
@@ -96,6 +109,13 @@ export component MainWindow inherits Window {
     in-out property <length> pan-x <=> editor.pan-x;
     in-out property <length> pan-y <=> editor.pan-y;
     in-out property <float> zoom <=> editor.zoom;
+    in-out property <BoxSelectionModifier> box-selection-modifier <=> editor.box-selection-modifier;
+    in-out property <bool> box-selection-on-empty <=> editor.box-selection-on-empty;
+    in-out property <bool> editor-enabled <=> editor.enabled;
+    in-out property <bool> editor-visible <=> editor.visible;
+    out property <bool> is-selecting: editor.is-selecting;
+    out property <bool> is-creating-link: editor.is-creating-link;
+    in-out property <int> embedded-control-click-count: 0;
     in property <int> geometry-version: GeometryVersion.version;
     in property <length> test-node-width: 150px;
     in property <length> test-node-height: 100px;
@@ -125,9 +145,21 @@ export component MainWindow inherits Window {
         editor.refresh-links();
     }
 
+    public function cancel-interactions() {
+        editor.cancel-interactions();
+    }
+
+    public function focus-editor() {
+        editor.focus();
+    }
+    public function clear-editor-focus() {
+        editor.clear-focus();
+    }
+
     editor := NodeEditor {
         width: 100%;
         height: 100%;
+        has-link-selection: true;
 
         for data in root.nodes: SimpleNode {
             node-id: data.id;
@@ -141,6 +173,11 @@ export component MainWindow inherits Window {
             input-pin-type: data.id == 1 ? root.test-input-pin-type : PinTypes.input;
             input-pin-visible: data.id == 1 ? root.test-input-pin-visible : true;
             selected: data.selected;
+            embedded-control-clicked => {
+                if data.id == 1 {
+                    root.embedded-control-click-count += 1;
+                }
+            }
         }
     }
 }

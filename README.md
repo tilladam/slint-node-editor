@@ -287,6 +287,8 @@ in property <length> link-hover-distance: 8px; // Click tolerance for links
 in property <length> pin-hit-radius: 10px;     // Hit radius for pins
 in property <int> link-hit-samples: 20;        // Bezier samples for hit-testing
 in property <float> bezier-min-offset: 50.0;   // Min horizontal offset for curves
+in property <bool> box-selection-on-empty: true;
+in property <BoxSelectionModifier> box-selection-modifier: BoxSelectionModifier.ctrl;
 
 // Minimap
 in property <bool> minimap-enabled: false;
@@ -411,6 +413,17 @@ example, which spans two node models sharing one id space.
 Multi-node drag needs no wiring: `GraphLogic::commit_drag` moves the dragged
 node plus every row the model shows as selected, which is the same data the
 editor renders.
+
+`box-selection-modifier` reserves a left-button marquee over every editor
+surface, including links, nodes, pins, and controls embedded in nodes. `ctrl`
+also accepts Command/Meta. `none` reserves no gestures; ordinary input reaches
+each surface and `box-selection-on-empty` still controls background marquees.
+The editor observes modifier keys without consuming them, so application
+shortcuts continue to receive the same key events.
+
+Pointer cancellation, release outside, focus loss, hiding, and disabling clear
+transient drag, link, pan, context-menu, and marquee state. A host that removes
+an editor conditionally should call `cancel-interactions()` before removal.
 
 **Callbacks (Events):**
 

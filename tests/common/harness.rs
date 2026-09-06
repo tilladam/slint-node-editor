@@ -368,6 +368,23 @@ impl MinimalTestHarness {
         self.pump_events();
     }
 
+    /// Simulate the pointer leaving the native window. Slint turns an active
+    /// pointer grab into `PointerEventKind::Cancel`.
+    pub fn pointer_exit(&self) {
+        self.window
+            .window()
+            .dispatch_event(WindowEvent::PointerExited);
+        self.pump_events();
+    }
+
+    /// Simulate native window activation or focus loss.
+    pub fn set_window_active(&self, active: bool) {
+        self.window
+            .window()
+            .dispatch_event(WindowEvent::WindowActiveChanged(active));
+        self.pump_events();
+    }
+
     /// Simulate a complete click (down + up) at the given position.
     pub fn click(&self, x: f32, y: f32) {
         self.mouse_down(x, y);

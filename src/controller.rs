@@ -225,6 +225,11 @@ impl NodeEditorController {
         self.state.borrow_mut().dragged_node_id = node_id;
     }
 
+    /// Clear controller state after a drag ends or is cancelled.
+    pub fn handle_node_drag_finished(&self) {
+        self.state.borrow_mut().dragged_node_id = 0;
+    }
+
     /// Set the zoom level (called from update-viewport).
     #[deprecated(since = "0.2.0", note = "Use set_viewport() which also updates pan state")]
     pub fn set_zoom(&self, zoom: f32) {
@@ -651,6 +656,16 @@ mod tests {
         assert!(ctrl.cache.borrow().node_rects.is_empty());
         assert!(ctrl.cache.borrow().pin_positions.is_empty());
         assert!(ctrl.state.borrow().links.is_empty());
+        assert_eq!(ctrl.dragged_node_id(), 0);
+    }
+
+    #[test]
+    fn finishing_drag_clears_drag_state() {
+        let ctrl = NodeEditorController::new();
+        ctrl.handle_node_drag_started(1);
+
+        ctrl.handle_node_drag_finished();
+
         assert_eq!(ctrl.dragged_node_id(), 0);
     }
 
