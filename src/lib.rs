@@ -14,6 +14,10 @@
 //!
 //! ## Quick Start
 //!
+//! This is a composition fragment. The
+//! [compiled downstream quick start](https://github.com/tilladam/slint-node-editor/tree/main/smoke/downstream)
+//! contains the Cargo manifest, build script, Slint UI and Rust host.
+//!
 //! ```slint
 //! import { NodeEditor, BaseNode, Pin, PinTypes } from "@nodeeditor";
 //!
@@ -145,9 +149,12 @@ pub use tracking::GeometryTracker;
 /// This macro sets up default behavior for geometry tracking, computations, and grid updates.
 /// You can override any callback after calling this macro - the last `.on_*()` call wins.
 ///
-/// # Example
+/// # Generated-UI integration
 ///
-/// ```ignore
+/// This fragment assumes the generated globals and window members from the
+/// [compiled quick start](https://github.com/tilladam/slint-node-editor/tree/main/smoke/downstream).
+///
+/// ```text
 /// use slint_node_editor::{NodeEditorSetup, wire_node_editor};
 ///
 /// let setup = NodeEditorSetup::new(|node_id, dx, dy| {
@@ -257,9 +264,12 @@ macro_rules! wire_node_editor {
 /// [`resolve_box`]: crate::selection::resolve_box
 /// [`selection`]: crate::selection
 ///
-/// # Example
+/// # Generated-UI integration
 ///
-/// ```ignore
+/// This fragment assumes the generated callbacks and models from the
+/// [compiled quick start](https://github.com/tilladam/slint-node-editor/tree/main/smoke/downstream).
+///
+/// ```text
 /// wire_node_editor!(window, setup);
 /// wire_selection!(window, setup, nodes);
 /// // …or, with selectable links:

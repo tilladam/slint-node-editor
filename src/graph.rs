@@ -10,7 +10,10 @@ use std::fmt;
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// use slint::Color;
+/// use slint_node_editor::LinkModel;
+///
 /// struct MyLink {
 ///     id: i32,
 ///     from: i32,
@@ -36,7 +39,7 @@ pub trait LinkModel {
     /// Pin ID where the link ends (typically an input pin)
     fn end_pin_id(&self) -> i32;
     /// Color for rendering the link (default: white).
-    /// Used as fallback when `status()` returns 0 (no status).
+    /// Used as fallback when `status()` returns -1 (no status).
     fn color(&self) -> Color {
         Color::from_rgb_u8(255, 255, 255)
     }
@@ -46,7 +49,8 @@ pub trait LinkModel {
     }
     /// Computation status for the link (default: -1 = no status, use color field).
     /// When >= 0, the Slint side resolves the color from `LinkStatusColors`.
-    /// Standard values: -1=none, 0=idle, 1=running, 2=succeeded, 3=failed.
+    /// Standard values: -1=none, 0=idle, 1=queued, 2=running,
+    /// 3=succeeded, 4=failed.
     fn status(&self) -> i32 {
         -1
     }
@@ -280,7 +284,13 @@ impl GraphLogic {
     /// * `predicate` - Function that extracts ID from a node
     ///
     /// # Example
-    /// ```ignore
+    /// ```
+    /// use slint::VecModel;
+    /// use slint_node_editor::GraphLogic;
+    ///
+    /// #[derive(Clone)]
+    /// struct Node { id: i32 }
+    /// let nodes_model = VecModel::from(vec![Node { id: 42 }]);
     /// let (index, node) = GraphLogic::find_node_by_id(
     ///     &nodes_model,
     ///     42,
@@ -382,7 +392,11 @@ impl fmt::Display for ValidationError {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// use slint_node_editor::{
+///     GeometryCache, LinkValidator, NodeGeometry, ValidationResult,
+/// };
+///
 /// struct MyValidator;
 ///
 /// impl<N, L> LinkValidator<N, L> for MyValidator
@@ -393,8 +407,8 @@ impl fmt::Display for ValidationError {
 ///         &self,
 ///         start_pin: i32,
 ///         end_pin: i32,
-///         cache: &GeometryCache<N>,
-///         links: &[L],
+///         _cache: &GeometryCache<N>,
+///         _links: &[L],
 ///     ) -> ValidationResult {
 ///         // Custom validation logic
 ///         ValidationResult::Valid
@@ -433,9 +447,20 @@ pub trait LinkValidator<N = SimpleNodeGeometry, L = ()> {
 ///
 /// # Example
 ///
-/// ```ignore
-/// let validator = BasicLinkValidator::new(2); // output_type = 2
-/// let result = validator.validate(start_pin, end_pin, &cache, &links);
+/// ```
+/// use slint_node_editor::{
+///     BasicLinkValidator, GeometryCache, LinkValidator, SimpleLink,
+///     SimpleNodeGeometry,
+/// };
+///
+/// let mut cache = GeometryCache::<SimpleNodeGeometry>::new();
+/// cache.update_node_rect(1, 0.0, 0.0, 100.0, 60.0);
+/// cache.update_node_rect(2, 200.0, 0.0, 100.0, 60.0);
+/// cache.handle_pin_report(3, 1, 2, 100.0, 30.0);
+/// cache.handle_pin_report(4, 2, 1, 0.0, 30.0);
+/// let links = Vec::<SimpleLink>::new();
+/// let validator = BasicLinkValidator::new(2);
+/// assert!(validator.validate(3, 4, &cache, &links).is_valid());
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct BasicLinkValidator {
@@ -498,9 +523,17 @@ where
 ///
 /// # Example
 ///
-/// ```ignore
-/// let validator = NoDuplicatesValidator;
-/// let result = validator.validate(start_pin, end_pin, &cache, &links);
+/// ```
+/// use slint::{Color};
+/// use slint_node_editor::{
+///     GeometryCache, LinkValidator, NoDuplicatesValidator, SimpleLink,
+///     SimpleNodeGeometry, ValidationResult,
+/// };
+///
+/// let cache = GeometryCache::<SimpleNodeGeometry>::new();
+/// let links = vec![SimpleLink::new(1, 3, 4, Color::from_rgb_u8(1, 2, 3))];
+/// let result = NoDuplicatesValidator.validate(3, 4, &cache, &links);
+/// assert!(matches!(result, ValidationResult::Invalid(_)));
 /// ```
 #[derive(Clone, Debug, Default)]
 pub struct NoDuplicatesValidator;
@@ -535,12 +568,23 @@ where
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// use slint_node_editor::{
+///     BasicLinkValidator, CompositeValidator, GeometryCache, LinkValidator,
+///     NoDuplicatesValidator, SimpleLink, SimpleNodeGeometry,
+/// };
+///
+/// let mut cache = GeometryCache::<SimpleNodeGeometry>::new();
+/// cache.update_node_rect(1, 0.0, 0.0, 100.0, 60.0);
+/// cache.update_node_rect(2, 200.0, 0.0, 100.0, 60.0);
+/// cache.handle_pin_report(3, 1, 2, 100.0, 30.0);
+/// cache.handle_pin_report(4, 2, 1, 0.0, 30.0);
+/// let links = Vec::<SimpleLink>::new();
 /// let validator = CompositeValidator::new()
 ///     .with(BasicLinkValidator::new(2))
 ///     .with(NoDuplicatesValidator);
 ///
-/// let result = validator.validate(start_pin, end_pin, &cache, &links);
+/// assert!(validator.validate(3, 4, &cache, &links).is_valid());
 /// ```
 pub struct CompositeValidator<N = SimpleNodeGeometry, L = ()> {
     validators: Vec<Box<dyn LinkValidator<N, L>>>,

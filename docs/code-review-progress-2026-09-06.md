@@ -4,7 +4,7 @@ This document tracks work against the findings in
 [code-review-2026-09-06.md](code-review-2026-09-06.md). Update it when a finding
 is started, completed, reopened, or intentionally deferred.
 
-Last updated: 2026-09-06 through R4.
+Last updated: 2026-09-06 through R5.
 
 ## Status
 
@@ -19,8 +19,8 @@ Last updated: 2026-09-06 through R4.
 | R1 | P1 | Complete | 1. Correctness | `83f7145`, `b097948` | Geometry changes now invalidate link bindings after updating the cache. Programmatic movement, sizing, pointer dragging, drag commits, and batched updates have regression coverage. |
 | R2 | P1 | Complete | 1. Correctness | `1363ce7` | Added explicit node, pin, and graph-reset lifecycle operations; identity replacement; cache and registered-link cleanup; interaction-state cleanup; advanced-example deletion wiring; and a tested hidden-pin policy. |
 | R3 | P1 | Complete | 1. Correctness | `ff274c9` | Default picking now uses the rendered world curve and converts screen tolerance once. Custom routes can supply their rendered geometry; the orthogonal example shares one route with its picker. |
-| R4 | P1 | Complete | 2. Interaction and public contract | This commit | Globals are canonical for computations and building-block events; component configuration synchronizes with the controller; public geometry functions use the lifecycle; obsolete members were removed or documented as host conveniences. |
-| R5 | P1 | Open | 2. Interaction and public contract | — | Replace the quick start with a compiled, working consumer. |
+| R4 | P1 | Complete | 2. Interaction and public contract | `0b454a9` | Globals are canonical for computations and building-block events; component configuration synchronizes with the controller; public geometry functions use the lifecycle; obsolete members were removed or documented as host conveniences. |
+| R5 | P1 | Complete | 2. Interaction and public contract | This commit | The quick start is a tested downstream crate using exact git dependencies; its docs cover generated members, ownership, callback replacement, units, IDs, and lifecycle. |
 | R6 | P2 | Open | 1. Correctness | — | Normalize endpoints before duplicate checking. |
 | R7 | P2 | Open | 2. Interaction and public contract | — | Apply gesture ownership and configured modifiers consistently. |
 | R8 | P2 | Open | 1. Correctness | — | Pick the nearest eligible pin with a deterministic tie rule. |
@@ -33,9 +33,9 @@ Last updated: 2026-09-06 through R4.
 | R15 | P1 release | Open | 3. Release hardening | — | Complete packaging gates and document the currently usable dependency source. |
 | R16 | P3 | Open | 3. Release hardening | — | Clean up examples and make maintenance checks reliable teaching material. |
 
-Overall: **4 of 16 findings complete**. Correctness batch: **3 of 5
-findings complete**. Interaction and public contract batch: **1 of 5 findings
-complete**. The next item by review order is **R5**.
+Overall: **5 of 16 findings complete**. Correctness batch: **3 of 5
+findings complete**. Interaction and public contract batch: **2 of 5 findings
+complete**. The next item by review order is **R6**.
 
 ## Completed work
 
@@ -75,7 +75,7 @@ Completed in `1363ce7`.
 
 ### R3 — use the rendered world curve for picking
 
-Completed in this commit.
+Completed in `ff274c9`.
 
 - Default link picking constructs the same zoom-independent world-space
   `CubicBezier` as rendering.
@@ -93,7 +93,7 @@ Completed in this commit.
 
 ### R4 — reconcile public component APIs with globals
 
-Completed in this commit.
+Completed in `0b454a9`.
 
 - `NodeEditorComputations` is the canonical computation surface. It now owns
   grid update requests and the synchronized grid-spacing and Bézier settings
@@ -112,6 +112,25 @@ Completed in this commit.
   observes the resulting controller/grid/path/node geometry, exercises public
   reporting and pin computation, and receives a real BaseNode double-click
   through the public event global.
+
+### R5 — replace the quick start with a compiled consumer
+
+Completed in this commit.
+
+- The downstream smoke crate is now the complete quick-start application. It
+  resolves `@nodeeditor` through dependency metadata and pins the currently
+  usable node-editor and Slint git revisions.
+- Its UI and Rust host create nodes, project selection synchronously, commit
+  movement, validate and normalize connections, reject duplicates, remove
+  connected links, retire geometry, and add nodes through visible controls.
+- A headless downstream test exercises selection, movement, connection in both
+  directions, deletion with link/cache cleanup, and node creation.
+- The README links the four tested files and documents macro imports and
+  generated members, single-handler replacement semantics, coordinate units,
+  integer ID domains, host ownership, and graph/geometry lifecycle.
+- Obsolete component wiring was removed from the controller, tracker, and link
+  manager documentation. Complete Rust examples are executable doctests;
+  generated-UI fragments are labeled and linked to the downstream fixture.
 
 ## Verification
 
@@ -136,6 +155,16 @@ After R4:
 - `cargo test --workspace --all-features --locked`: **402 tests passed**; 18
   doctests remained ignored.
 - `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`:
+  passed.
+- `git diff --check`: passed.
+
+After R5:
+
+- `cargo test --workspace --all-features --locked`: **402 tests passed** plus
+  **13 executable doctests passed**, with no ignored doctests.
+- `./smoke/run.sh git`: the exact documented git consumer passed its end-to-end
+  edit test outside the workspace.
+- Workspace and downstream `cargo clippy --all-targets ... -- -D warnings`:
   passed.
 - `git diff --check`: passed.
 

@@ -1,21 +1,20 @@
 //! Convenience helpers for geometry tracking setup.
 //!
 //! This module provides [`GeometryTracker`], a wrapper around [`GeometryCache`]
-//! that simplifies wiring up Slint callbacks for position tracking.
+//! that supplies callback closures for position tracking.
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```
 //! use slint_node_editor::GeometryTracker;
 //!
 //! let tracker = GeometryTracker::new();
-//!
-//! // Wire up callbacks (one-time setup)
-//! window.on_node_rect_changed(tracker.node_rect_callback());
-//! window.on_pin_position_changed(tracker.pin_position_callback());
-//!
-//! // Get the cache for use elsewhere
+//! let report_node = tracker.node_rect_callback();
+//! let report_pin = tracker.pin_position_callback();
+//! report_node(1, 10.0, 20.0, 100.0, 60.0);
+//! report_pin(3, 1, 2, 100.0, 30.0);
 //! let cache = tracker.cache();
+//! assert_eq!(cache.borrow().pin_positions[&3].node_id, 1);
 //! ```
 
 use crate::hit_test::{NodeGeometry, SimpleNodeGeometry};
@@ -36,17 +35,21 @@ use std::rc::Rc;
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// use slint_node_editor::GeometryTracker;
+///
 /// // Create tracker with default SimpleNodeGeometry
 /// let tracker = GeometryTracker::new();
 ///
-/// // Wire up Slint callbacks
-/// window.on_node_rect_changed(tracker.node_rect_callback());
-/// window.on_pin_position_changed(tracker.pin_position_callback());
+/// let report_node = tracker.node_rect_callback();
+/// let report_pin = tracker.pin_position_callback();
+/// report_node(1, 10.0, 20.0, 100.0, 60.0);
+/// report_pin(3, 1, 2, 100.0, 30.0);
 ///
 /// // Access the cache for hit testing, path computation, etc.
 /// let cache = tracker.cache();
-/// let pin_id = cache.borrow().find_pin_at(x, y, 10.0);
+/// let pin_id = cache.borrow().find_pin_at(110.0, 50.0, 10.0);
+/// assert_eq!(pin_id, 3);
 /// ```
 pub struct GeometryTracker<N = SimpleNodeGeometry> {
     cache: Rc<RefCell<GeometryCache<N>>>,
@@ -89,10 +92,13 @@ where
 {
     /// Get a callback for pin position updates.
     ///
-    /// Wire this to the Slint `on_pin_position_changed` callback:
+    /// The returned closure accepts world-space pin data:
     ///
-    /// ```ignore
-    /// window.on_pin_position_changed(tracker.pin_position_callback());
+    /// ```
+    /// use slint_node_editor::GeometryTracker;
+    /// let tracker: GeometryTracker = GeometryTracker::new();
+    /// let report = tracker.pin_position_callback();
+    /// report(3, 1, 2, 100.0, 30.0);
     /// ```
     ///
     /// The callback signature matches Slint's generated callback:
@@ -110,10 +116,13 @@ where
 impl GeometryTracker<SimpleNodeGeometry> {
     /// Get a callback for node rectangle updates.
     ///
-    /// Wire this to the Slint `on_node_rect_changed` callback:
+    /// The returned closure accepts a world-space node rectangle:
     ///
-    /// ```ignore
-    /// window.on_node_rect_changed(tracker.node_rect_callback());
+    /// ```
+    /// use slint_node_editor::GeometryTracker;
+    /// let tracker = GeometryTracker::new();
+    /// let report = tracker.node_rect_callback();
+    /// report(1, 10.0, 20.0, 100.0, 60.0);
     /// ```
     ///
     /// The callback signature matches Slint's generated callback:
@@ -144,7 +153,9 @@ where
     ///
     /// # Example
     ///
-    /// ```ignore
+    /// ```
+    /// use slint_node_editor::{GeometryTracker, NodeGeometry};
+    ///
     /// #[derive(Clone, Copy)]
     /// struct MyNodeGeometry {
     ///     id: i32,
@@ -158,13 +169,14 @@ where
     /// }
     ///
     /// let tracker = GeometryTracker::<MyNodeGeometry>::new();
-    /// window.on_node_rect_changed(tracker.node_rect_callback_with(|id, x, y, w, h| {
+    /// let report = tracker.node_rect_callback_with(|id, x, y, w, h| {
     ///     MyNodeGeometry {
     ///         id,
     ///         bounds: (x, y, w, h),
     ///         collapsed: false,
     ///     }
-    /// }));
+    /// });
+    /// report(1, 10.0, 20.0, 100.0, 60.0);
     /// ```
     pub fn node_rect_callback_with<F>(&self, convert: F) -> impl Fn(i32, f32, f32, f32, f32) + Clone
     where

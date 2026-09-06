@@ -5,29 +5,22 @@
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```
 //! use slint_node_editor::{GeometryTracker, LinkManager, SimpleLink};
 //! use slint::Color;
 //!
-//! // Set up geometry tracking
 //! let tracker = GeometryTracker::new();
-//! window.on_node_rect_changed(tracker.node_rect_callback());
-//! window.on_pin_position_changed(tracker.pin_position_callback());
+//! let report_node = tracker.node_rect_callback();
+//! let report_pin = tracker.pin_position_callback();
+//! report_node(1, 0.0, 0.0, 100.0, 50.0);
+//! report_node(2, 200.0, 100.0, 100.0, 50.0);
+//! report_pin(3, 1, 2, 100.0, 25.0);
+//! report_pin(4, 2, 1, 0.0, 25.0);
 //!
-//! // Set up link management
 //! let mut links = LinkManager::new(tracker.cache());
-//!
-//! // Add a link with default line width (2.0)
-//! links.add(SimpleLink::new(1, output_pin, input_pin, Color::from_rgb_u8(100, 180, 255)));
-//!
-//! // Or add a link with custom line width
-//! links.add(SimpleLink::with_line_width(2, output_pin, input_pin, Color::from_rgb_u8(255, 100, 100), 4.0));
-//!
-//! // Connect to Slint
-//! window.set_link_paths(links.paths());
-//!
-//! // Update paths when geometry changes (in callbacks)
-//! links.update_paths(zoom, bezier_offset);
+//! links.add(SimpleLink::new(1, 3, 4, Color::from_rgb_u8(100, 180, 255)));
+//! links.update_paths(1.0);
+//! assert_eq!(links.ids().collect::<Vec<_>>(), vec![1]);
 //! ```
 
 use crate::graph::LinkModel;
@@ -87,7 +80,10 @@ where
 /// to a Slint `VecModel`. After binding, every call to [`update_paths`](Self::update_paths)
 /// automatically updates the Slint model.
 ///
-/// ```ignore
+/// This fragment assumes the generated `LinkRow` and window types from the
+/// host's Slint UI; the complete binding is application-specific.
+///
+/// ```text
 /// let mut links = LinkManager::new(cache);
 /// links.add(SimpleLink::new(1, start_pin, end_pin, color));
 ///

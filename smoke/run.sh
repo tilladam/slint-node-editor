@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Downstream smoke test: build a crate that is not in this workspace against
-# slint-node-editor and make it compile `import … from "@nodeeditor";`.
+# Downstream smoke test: test the compiled quick-start crate outside this
+# workspace against slint-node-editor.
 #
 # This is the check `cargo publish --dry-run` cannot do. A dry-run compiles
 # only the Rust library; it never parses a single .slint file, so a broken
 # component — or a library name that silently fails to resolve — passes it.
 #
 #   ./smoke/run.sh            # path mode: against this checkout
+#   ./smoke/run.sh git        # exact git revisions documented in README
 #   ./smoke/run.sh included   # against only the files `include` would ship
 #   ./smoke/run.sh packaged   # against an extracted `cargo package` tarball
 #
@@ -29,6 +30,9 @@ mode="${1:-path}"
 case "$mode" in
 path)
     library="$root"
+    ;;
+git)
+    library=""
     ;;
 included)
     # cargo's own include filter, without needing `cargo package` to succeed.
@@ -57,7 +61,7 @@ packaged)
     library="$root/target/smoke-package/slint-node-editor-$version"
     ;;
 *)
-    echo "usage: $0 [path|included|packaged]" >&2
+    echo "usage: $0 [path|git|included|packaged]" >&2
     exit 2
     ;;
 esac
@@ -68,16 +72,21 @@ staging="$root/target/smoke-fixture"
 rm -rf "$staging"
 mkdir -p "$staging"
 cp -R "$root/smoke/downstream/." "$staging/"
+if [[ "$mode" != "git" ]]; then
 python3 - "$staging/Cargo.toml" "$library" <<'PY'
 import sys
 manifest, library = sys.argv[1], sys.argv[2]
 text = open(manifest).read()
-old = 'slint-node-editor = { path = "../.." }'
-assert old in text, "fixture manifest no longer declares the path dependency"
+old = 'slint-node-editor = { git = "https://github.com/tilladam/slint-node-editor", rev = "0b454a9839af39de213839c8de44793dbbd5d993" }'
+assert old in text, "fixture manifest no longer declares the documented git dependency"
 open(manifest, 'w').write(
     text.replace(old, f'slint-node-editor = {{ path = "{library}" }}'))
 PY
+    source_description="$library"
+else
+    source_description="the documented git revisions"
+fi
 
-echo "smoke: building downstream fixture against $library"
-cargo build --manifest-path "$staging/Cargo.toml"
+echo "smoke: testing downstream quick start against $source_description"
+cargo test --manifest-path "$staging/Cargo.toml" --target-dir "$root/target/smoke-target"
 echo "smoke: ok ($mode mode)"

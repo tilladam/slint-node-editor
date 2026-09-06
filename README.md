@@ -43,100 +43,172 @@ https://github.com/user-attachments/assets/f0e8d69c-19da-4acf-b3e1-ea7e6c1324d8
 
 ## Quick Start
 
-### 1. Add to Your Project
+The quick start is a complete downstream crate, compiled outside this workspace
+by [`smoke/run.sh git`](smoke/run.sh). Copy its four application files:
+
+- [`Cargo.toml`](smoke/downstream/Cargo.toml)
+- [`build.rs`](smoke/downstream/build.rs)
+- [`ui/app.slint`](smoke/downstream/ui/app.slint)
+- [`src/main.rs`](smoke/downstream/src/main.rs)
+
+It starts with two nodes. Click a node to select it, drag its body to move it,
+drag from one pin to the other to connect the nodes, and use the toolbar to add
+or delete nodes.
+
+### 1. Declare the current dependency source
+
+The crate is not yet available from crates.io. Use the tested git revision
+below. Slint is pinned to the same revision used by the library; the software
+renderer keeps this setup portable and avoids a native graphics SDK dependency.
 
 ```toml
-# In your Cargo.toml
+[workspace]
+
+[package]
+name = "node-editor-quick-start"
+version = "0.1.0"
+edition = "2021"
+
 [dependencies]
-slint = "1.18"
-slint-node-editor = "0.1"
+slint = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software"] }
+slint-node-editor = { git = "https://github.com/tilladam/slint-node-editor", rev = "0b454a9839af39de213839c8de44793dbbd5d993" }
 
 [build-dependencies]
-# `experimental-module-builds` is what lets the Slint compiler resolve the
-# `@nodeeditor` import below. You get it transitively today, because cargo
-# unifies build-dependency features and slint-node-editor enables it — but
-# declare it anyway, so your build does not depend on that.
-slint-build = { version = "1.18", features = ["experimental-module-builds"] }
+slint-build = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2", features = ["experimental-module-builds"] }
 ```
 
-Requires Rust 1.92, which is Slint 1.18's minimum, not ours.
+The current dependency graph requires Rust 1.92. The standalone fixture also
+has a test-only backend dependency; it is unnecessary in an application.
 
-### 2. Import Core Components
+### 2. Compile the Slint UI
 
-```slint
-// In your main .slint file
-import { NodeEditor, BaseNode, Pin, Link, LinkData, PinTypes } from "@nodeeditor";
-```
-
-### 3. Configure build.rs
-
-Nothing special — `@nodeeditor` resolves from the dependency's own metadata:
+`experimental-module-builds` lets `@nodeeditor` resolve from dependency
+metadata. The complete `build.rs` is:
 
 ```rust
 fn main() {
-    slint_build::compile("ui/main.slint").unwrap();
+    slint_build::compile("ui/app.slint").unwrap();
 }
 ```
 
-The components ship as a [Slint library
-module](https://github.com/slint-ui/slint/issues/154). That mechanism is
-marked experimental upstream and may change; if it does, this crate needs a new
-release, and pinning `slint-node-editor` to an exact version is the safe move.
+No library paths or environment variables are required.
 
-Data types declared in the `.slint` sources — `LinkData`, `MinimapNode`,
-`MinimapPosition`, `LinkCreationState`, `BoxSelectionModifier` — are re-exported
-from the Rust crate, so reach for them there:
+### 3. Compose the editor
 
-```rust
-use slint_node_editor::LinkData;
-```
-
-### 4. Create a Simple Node
+The complete compiled UI is [`ui/app.slint`](smoke/downstream/ui/app.slint).
+This excerpt shows the required integration surface:
 
 ```slint
-component Node inherits BaseNode {
-    Text { text: "My Node"; color: white; }
+// Excerpt — copy the complete linked file above.
+import {
+    NodeEditor, BaseNode, Pin, PinTypes,
+    NodeEditorInternalCallbacks, NodeEditorComputations, LinkData,
+} from "@nodeeditor";
+
+export { PinTypes, NodeEditorInternalCallbacks, NodeEditorComputations }
+
+component QuickNode inherits BaseNode {
+    node-width: 180px;
+    node-height: 80px;
+
     Pin {
-        pin-type: PinTypes.input;
+        pin-id: root.node-id * 2;
         node-id: root.node-id;
-        // Pass required context for drag handling
-        zoom: root.zoom;
+        pin-type: PinTypes.input;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
     }
 }
-```
 
-### 5. Wire Up the NodeEditor Component
+export component App inherits Window {
+    in property <[NodeData]> nodes;
+    in property <[LinkData]> links <=> editor.links;
 
-```slint
-export component MainWindow inherits Window {
-    width: 1200px;
-    height: 800px;
+    // Required names used by wire_node_editor! for grid generation.
+    in-out property <string> grid-commands <=> editor.grid-commands;
+    out property <float> width_: editor.width / 1px;
+    out property <float> height_: editor.height / 1px;
 
-    in property <[LinkData]> links; // Provided by your Rust backend
+    // Required by wire_selection! and the host link policy.
+    callback link-requested <=> editor.link-requested;
+    callback node-selected <=> editor.node-selected;
+    callback selection-cleared <=> editor.selection-cleared;
+    callback box-selection-committed <=> editor.box-selection-committed;
 
-    NodeEditor {
-        id: editor;
-        links: root.links; // Bind links model
-
-        // Provide your node data as @children
-        for node in nodes: Node {
+    editor := NodeEditor {
+        for node in root.nodes: QuickNode {
             node-id: node.id;
-            world-x: node.x * 1px; // Convert float to length
+            world-x: node.x * 1px;
             world-y: node.y * 1px;
-            
-            // Pass viewport state for local coordinate calculation
-            zoom: editor.zoom;
-            pan-x: editor.pan-x;
-            pan-y: editor.pan-y;
+            selected: node.selected;
         }
-
-        // Implement callbacks (see Callbacks section below)
-        // Note: Use NodeEditorController in Rust to handle these easily
     }
 }
 ```
+
+Each pin needs a unique positive `pin-id`, its owning `node-id` and type, and
+the node's screen position. A complete node normally supplies both an input and
+an output pin, as the fixture does.
+
+### 4. Wire the Rust side
+
+The complete compiled implementation is
+[`src/main.rs`](smoke/downstream/src/main.rs). The central setup is:
+
+```rust
+// Excerpt — NodeData implements MovableNode in the complete linked file.
+let setup = NodeEditorSetup::new({
+    let nodes = nodes.clone();
+    move |dragged, dx, dy| GraphLogic::commit_drag(&nodes, dragged, dx, dy)
+});
+
+wire_node_editor!(window, setup);
+wire_selection!(window, setup, nodes);
+```
+
+Keep `LinkPath` plus the two macros and setup types in Rust scope. The generated
+`NodeEditorInternalCallbacks` and `NodeEditorComputations` types come from the
+Slint exports shown above. `wire_node_editor!` installs geometry,
+route, pin-picking, viewport and grid handlers. `wire_selection!` resolves each
+selection intent immediately and writes the absolute result into row
+`selected` flags before a drag continues.
+
+Slint callbacks have one handler. Install application overrides after the
+macros; the last `on_*` handler replaces the earlier one. Replacing a
+computation or lifecycle handler also takes responsibility for the behavior the
+macro supplied.
+
+The host handles `link-requested`: validate and normalize the two pins, then add
+a `LinkData` row. The fixture rejects same-node, same-type and duplicate links.
+Keyboard and toolbar policy is also host-owned. Its delete handler removes
+connected logical links and selected node rows, then invokes
+`NodeEditorInternalCallbacks.remove-node(id)` to retire cached geometry and
+interaction state.
+
+### 5. Run and edit
+
+```sh
+cargo run
+```
+
+`BaseNode` and `Pin` automatically publish geometry after they render. Model
+positions, drag deltas, cached rectangles, pin offsets, link picking and box
+selection use world units. Screen positions are `world * zoom + pan`; pointer
+hit tolerances are converted to world units internally.
+
+IDs are integers with these current domains:
+
+| Kind | Contract |
+|---|---|
+| Node | Unique while live; `0` is reserved for “no node”; negative IDs are supported |
+| Pin | Unique and positive while live; otherwise opaque to the library |
+| Link | Unique and nonnegative while live; `-1` means “no link” in picking |
+
+When replacing the whole graph, install the new models and invoke
+`NodeEditorInternalCallbacks.reset-graph()`. When seeding geometry without live
+components, call `NodeEditor.report-node-rect` and
+`NodeEditor.report-pin-position`; those functions update the same cache and
+invalidation lifecycle used by `BaseNode` and `Pin`.
 
 ## Core Concepts
 
@@ -270,8 +342,10 @@ last installed handler wins.
 
 ```slint
 NodeEditorComputations.compute-pin-at(world-x, world-y, world-radius);
-NodeEditorComputations.compute-link-path(start-pin, end-pin, geometry-version);
-NodeEditorComputations.compute-link-preview-path(start-x, start-y, end-x, end-y, zoom, offset);
+NodeEditorComputations.compute-link-path(start-pin, end-pin, geometry-version); // world geometry
+NodeEditorComputations.compute-link-preview-path(screen-start-x, screen-start-y,
+                                                  screen-end-x, screen-end-y,
+                                                  zoom, world-offset);
 NodeEditorComputations.request-grid-update();
 ```
 
@@ -316,7 +390,8 @@ On the Rust side the `selection` module holds the policy — `resolve_click` and
 **absolute set**, never a delta, and both resolvers are order-stable.
 
 `wire_selection!` composes them for the common case — rows with `id` and
-`selected` fields — and keeps no state of its own:
+`selected` fields — and keeps no state of its own. This wiring fragment uses
+the models and setup constructed in the compiled quick start:
 
 ```rust
 let setup = NodeEditorSetup::new({
@@ -385,10 +460,14 @@ in property <int> node-id;             // Unique node ID
 in property <length> world-x;          // X position in graph space
 in property <length> world-y;          // Y position in graph space
 in property <bool> selected: false;    // Selection state — bind it from your model row
-in property <float> zoom;              // Required for view calculation
-in property <length> pan-x;            // Required for view calculation
-in property <length> pan-y;            // Required for view calculation
+in property <length> node-width: 150px;
+in property <length> node-height: 100px;
+out property <length> screen-x;         // Includes the current global zoom/pan
+out property <length> screen-y;
 ```
+
+`BaseNode` reads zoom and pan from `ViewportState`; consumers do not pass those
+values into each node.
 
 ### Pin
 
@@ -401,9 +480,11 @@ in property <int> node-id;          // Parent node ID
 in property <int> pin-type;         // PinTypes.input or .output (or custom)
 in property <color> base-color: #888;
 in property <color> hover-color: #aaa;
-in property <float> zoom;           // Required for scaling
 in property <length> node-screen-x; // Required for drag handling
 in property <length> node-screen-y; // Required for drag handling
+in property <length> parent-offset-x: 0px; // For pins inside wrappers
+in property <length> parent-offset-y: 0px;
+in property <int> refresh-trigger: 0;      // Force geometry re-reporting
 ```
 
 ### Link
@@ -436,7 +517,8 @@ struct LinkPath {
 Building one in Rust from a curve — `CubicBezier::to_link_path` takes the
 constructor rather than naming the type, because a consumer importing
 `@nodeeditor` through cargo metadata gets the crate's `LinkPath` while one
-passing a library path gets their own generated copy:
+passing a library path gets their own generated copy. This is a construction
+fragment; the caller supplies the endpoints and generated `LinkPath` type:
 
 ```rust
 use slint_node_editor::path::CubicBezier;
@@ -460,48 +542,23 @@ The library provides Rust helpers to reduce boilerplate.
 The `NodeEditorController` is a high-level helper that manages geometry tracking, zoom state, and link path computation. It provides ready-to-use callback implementations.
 
 ```rust
-use slint_node_editor::NodeEditorController;
-
-fn main() {
-    let window = MainWindow::new().unwrap();
-    let ctrl = NodeEditorController::new();
-
-    // 1. Hook up computation callbacks
-    window.on_compute_link_path(ctrl.compute_link_path_callback(
-        |commands, x, y, width, height| LinkPath { commands: commands.into(), x, y, width, height },
-    ));
-    window.on_node_drag_started(ctrl.node_drag_started_callback());
-
-    // 2. Hook up geometry tracking
-    window.on_node_rect_changed({
-        let ctrl = ctrl.clone();
-        move |id, x, y, w, h| ctrl.handle_node_rect(id, x, y, w, h)
-    });
-    
-    window.on_pin_position_changed({
-        let ctrl = ctrl.clone();
-        move |pid, nid, ptype, x, y| ctrl.handle_pin_position(pid, nid, ptype, x, y)
-    });
-
-    // 3. Handle grid updates
-    window.on_request_grid_update({
-        let ctrl = ctrl.clone();
-        let w = window.as_weak();
-        move || {
-            if let Some(w) = w.upgrade() {
-                w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
-            }
-        }
-    });
-
-    window.invoke_request_grid_update();
-    window.run().unwrap();
-}
+// Fragment from the compiled quick start linked above.
+let setup = NodeEditorSetup::new(move |dragged, dx, dy| {
+    GraphLogic::commit_drag(&nodes, dragged, dx, dy);
+});
+let controller = setup.controller().clone();
+wire_node_editor!(window, setup);
 ```
+
+Prefer `NodeEditorSetup` plus `wire_node_editor!` for the standard integration.
+Use the cloned controller for host policies such as validation, custom picking
+and deletion. If an application wires globals manually, the macro source in
+[`src/lib.rs`](src/lib.rs) is the canonical list of handlers and units.
 
 Node and pin geometry is a projection of the application's graph model. Retire
 that projection whenever the model removes an object, and reset it after
-replacing the whole graph:
+replacing the whole graph. This lifecycle fragment assumes the compiled quick
+start's generated window and application IDs:
 
 ```rust
 let lifecycle = window.global::<NodeEditorInternalCallbacks>();
@@ -521,16 +578,25 @@ existing links, but it is excluded from pin hit testing until visible again.
 
 ### GeometryTracker
 
-For lower-level control, `GeometryTracker` simplifies just the geometry cache setup.
+For lower-level integrations without `NodeEditorSetup`, `GeometryTracker`
+provides callback closures that update a standalone cache. This fragment leaves
+the application's IDs and world-space coordinates as local variables:
 
 ```rust
 use slint_node_editor::GeometryTracker;
 
 let tracker = GeometryTracker::new();
-window.on_node_rect_changed(tracker.node_rect_callback());
-window.on_pin_position_changed(tracker.pin_position_callback());
-let cache = tracker.cache(); // Use for hit testing
+let report_node = tracker.node_rect_callback();
+let report_pin = tracker.pin_position_callback();
+
+report_node(node_id, x, y, width, height);
+report_pin(pin_id, node_id, pin_type, relative_x, relative_y);
+let cache = tracker.cache();
 ```
+
+All coordinates in these callbacks are world-space `f32` values. When using
+live `BaseNode` and `Pin` components, `wire_node_editor!` already installs the
+equivalent lifecycle and a second tracker is unnecessary.
 
 ## Examples
 

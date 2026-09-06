@@ -81,8 +81,22 @@ pub fn resolve_box<T: Clone + PartialEq>(current: &[T], hits: Vec<T>, shift: boo
 /// Only rows whose flag actually changes are written back, so untouched rows
 /// don't re-render.
 ///
-/// ```ignore
-/// project_selection(&nodes, |n| selection.contains(&n.id), |n| &mut n.selected);
+/// ```
+/// use slint::VecModel;
+/// use slint_node_editor::selection::project_selection;
+///
+/// #[derive(Clone)]
+/// struct Row { id: i32, selected: bool }
+/// let nodes = VecModel::from(vec![
+///     Row { id: 1, selected: false },
+///     Row { id: 2, selected: false },
+/// ]);
+/// let selection = [2];
+/// project_selection(
+///     &nodes,
+///     |node| selection.contains(&node.id),
+///     |node| &mut node.selected,
+/// );
 /// ```
 pub fn project_selection<T: Clone + 'static>(
     model: &impl Model<Data = T>,

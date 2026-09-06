@@ -3,70 +3,15 @@
 //! The [`NodeEditorController`] reduces boilerplate by managing geometry tracking,
 //! link path computation, and viewport state in one place.
 //!
-//! # Example
+//! # Standard integration
 //!
-//! ```ignore
-//! use slint_node_editor::NodeEditorController;
-//!
-//! slint::include_modules!();
-//!
-//! fn main() {
-//!     let window = MainWindow::new().unwrap();
-//!     let ctrl = NodeEditorController::new();
-//!     let w = window.as_weak();
-//!
-//!     // Core callbacks - controller handles the logic
-//!     window.on_compute_link_path(ctrl.compute_link_path_callback(
-//!         |commands, x, y, width, height| LinkPath { commands: commands.into(), x, y, width, height },
-//!     ));
-//!     window.on_node_drag_started(ctrl.node_drag_started_callback());
-//!
-//!     // Geometry tracking
-//!     window.on_node_rect_changed({
-//!         let ctrl = ctrl.clone();
-//!         move |id, x, y, w, h| ctrl.handle_node_rect(id, x, y, w, h)
-//!     });
-//!
-//!     window.on_pin_position_changed({
-//!         let ctrl = ctrl.clone();
-//!         move |pid, nid, ptype, x, y| ctrl.handle_pin_position(pid, nid, ptype, x, y)
-//!     });
-//!
-//!     // Grid updates
-//!     window.on_request_grid_update({
-//!         let ctrl = ctrl.clone();
-//!         let w = w.clone();
-//!         move || {
-//!             if let Some(w) = w.upgrade() {
-//!                 w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
-//!             }
-//!         }
-//!     });
-//!
-//!     window.on_update_viewport({
-//!         let ctrl = ctrl.clone();
-//!         let w = w.clone();
-//!         move |z, pan_x, pan_y| {
-//!             if let Some(w) = w.upgrade() {
-//!                 ctrl.set_viewport(z, pan_x, pan_y);
-//!                 w.set_grid_commands(ctrl.generate_grid(w.get_width_(), w.get_height_(), pan_x, pan_y));
-//!             }
-//!         }
-//!     });
-//!
-//!     // App-specific: update node positions after drag
-//!     window.on_node_drag_ended({
-//!         let ctrl = ctrl.clone();
-//!         move |delta_x, delta_y| {
-//!             let node_id = ctrl.dragged_node_id();
-//!             // Update your node model here
-//!         }
-//!     });
-//!
-//!     window.invoke_request_grid_update();
-//!     window.run().unwrap();
-//! }
-//! ```
+//! Construct a [`crate::NodeEditorSetup`] and pass it to
+//! [`crate::wire_node_editor!`]. The macro installs this controller's geometry,
+//! computation, viewport and grid handlers on the generated Slint globals. Its
+//! callback replacement rules and required generated members are documented in
+//! the crate README. The repository's
+//! [compiled quick start](https://github.com/tilladam/slint-node-editor/tree/main/smoke/downstream)
+//! demonstrates model-owned selection, movement, connection and deletion.
 
 use crate::hit_test::{NodeGeometry, SimpleLinkGeometry};
 use crate::state::GeometryCache;

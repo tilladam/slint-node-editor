@@ -1,6 +1,4 @@
-# Deliberately NOT a workspace member: this fixture has to see the library the
-# way an outside crate does. `SMOKE_LIBRARY_PATH` points either at this
-# checkout (path mode) or at an extracted `cargo package` tarball.
+# Deliberately not a workspace member: this is a copyable downstream project.
 [workspace]
 
 [package]
@@ -10,10 +8,13 @@ edition = "2021"
 publish = false
 
 [dependencies]
-slint = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-skia"] }
-slint-node-editor = { path = "../.." }
+slint = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software"] }
+slint-node-editor = { git = "https://github.com/tilladam/slint-node-editor", rev = "0b454a9839af39de213839c8de44793dbbd5d993" }
 
 [build-dependencies]
 # Required on the consumer side too: it turns on the compiler's
 # `experimental-library-module` support, which resolves `@nodeeditor`.
 slint-build = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2", features = ["experimental-module-builds"] }
+
+[dev-dependencies]
+i-slint-backend-testing = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2" }

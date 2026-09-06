@@ -3,9 +3,12 @@
 //! The [`NodeEditorSetup`] provides automatic callback handling. You only need
 //! to provide a closure that commits a finished drag into your model.
 //!
-//! # Example
+//! # Generated-UI integration
 //!
-//! ```ignore
+//! This fragment uses the generated types and model from the
+//! [compiled quick start](https://github.com/tilladam/slint-node-editor/tree/main/smoke/downstream).
+//!
+//! ```text
 //! use slint_node_editor::{GraphLogic, NodeEditorSetup, wire_node_editor};
 //!
 //! slint::include_modules!();
