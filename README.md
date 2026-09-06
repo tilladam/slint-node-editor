@@ -516,6 +516,26 @@ fn main() {
 }
 ```
 
+Node and pin geometry is a projection of the application's graph model. Retire
+that projection whenever the model removes an object, and reset it after
+replacing the whole graph:
+
+```rust
+let lifecycle = window.global::<NodeEditorInternalCallbacks>();
+
+// Remove connected logical links in the host model, then:
+lifecycle.invoke_remove_pin(pin_id);
+lifecycle.invoke_remove_node(node_id); // also retires pins owned by the node
+
+// After installing another graph model (including one that reuses IDs):
+lifecycle.invoke_reset_graph();
+```
+
+These functions also clear editor interactions that refer to retired objects.
+Call the controller's `remove_pin`, `remove_node`, or `reset_graph` methods when
+there is no Slint component instance. A hidden `Pin` remains available to route
+existing links, but it is excluded from pin hit testing until visible again.
+
 ### GeometryTracker
 
 For lower-level control, `GeometryTracker` simplifies just the geometry cache setup.

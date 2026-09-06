@@ -9,6 +9,10 @@ import {
     LinkData,
     ViewportState,
     GeometryVersion,
+    DragState,
+    HoverState,
+    LinkCreation,
+    LinkCreationState,
     NodeEditorInternalCallbacks,
     NodeEditorComputations,
     LinkPath,
@@ -24,12 +28,16 @@ export struct NodeData {
 }
 
 // Re-export for Rust
-export { LinkData, GeometryVersion, NodeEditorInternalCallbacks, NodeEditorComputations }
+export { LinkData, GeometryVersion, DragState, HoverState, LinkCreation, LinkCreationState, NodeEditorInternalCallbacks, NodeEditorComputations }
 
 component SimpleNode inherits BaseNode {
     in property <string> title: "Node";
     in property <length> configured-width: 150px;
     in property <length> configured-height: 100px;
+    in property <int> input-pin-id: root.node-id * 2;
+    in property <int> input-pin-node-id: root.node-id;
+    in property <int> input-pin-type: PinTypes.input;
+    in property <bool> input-pin-visible: true;
     node-width: configured-width;
     node-height: configured-height;
 
@@ -52,9 +60,10 @@ component SimpleNode inherits BaseNode {
     Pin {
         x: 0px;
         y: root.node-height / 2 - self.height / 2;
-        pin-id: root.node-id * 2;
-        node-id: root.node-id;
-        pin-type: PinTypes.input;
+        pin-id: root.input-pin-id;
+        node-id: root.input-pin-node-id;
+        pin-type: root.input-pin-type;
+        visible: root.input-pin-visible;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
     }
@@ -90,6 +99,10 @@ export component MainWindow inherits Window {
     in property <int> geometry-version: GeometryVersion.version;
     in property <length> test-node-width: 150px;
     in property <length> test-node-height: 100px;
+    in-out property <int> test-input-pin-id: 2;
+    in-out property <int> test-input-pin-node-id: 1;
+    in-out property <int> test-input-pin-type: PinTypes.input;
+    in-out property <bool> test-input-pin-visible: true;
     out property <LinkPath> observed-link-geometry: NodeEditorComputations.compute-link-path(3, 4, GeometryVersion.version);
 
     // Core callbacks to Rust
@@ -126,6 +139,10 @@ export component MainWindow inherits Window {
             world-y: data.y * 1px;
             configured-width: root.test-node-width;
             configured-height: root.test-node-height;
+            input-pin-id: data.id == 1 ? root.test-input-pin-id : data.id * 2;
+            input-pin-node-id: data.id == 1 ? root.test-input-pin-node-id : data.id;
+            input-pin-type: data.id == 1 ? root.test-input-pin-type : PinTypes.input;
+            input-pin-visible: data.id == 1 ? root.test-input-pin-visible : true;
             viewport-width: editor.width;
             viewport-height: editor.height;
             selected: data.selected;

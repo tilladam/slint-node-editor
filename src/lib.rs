@@ -165,6 +165,9 @@ macro_rules! wire_node_editor {
         let gc = $window.global::<NodeEditorInternalCallbacks>();
         gc.on_report_node_rect($setup.report_node_rect());
         gc.on_report_pin_position($setup.report_pin_position());
+        gc.on_remove_node_from_cache($setup.remove_node());
+        gc.on_remove_pin_from_cache($setup.remove_pin());
+        gc.on_reset_graph_cache($setup.reset_graph());
         gc.on_end_node_drag($setup.end_node_drag());
 
         // Computations

@@ -78,11 +78,40 @@ where
     }
 
     /// Callback for `NodeEditorInternalCallbacks.on_report_pin_position`.
-    pub fn report_pin_position(&self) -> impl Fn(i32, i32, i32, f32, f32) + 'static {
+    pub fn report_pin_position(&self) -> impl Fn(i32, i32, i32, f32, f32, bool) + 'static {
         let ctrl = self.controller.clone();
-        move |pin_id, node_id, pin_type, x, y| {
-            ctrl.handle_pin_position(pin_id, node_id, pin_type, x, y);
+        move |pin_id, node_id, pin_type, x, y, hit_testable| {
+            ctrl.handle_pin_position_with_hit_testable(
+                pin_id,
+                node_id,
+                pin_type,
+                x,
+                y,
+                hit_testable,
+            );
         }
+    }
+
+    /// Callback for retiring a node and all of its projected pins.
+    pub fn remove_node(&self) -> impl Fn(i32) + 'static {
+        let ctrl = self.controller.clone();
+        move |node_id| {
+            ctrl.remove_node(node_id);
+        }
+    }
+
+    /// Callback for retiring one projected pin.
+    pub fn remove_pin(&self) -> impl Fn(i32) + 'static {
+        let ctrl = self.controller.clone();
+        move |pin_id| {
+            ctrl.remove_pin(pin_id);
+        }
+    }
+
+    /// Callback for clearing all projected graph state.
+    pub fn reset_graph(&self) -> impl Fn() + 'static {
+        let ctrl = self.controller.clone();
+        move || ctrl.reset_graph()
     }
 
     /// Callback for `NodeEditorInternalCallbacks.on_end_node_drag`.

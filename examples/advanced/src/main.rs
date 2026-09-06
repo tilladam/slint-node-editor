@@ -9,6 +9,8 @@ use slint_node_editor::{
     LinkPath, LinkValidator, MinimapNode, MovableNode, NoDuplicatesValidator, NodeEditorSetup,
     ValidationResult,
 };
+#[cfg(test)]
+use slint_node_editor::NodeEditorController;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -81,6 +83,18 @@ fn remove_selected_items<T: Clone + 'static>(
         model.remove(i);
     }
     removed_ids
+}
+
+fn selected_item_ids<T: Clone + 'static>(
+    model: &VecModel<T>,
+    get_id: impl Fn(&T) -> i32,
+    is_selected: impl Fn(&T) -> bool,
+) -> Vec<i32> {
+    (0..model.row_count())
+        .filter_map(|i| model.row_data(i))
+        .filter(|item| is_selected(item))
+        .map(|item| get_id(&item))
+        .collect()
 }
 
 /// Compute graph bounds from all nodes
@@ -168,12 +182,16 @@ fn build_minimap_nodes(
 /// installed here are the ones the app runs with.
 struct App {
     window: MainWindow,
+    #[cfg(test)]
+    controller: Rc<NodeEditorController>,
     // Only the tests reach for the models directly; `main` drives everything
     // through the window's callbacks.
     #[cfg_attr(not(test), allow(dead_code))]
     nodes: Rc<VecModel<NodeData>>,
     #[cfg_attr(not(test), allow(dead_code))]
     filter_nodes: Rc<VecModel<FilterNodeData>>,
+    #[cfg(test)]
+    links: Rc<VecModel<LinkData>>,
 }
 
 fn build_app() -> App {
@@ -524,17 +542,17 @@ fn build_app() -> App {
 
     window.on_delete_selected_nodes({
         let ctrl = setup.controller().clone();
+        let window = window.as_weak();
         let nodes = nodes.clone();
         let filter_nodes = filter_nodes.clone();
         let links = links.clone();
         let refresh_minimap = refresh_minimap.clone();
         move || {
-            let mut deleted_node_ids = remove_selected_items(&nodes, |n| n.id, |n| n.selected);
-            deleted_node_ids.extend(remove_selected_items(
-                &filter_nodes,
-                |n| n.id,
-                |n| n.selected,
-            ));
+            // Resolve the whole deletion while cache ownership is still intact.
+            // Removing rows first can cause a repeater to reuse a component for
+            // another node and retire the old identity before link lookup.
+            let mut deleted_node_ids = selected_item_ids(&nodes, |n| n.id, |n| n.selected);
+            deleted_node_ids.extend(selected_item_ids(&filter_nodes, |n| n.id, |n| n.selected));
 
             let cache = ctrl.cache();
             let cache = cache.borrow();
@@ -559,6 +577,16 @@ fn build_app() -> App {
             for &i in link_indices_to_remove.iter().rev() {
                 links.remove(i);
             }
+
+            if let Some(window) = window.upgrade() {
+                let lifecycle = window.global::<NodeEditorInternalCallbacks>();
+                for node_id in deleted_node_ids {
+                    lifecycle.invoke_remove_node(node_id);
+                }
+            }
+
+            remove_selected_items(&nodes, |n| n.id, |n| n.selected);
+            remove_selected_items(&filter_nodes, |n| n.id, |n| n.selected);
 
             refresh_minimap();
         }
@@ -620,8 +648,12 @@ fn build_app() -> App {
 
     App {
         window,
+        #[cfg(test)]
+        controller: setup.controller().clone(),
         nodes,
         filter_nodes,
+        #[cfg(test)]
+        links,
     }
 }
 
@@ -712,6 +744,25 @@ mod tests {
             !after.iter().any(|r| r.0 == 1),
             "deleted node should be gone from the minimap, got {after:?}"
         );
+    }
+
+    #[test]
+    fn deletion_retires_cached_node_and_pin_geometry() {
+        let app = app();
+        app.window.show().unwrap();
+        slint::platform::update_timers_and_animations();
+        slint::platform::update_timers_and_animations();
+        assert!(app.controller.cache().borrow().node_rects.contains_key(&1));
+
+        select(&app.nodes, 1);
+        app.window.invoke_delete_selected_nodes();
+
+        let cache = app.controller.cache();
+        let cache = cache.borrow();
+        assert!(!cache.node_rects.contains_key(&1));
+        assert!(cache.pin_positions.values().all(|pin| pin.node_id != 1));
+        assert_eq!(app.links.row_count(), 1);
+        assert_eq!(app.links.row_data(0).unwrap().id, 2);
     }
 
     /// ...and adding one has to grow it.
@@ -866,5 +917,4 @@ mod tests {
             );
         }
     }
-
 }

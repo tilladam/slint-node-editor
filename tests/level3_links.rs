@@ -4,7 +4,10 @@
 
 mod common;
 
-use common::harness::MinimalTestHarness;
+use common::harness::{
+    DragState, HoverState, LinkCreation, LinkCreationState, MinimalTestHarness,
+    NodeEditorInternalCallbacks,
+};
 use slint::{Color, ComponentHandle, Model, SharedString};
 use slint_node_editor::NodeGeometry;
 
@@ -351,6 +354,186 @@ fn test_find_pin_returns_zero_for_no_hit() {
     let pin_id = harness.ctrl.cache().borrow().find_pin_at(50.0, 50.0, 10.0);
 
     assert_eq!(pin_id, 0, "Should return 0 when no pin is hit");
+}
+
+#[test]
+fn explicit_node_removal_retires_geometry_and_allows_id_reuse() {
+    let harness = MinimalTestHarness::new();
+    realize(&harness);
+    let old_pin_position = harness.pin_position(2).unwrap();
+
+    harness
+        .window
+        .global::<NodeEditorInternalCallbacks>()
+        .invoke_remove_node(1);
+    harness.nodes.remove(0);
+    flush_geometry(&harness);
+
+    {
+        let cache = harness.ctrl.cache();
+        let cache = cache.borrow();
+        assert_eq!(cache.node_rects.len(), 1);
+        assert_eq!(cache.pin_positions.len(), 2);
+        assert_eq!(
+            cache.find_pin_at(old_pin_position.0, old_pin_position.1, 2.0),
+            0
+        );
+        assert!(cache.compute_link_path_world(3, 4, 50.0).is_none());
+    }
+
+    harness.ctrl.handle_node_rect(1, 50.0, 60.0, 150.0, 100.0);
+    harness.ctrl.handle_pin_position(2, 1, 1, 0.0, 50.0);
+    harness.ctrl.handle_pin_position(3, 1, 2, 150.0, 50.0);
+
+    let cache = harness.ctrl.cache();
+    let cache = cache.borrow();
+    assert_eq!(cache.node_rects.len(), 2);
+    assert_eq!(cache.pin_positions.len(), 4);
+    assert_eq!(cache.node_rects[&1].x, 50.0);
+}
+
+#[test]
+fn node_removal_clears_hover_drag_and_link_gesture_state() {
+    let harness = MinimalTestHarness::new();
+    realize(&harness);
+    let hover = harness.window.global::<HoverState>();
+    hover.set_hovered_node_id(1);
+    let drag = harness.window.global::<DragState>();
+    drag.set_is_dragging(true);
+    drag.set_dragged_node_id(1);
+    drag.set_drag_offset_x(25.0);
+    drag.set_drag_offset_y(30.0);
+    let link = harness.window.global::<LinkCreation>();
+    link.set_start_pin_id(2);
+    link.set_state(LinkCreationState::Started);
+
+    harness
+        .window
+        .global::<NodeEditorInternalCallbacks>()
+        .invoke_remove_node(1);
+    flush_geometry(&harness);
+
+    assert_eq!(hover.get_hovered_node_id(), 0);
+    assert!(!drag.get_is_dragging());
+    assert_eq!(drag.get_dragged_node_id(), 0);
+    assert_eq!(drag.get_drag_offset_x(), 0.0);
+    assert_eq!(drag.get_drag_offset_y(), 0.0);
+    assert_eq!(link.get_state(), LinkCreationState::Idle);
+    assert_eq!(link.get_start_pin_id(), 0);
+}
+
+#[test]
+fn changing_node_identity_retires_the_previous_node_and_pins() {
+    let harness = MinimalTestHarness::new();
+    realize(&harness);
+    let mut node = harness.nodes.row_data(0).unwrap();
+    node.id = 10;
+
+    harness.nodes.set_row_data(0, node);
+    flush_geometry(&harness);
+
+    let cache = harness.ctrl.cache();
+    let cache = cache.borrow();
+    assert!(!cache.node_rects.contains_key(&1));
+    assert!(!cache.pin_positions.contains_key(&2));
+    assert!(!cache.pin_positions.contains_key(&3));
+    assert!(cache.node_rects.contains_key(&10));
+    assert_eq!(cache.pin_positions[&20].node_id, 10);
+    assert_eq!(cache.pin_positions[&21].node_id, 10);
+    assert_eq!(cache.node_rects.len(), 2);
+    assert_eq!(cache.pin_positions.len(), 4);
+}
+
+#[test]
+fn pin_identity_type_and_owner_updates_replace_the_cached_record() {
+    let harness = MinimalTestHarness::new();
+    realize(&harness);
+
+    harness.window.set_test_input_pin_id(22);
+    harness.window.set_test_input_pin_type(7);
+    harness.window.set_test_input_pin_node_id(2);
+    flush_geometry(&harness);
+
+    let cache = harness.ctrl.cache();
+    let cache = cache.borrow();
+    assert!(!cache.pin_positions.contains_key(&2));
+    assert_eq!(cache.pin_positions.len(), 4);
+    assert_eq!(cache.pin_positions[&22].node_id, 2);
+    assert_eq!(cache.pin_positions[&22].pin_type, 7);
+}
+
+#[test]
+fn hidden_pin_remains_a_route_endpoint_but_cannot_be_picked() {
+    let harness = MinimalTestHarness::new();
+    realize(&harness);
+    let position = harness.pin_position(2).unwrap();
+
+    harness.window.set_test_input_pin_visible(false);
+    flush_geometry(&harness);
+
+    {
+        let cache = harness.ctrl.cache();
+        let cache = cache.borrow();
+        assert!(cache.pin_positions.contains_key(&2));
+        assert_eq!(cache.find_pin_at(position.0, position.1, 2.0), 0);
+        assert!(cache.compute_link_path_world(2, 5, 50.0).is_some());
+    }
+
+    harness.window.set_test_input_pin_visible(true);
+    flush_geometry(&harness);
+    assert_eq!(
+        harness
+            .ctrl
+            .cache()
+            .borrow()
+            .find_pin_at(position.0, position.1, 2.0),
+        2
+    );
+}
+
+#[test]
+fn graph_reset_clears_the_disposable_projection() {
+    let harness = MinimalTestHarness::new();
+    realize(&harness);
+
+    while harness.nodes.row_count() > 0 {
+        harness.nodes.remove(0);
+    }
+    harness
+        .window
+        .global::<NodeEditorInternalCallbacks>()
+        .invoke_reset_graph();
+    flush_geometry(&harness);
+
+    let cache = harness.ctrl.cache();
+    let cache = cache.borrow();
+    assert!(cache.node_rects.is_empty());
+    assert!(cache.pin_positions.is_empty());
+}
+
+#[test]
+fn graph_reset_discards_stale_geometry_and_republishes_live_ids() {
+    let harness = MinimalTestHarness::new();
+    realize(&harness);
+    harness.ctrl.handle_node_rect(99, 1.0, 2.0, 3.0, 4.0);
+    harness.ctrl.handle_pin_position(999, 99, 1, 0.0, 0.0);
+
+    harness
+        .window
+        .global::<NodeEditorInternalCallbacks>()
+        .invoke_reset_graph();
+    flush_geometry(&harness);
+
+    let cache = harness.ctrl.cache();
+    let cache = cache.borrow();
+    assert_eq!(cache.node_rects.len(), 2);
+    assert_eq!(cache.pin_positions.len(), 4);
+    assert!(cache.node_rects.contains_key(&1));
+    assert!(cache.node_rects.contains_key(&2));
+    assert!(!cache.node_rects.contains_key(&99));
+    assert!(!cache.pin_positions.contains_key(&999));
+    assert_eq!(cache.pin_positions[&2].node_id, 1);
+    assert_eq!(cache.pin_positions[&3].node_id, 1);
 }
 
 #[test]

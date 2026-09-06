@@ -68,11 +68,11 @@
 //! }
 //! ```
 
-use crate::state::GeometryCache;
 use crate::hit_test::{find_link_at, NodeGeometry, SimpleLinkGeometry};
+use crate::state::GeometryCache;
 use slint::SharedString;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 /// Viewport and configuration state, behind a single `Rc<RefCell<_>>`.
@@ -227,6 +227,26 @@ impl NodeEditorController {
         self.cache.borrow_mut().handle_pin_report(pid, nid, ptype, x, y);
     }
 
+    /// Update cached pin geometry and its pin-picking eligibility.
+    pub fn handle_pin_position_with_hit_testable(
+        &self,
+        pid: i32,
+        nid: i32,
+        ptype: i32,
+        x: f32,
+        y: f32,
+        hit_testable: bool,
+    ) {
+        self.cache.borrow_mut().handle_pin_report_with_hit_testable(
+            pid,
+            nid,
+            ptype,
+            x,
+            y,
+            hit_testable,
+        );
+    }
+
     /// Seed a node's world-space rect directly, bypassing screen→world conversion.
     ///
     /// Use this to pre-populate the geometry cache for nodes that haven't been
@@ -278,14 +298,44 @@ impl NodeEditorController {
         self.state.borrow_mut().links.clear();
     }
 
-    /// Clear the geometry cache (node rects and pin positions).
+    /// Remove a pin and any registered hit-test links incident on it.
+    pub fn remove_pin(&self, pin_id: i32) -> bool {
+        let removed = self.cache.borrow_mut().remove_pin(pin_id);
+        self.state
+            .borrow_mut()
+            .links
+            .retain(|_, pins| pins.0 != pin_id && pins.1 != pin_id);
+        removed
+    }
+
+    /// Remove a node, its pins, and registered hit-test links using those pins.
+    pub fn remove_node(&self, node_id: i32) -> Vec<i32> {
+        let removed_pins = self.cache.borrow_mut().remove_node(node_id);
+        let removed_pin_set: HashSet<_> = removed_pins.iter().copied().collect();
+        let mut state = self.state.borrow_mut();
+        state.links.retain(|_, pins| {
+            !removed_pin_set.contains(&pins.0) && !removed_pin_set.contains(&pins.1)
+        });
+        if state.dragged_node_id == node_id {
+            state.dragged_node_id = 0;
+        }
+        removed_pins
+    }
+
+    /// Reset geometry and controller-owned topology for a graph switch.
+    pub fn reset_graph(&self) {
+        self.cache.borrow_mut().clear();
+        let mut state = self.state.borrow_mut();
+        state.links.clear();
+        state.dragged_node_id = 0;
+    }
+
+    /// Clear only the geometry cache (node rects and pin positions).
     ///
-    /// Call this when navigating between subgraphs to prevent stale
-    /// pin-to-node associations from producing incorrect link paths.
+    /// Use [`Self::reset_graph`] when switching graphs so registered hit-test
+    /// links and drag state are retired as well.
     pub fn clear_geometry(&self) {
-        let mut cache = self.cache.borrow_mut();
-        cache.node_rects.clear();
-        cache.pin_positions.clear();
+        self.cache.borrow_mut().clear();
     }
 
     /// Compute link path for given pins (screen-space output from world-space cache).
@@ -591,6 +641,42 @@ mod tests {
         ctrl.register_link(2, 300, 400);
         ctrl.clear_links();
         assert!(ctrl.state.borrow().links.is_empty());
+    }
+
+    #[test]
+    fn remove_pin_prunes_registered_links() {
+        let ctrl = setup_controller();
+
+        assert!(ctrl.remove_pin(1001));
+
+        assert!(!ctrl.cache.borrow().pin_positions.contains_key(&1001));
+        assert!(ctrl.state.borrow().links.is_empty());
+    }
+
+    #[test]
+    fn remove_node_cascades_geometry_links_and_drag_state() {
+        let ctrl = setup_controller();
+        ctrl.handle_node_drag_started(1);
+
+        assert_eq!(ctrl.remove_node(1), vec![1001]);
+
+        assert!(!ctrl.cache.borrow().node_rects.contains_key(&1));
+        assert!(!ctrl.cache.borrow().pin_positions.contains_key(&1001));
+        assert!(ctrl.state.borrow().links.is_empty());
+        assert_eq!(ctrl.dragged_node_id(), 0);
+    }
+
+    #[test]
+    fn reset_graph_clears_geometry_topology_and_drag_state() {
+        let ctrl = setup_controller();
+        ctrl.handle_node_drag_started(1);
+
+        ctrl.reset_graph();
+
+        assert!(ctrl.cache.borrow().node_rects.is_empty());
+        assert!(ctrl.cache.borrow().pin_positions.is_empty());
+        assert!(ctrl.state.borrow().links.is_empty());
+        assert_eq!(ctrl.dragged_node_id(), 0);
     }
 
     // ========================================================================

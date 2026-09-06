@@ -52,6 +52,9 @@ export global GeometryVersion {
     in-out property <int> version: 0;
     /// Internal request counter written after a geometry report reaches Rust.
     in-out property <int> request-version: 0;
+    /// Changes when the disposable projection is reset so live components
+    /// publish themselves again, even when their IDs and geometry are reused.
+    in-out property <int> projection-version: 0;
 }
 
 /// Link creation lifecycle states.
@@ -117,7 +120,13 @@ export global NodeEditorInternalCallbacks {
     /// Report node rectangle (world coordinates)
     callback report-node-rect(/* id */ int, /* x */ length, /* y */ length, /* width */ length, /* height */ length);
     /// Report pin position relative to node
-    callback report-pin-position(/* pin-id */ int, /* node-id */ int, /* pin-type */ int, /* rel-x */ length, /* rel-y */ length);
+    callback report-pin-position(/* pin-id */ int, /* node-id */ int, /* pin-type */ int, /* rel-x */ length, /* rel-y */ length, /* hit-testable */ bool);
+    /// Retire projected geometry for a node and its pins.
+    callback remove-node-from-cache(/* node-id */ int);
+    /// Retire projected geometry for one pin.
+    callback remove-pin-from-cache(/* pin-id */ int);
+    /// Retire all projected geometry and controller-owned topology.
+    callback reset-graph-cache();
     /// Start node drag
     callback start-node-drag(/* node-id */ int, /* already-selected */ bool, /* world-x */ length, /* world-y */ length);
     /// Update node drag
@@ -136,6 +145,58 @@ export global NodeEditorInternalCallbacks {
     callback update-link-preview(/* x */ length, /* y */ length);
     /// Complete link creation
     callback complete-link();
+
+    /// Remove a node from the geometry projection and clear interactions that
+    /// could still refer to it. Hosts must call this when removing a model row.
+    public function remove-node(node-id: int) {
+        if HoverState.hovered-node-id == node-id {
+            HoverState.hovered-node-id = 0;
+        }
+        if DragState.dragged-node-id == node-id {
+            DragState.is-dragging = false;
+            DragState.dragged-node-id = 0;
+            DragState.drag-offset-x = 0px;
+            DragState.drag-offset-y = 0px;
+        }
+        if LinkCreation.state != LinkCreationState.idle {
+            LinkCreation.state = LinkCreationState.idle;
+            LinkCreation.version += 1;
+        }
+        LinkCreation.start-pin-id = 0;
+        self.remove-node-from-cache(node-id);
+        GeometryVersion.request-version += 1;
+    }
+
+    /// Remove one pin from the geometry projection. Existing logical links are
+    /// application data and remain the host's responsibility.
+    public function remove-pin(pin-id: int) {
+        if LinkCreation.start-pin-id == pin-id {
+            if LinkCreation.state != LinkCreationState.idle {
+                LinkCreation.state = LinkCreationState.idle;
+                LinkCreation.version += 1;
+            }
+            LinkCreation.start-pin-id = 0;
+        }
+        self.remove-pin-from-cache(pin-id);
+        GeometryVersion.request-version += 1;
+    }
+
+    /// Clear projected state before replacing the current graph.
+    public function reset-graph() {
+        HoverState.hovered-node-id = 0;
+        DragState.is-dragging = false;
+        DragState.dragged-node-id = 0;
+        DragState.drag-offset-x = 0px;
+        DragState.drag-offset-y = 0px;
+        if LinkCreation.state != LinkCreationState.idle {
+            LinkCreation.state = LinkCreationState.idle;
+            LinkCreation.version += 1;
+        }
+        LinkCreation.start-pin-id = 0;
+        self.reset-graph-cache();
+        GeometryVersion.projection-version += 1;
+        GeometryVersion.request-version += 1;
+    }
 }
 
 /// Computational callbacks wired by Rust - examples don't touch these!
@@ -574,6 +635,8 @@ export component BaseNode inherits Rectangle {
     // Persistent position offset (survives drag end until model updates)
     property <length> persistent-offset-x: 0px;
     property <length> persistent-offset-y: 0px;
+    property <int> reported-node-id: 0;
+    property <int> projection-version: GeometryVersion.projection-version;
     // === Viewport (for visibility culling) - provided by parent ===
     in property <length> viewport-width: 10000px;
     in property <length> viewport-height: 10000px;
@@ -615,6 +678,12 @@ export component BaseNode inherits Rectangle {
     // invalidation only afterwards so link bindings never observe stale cache
     // data. NodeEditor coalesces requests from x/y/size and pin changes.
     function report-geometry() {
+        if reported-node-id != node-id {
+            if reported-node-id != 0 {
+                NodeEditorInternalCallbacks.remove-node(reported-node-id);
+            }
+            reported-node-id = node-id;
+        }
         if node-id != 0 {
             NodeEditorInternalCallbacks.report-node-rect(node-id, world-pos-x, world-pos-y, node-width, node-height);
             GeometryVersion.request-version += 1;
@@ -629,6 +698,10 @@ export component BaseNode inherits Rectangle {
     }
 
     changed node-id => {
+        root.report-geometry();
+    }
+
+    changed projection-version => {
         root.report-geometry();
     }
 
@@ -837,6 +910,8 @@ export component Pin inherits Rectangle {
     in property <length> parent-offset-y: 0px;  // For wrapped pins (offset from node)
     /// Increment this to force pin position re-reporting (workaround for init timing)
     in property <int> refresh-trigger: 0;
+    property <int> reported-pin-id: 0;
+    property <int> projection-version: GeometryVersion.projection-version;
 
     property <length> pin-radius: base-size / 2;
 
@@ -854,8 +929,14 @@ export component Pin inherits Rectangle {
     // single route refresh for that frame. Outside a drag, request a coalesced
     // refresh after the cache callback returns.
     function report-geometry() {
+        if reported-pin-id != pin-id {
+            if reported-pin-id > 0 {
+                NodeEditorInternalCallbacks.remove-pin(reported-pin-id);
+            }
+            reported-pin-id = pin-id;
+        }
         if pin-id > 0 {
-            NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y);
+            NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y, self.visible);
             if (!DragState.is-dragging) {
                 GeometryVersion.request-version += 1;
             }
@@ -872,6 +953,15 @@ export component Pin inherits Rectangle {
     changed pin-id => {
         root.report-geometry();
     }
+    changed node-id => {
+        root.report-geometry();
+    }
+    changed pin-type => {
+        root.report-geometry();
+    }
+    changed visible => {
+        root.report-geometry();
+    }
     changed center-x => {
         root.report-geometry();
     }
@@ -879,6 +969,9 @@ export component Pin inherits Rectangle {
         root.report-geometry();
     }
     changed refresh-trigger => {
+        root.report-geometry();
+    }
+    changed projection-version => {
         root.report-geometry();
     }
 

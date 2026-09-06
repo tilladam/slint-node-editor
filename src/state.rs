@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use crate::hit_test::{
     find_link_at, find_pin_at, links_in_selection_box, nodes_in_selection_box, SimpleLinkGeometry,
     SimpleNodeGeometry, SimplePinGeometry, NodeGeometry,
@@ -14,11 +14,12 @@ pub struct StoredPin {
 }
 
 /// Helper struct to manage spatial state of the editor (node rects and pin positions)
-/// 
+///
 /// Generic over N to allow using specialized node types that implement NodeGeometry.
 pub struct GeometryCache<N = SimpleNodeGeometry> {
     pub node_rects: HashMap<i32, N>,
     pub pin_positions: HashMap<i32, StoredPin>,
+    non_hit_testable_pins: HashSet<i32>,
 }
 
 impl<N> Default for GeometryCache<N> {
@@ -26,6 +27,7 @@ impl<N> Default for GeometryCache<N> {
         Self {
             node_rects: HashMap::new(),
             pin_positions: HashMap::new(),
+            non_hit_testable_pins: HashSet::new(),
         }
     }
 }
@@ -33,6 +35,37 @@ impl<N> Default for GeometryCache<N> {
 impl<N> GeometryCache<N> {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Remove one pin from the disposable geometry projection.
+    pub fn remove_pin(&mut self, pin_id: i32) -> bool {
+        self.non_hit_testable_pins.remove(&pin_id);
+        self.pin_positions.remove(&pin_id).is_some()
+    }
+
+    /// Remove a node and every pin currently owned by it.
+    ///
+    /// The returned pin IDs let higher layers retire topology that refers to
+    /// those pins without deriving ownership from an application-specific ID.
+    pub fn remove_node(&mut self, node_id: i32) -> Vec<i32> {
+        self.node_rects.remove(&node_id);
+        let mut removed_pins: Vec<_> = self
+            .pin_positions
+            .iter()
+            .filter_map(|(&pin_id, pin)| (pin.node_id == node_id).then_some(pin_id))
+            .collect();
+        removed_pins.sort_unstable();
+        for pin_id in &removed_pins {
+            self.remove_pin(*pin_id);
+        }
+        removed_pins
+    }
+
+    /// Clear all projected node and pin geometry.
+    pub fn clear(&mut self) {
+        self.node_rects.clear();
+        self.pin_positions.clear();
+        self.non_hit_testable_pins.clear();
     }
 }
 
@@ -44,6 +77,7 @@ where
     pub fn get_absolute_pins(&self) -> impl Iterator<Item = SimplePinGeometry> + '_ {
         self.pin_positions
             .iter()
+            .filter(|(pin_id, _)| !self.non_hit_testable_pins.contains(pin_id))
             .filter_map(move |(&pin_id, pin_pos)| {
                 let rect = self.node_rects.get(&pin_pos.node_id)?.rect();
                 Some(SimplePinGeometry {
@@ -233,6 +267,23 @@ where
         rel_x: f32,
         rel_y: f32,
     ) {
+        self.handle_pin_report_with_hit_testable(pin_id, node_id, pin_type, rel_x, rel_y, true);
+    }
+
+    /// Update a pin and whether it participates in pin hit testing.
+    ///
+    /// Non-hit-testable pins remain available for existing link routing and
+    /// validation. This lets a level-of-detail view hide a pin without making
+    /// its logical connections disappear.
+    pub fn handle_pin_report_with_hit_testable(
+        &mut self,
+        pin_id: i32,
+        node_id: i32,
+        pin_type: i32,
+        rel_x: f32,
+        rel_y: f32,
+        hit_testable: bool,
+    ) {
         self.pin_positions.insert(
             pin_id,
             StoredPin {
@@ -242,6 +293,11 @@ where
                 rel_y,
             },
         );
+        if hit_testable {
+            self.non_hit_testable_pins.remove(&pin_id);
+        } else {
+            self.non_hit_testable_pins.insert(pin_id);
+        }
     }
 }
 
@@ -341,6 +397,47 @@ mod tests {
         let pin = cache.pin_positions.get(&1001).expect("Pin should exist");
         assert_eq!(pin.rel_x, -10.0);
         assert_eq!(pin.rel_y, -20.0);
+    }
+
+    #[test]
+    fn remove_pin_retires_its_geometry() {
+        let mut cache = setup_test_cache();
+
+        assert!(cache.remove_pin(1001));
+        assert!(!cache.remove_pin(1001));
+        assert!(!cache.pin_positions.contains_key(&1001));
+    }
+
+    #[test]
+    fn remove_node_cascades_to_owned_pins() {
+        let mut cache = setup_test_cache();
+
+        let removed_pins = cache.remove_node(1);
+
+        assert_eq!(removed_pins, vec![1001]);
+        assert!(!cache.node_rects.contains_key(&1));
+        assert!(!cache.pin_positions.contains_key(&1001));
+        assert!(cache.node_rects.contains_key(&2));
+        assert!(cache.pin_positions.contains_key(&2001));
+    }
+
+    #[test]
+    fn clear_removes_all_projected_geometry() {
+        let mut cache = setup_test_cache();
+
+        cache.clear();
+
+        assert!(cache.node_rects.is_empty());
+        assert!(cache.pin_positions.is_empty());
+    }
+
+    #[test]
+    fn hidden_pin_routes_but_is_not_hit_testable() {
+        let mut cache = setup_test_cache();
+        cache.handle_pin_report_with_hit_testable(1001, 1, 2, 100.0, 25.0, false);
+
+        assert_eq!(cache.find_pin_at(100.0, 25.0, 10.0), 0);
+        assert!(cache.compute_link_path_world(1001, 2001, 50.0).is_some());
     }
 
     // ========================================================================

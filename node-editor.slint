@@ -453,6 +453,8 @@ export component NodeEditor inherits FocusScope {
         } else if LinkCreation.state == LinkCreationState.complete {
             root.complete-link-creation();
             LinkCreation.state = LinkCreationState.idle;
+        } else {
+            root.cancel-link-creation();
         }
     }
     

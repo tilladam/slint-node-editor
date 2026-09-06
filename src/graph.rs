@@ -689,6 +689,20 @@ mod tests {
     }
 
     #[test]
+    fn removed_node_pins_are_no_longer_valid_endpoints() {
+        let mut cache = setup_cache();
+        let validator = BasicLinkValidator::new(2);
+        let links: Vec<TestLink> = vec![];
+
+        cache.remove_node(1);
+
+        assert_eq!(
+            validator.validate(1001, 2001, &cache, &links),
+            ValidationResult::Invalid(ValidationError::PinNotFound(1001))
+        );
+    }
+
+    #[test]
     fn test_basic_validator_rejects_same_pin() {
         let cache = setup_cache();
         let validator = BasicLinkValidator::new(2);

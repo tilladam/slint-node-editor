@@ -146,8 +146,8 @@ impl MinimalTestHarness {
             .on_report_pin_position({
                 let ctrl = setup.controller().clone();
                 let tracker = tracker.clone();
-                move |pid, nid, ptype, x, y| {
-                    ctrl.handle_pin_position(pid, nid, ptype, x, y);
+                move |pid, nid, ptype, x, y, hit_testable| {
+                    ctrl.handle_pin_position_with_hit_testable(pid, nid, ptype, x, y, hit_testable);
                     tracker
                         .pin_position_changed
                         .borrow_mut()
