@@ -633,15 +633,19 @@ export component BaseNode inherits Rectangle {
     }
 
     changed world-x => {
-        // Model updated — clear persistent offset (world-pos-x changed handler reports geometry)
+        // The model is authoritative after a commit. Clear the temporary drag
+        // offset, then publish the settled geometry even when world-pos-x has
+        // the same value it had on the final live-drag frame.
         if abs(persistent-offset-x) > 0.1px {
             root.persistent-offset-x = 0px;
         }
+        root.report-geometry();
     }
     changed world-y => {
         if abs(persistent-offset-y) > 0.1px {
             root.persistent-offset-y = 0px;
         }
+        root.report-geometry();
     }
     changed node-width => {
         root.report-geometry();

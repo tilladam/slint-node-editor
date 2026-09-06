@@ -6,6 +6,7 @@ mod common;
 
 use common::harness::MinimalTestHarness;
 use slint::{Color, ComponentHandle, Model, SharedString};
+use slint_node_editor::NodeGeometry;
 
 fn realize(harness: &MinimalTestHarness) {
     harness.window.show().unwrap();
@@ -99,6 +100,49 @@ fn test_drag_commit_refreshes_link_binding() {
         initial_geometry
     );
     assert_eq!(harness.window.get_geometry_version(), initial_version + 1);
+}
+
+#[test]
+fn test_pointer_drag_keeps_link_at_committed_position() {
+    let harness = MinimalTestHarness::new();
+    realize(&harness);
+    harness.window.set_zoom(1.5);
+    harness.window.set_pan_x(30.0);
+    harness.window.set_pan_y(20.0);
+    flush_geometry(&harness);
+
+    let initial_geometry = harness.window.get_observed_link_geometry();
+    // Node 1's world-space centre (175, 150) appears at (292.5, 245).
+    // A 75x45 screen drag is a 50x30 world-space model update at zoom 1.5.
+    harness.mouse_down(292.5, 245.0);
+    harness.mouse_move(367.5, 290.0);
+    flush_geometry(&harness);
+    let version_before_commit = harness.window.get_geometry_version();
+    harness.mouse_up(367.5, 290.0);
+    flush_geometry(&harness);
+
+    let node = harness.nodes.row_data(0).unwrap();
+    assert_eq!((node.x, node.y), (150.0, 130.0));
+    assert_eq!(
+        harness.window.get_geometry_version(),
+        version_before_commit + 1,
+        "the authoritative world-x/y commit must request a refresh"
+    );
+    assert_eq!(
+        harness.ctrl.cache().borrow().node_rects[&1].rect(),
+        (150.0, 130.0, 150.0, 100.0)
+    );
+    let committed_geometry = harness.window.get_observed_link_geometry();
+    assert_ne!(committed_geometry, initial_geometry);
+
+    // A later interaction must not reveal a route that was left one update
+    // behind by the drag release.
+    harness.mouse_move(20.0, 20.0);
+    flush_geometry(&harness);
+    assert_eq!(
+        harness.window.get_observed_link_geometry(),
+        committed_geometry
+    );
 }
 
 #[test]
