@@ -586,8 +586,11 @@ lifecycle.invoke_reset_graph();
 
 These functions also clear editor interactions that refer to retired objects.
 Call the controller's `remove_pin`, `remove_node`, or `reset_graph` methods when
-there is no Slint component instance. A hidden `Pin` remains available to route
-existing links, but it is excluded from pin hit testing until visible again.
+there is no Slint component instance. A hidden or disabled `Pin` remains
+available to route existing links, but it is excluded from pin hit testing
+until eligible again. Pin picking chooses the nearest eligible pin within the
+radius; exact distance ties choose the lowest pin ID, independent of cache
+insertion order.
 
 ### GeometryTracker
 

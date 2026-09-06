@@ -4,7 +4,7 @@ This document tracks work against the findings in
 [code-review-2026-09-06.md](code-review-2026-09-06.md). Update it when a finding
 is started, completed, reopened, or intentionally deferred.
 
-Last updated: 2026-09-06 through R7.
+Last updated: 2026-09-06 through R8.
 
 ## Status
 
@@ -22,8 +22,8 @@ Last updated: 2026-09-06 through R7.
 | R4 | P1 | Complete | 2. Interaction and public contract | `0b454a9` | Globals are canonical for computations and building-block events; component configuration synchronizes with the controller; public geometry functions use the lifecycle; obsolete members were removed or documented as host conveniences. |
 | R5 | P1 | Complete | 2. Interaction and public contract | `5a4b483` | The quick start is a tested downstream crate using exact git dependencies; its docs cover generated members, ownership, callback replacement, units, IDs, and lifecycle. |
 | R6 | P2 | Complete | 1. Correctness | `28eeaa3` | Link validation now returns canonical output/input endpoints before topology rules run; the advanced and pin-compatibility examples create links from those validated endpoints. |
-| R7 | P2 | Complete | 2. Interaction and public contract | This commit | A modifier-only editor overlay owns forced marquees across every surface; node and pin fallbacks share the configuration, and all transient interactions have cancellation paths. |
-| R8 | P2 | Open | 1. Correctness | — | Pick the nearest eligible pin with a deterministic tie rule. |
+| R7 | P2 | Complete | 2. Interaction and public contract | `e6e9aa5` | A modifier-only editor overlay owns forced marquees across every surface; node and pin fallbacks share the configuration, and all transient interactions have cancellation paths. |
+| R8 | P2 | Complete | 1. Correctness | This commit | Pin picking scans all eligible candidates for the nearest and resolves exact distance ties by lowest pin ID, independent of insertion order. |
 | R9 | P2 | Open | 2. Interaction and public contract | — | Normalize layout inputs and make result ordering deterministic. |
 | R10 | P1 | Open | 2. Interaction and public contract | — | Replace self-confirming tests with tests through promised interfaces. |
 | R11 | P2 | In progress | 5. Scale and optional UX | `1542652` | Unselected nodes no longer subscribe to the global drag start/end toggle through their world-position bindings; frame baselines and broader update localization remain open. |
@@ -33,9 +33,9 @@ Last updated: 2026-09-06 through R7.
 | R15 | P1 release | Open | 3. Release hardening | — | Complete packaging gates and document the currently usable dependency source. |
 | R16 | P3 | Open | 3. Release hardening | — | Clean up examples and make maintenance checks reliable teaching material. |
 
-Overall: **7 of 16 findings complete**. Correctness batch: **4 of 5
+Overall: **8 of 16 findings complete**. Correctness batch: **5 of 5
 findings complete**. Interaction and public contract batch: **3 of 5 findings
-complete**. The next item by review order is **R8**.
+complete**. The next item by review order is **R9**.
 
 ## Completed work
 
@@ -148,7 +148,7 @@ Completed in `28eeaa3`.
 
 ### R7 — arbitrate gestures consistently across surfaces
 
-Completed in this commit.
+Completed in `e6e9aa5`.
 
 - A topmost TouchArea is enabled only while the configured marquee modifier is
   held. It gives forced box selection one owner over the background, links,
@@ -164,6 +164,20 @@ Completed in this commit.
   a node drag.
 - Interaction tests cover all four settings over all five surfaces and each
   cancellation path.
+
+### R8 — pick the nearest pin deterministically
+
+Completed in this commit.
+
+- `find_pin_at` now scans every candidate within the radius and compares
+  squared distances, avoiding unnecessary square roots.
+- Exact distance ties choose the lowest pin ID, so results do not depend on
+  iterator or `HashMap` insertion order.
+- Cache and controller pickers exclude non-hit-testable pins. `Pin.enabled`
+  now controls both its pointer input and its cache eligibility, matching the
+  existing hidden-pin behavior while retaining both as link route endpoints.
+- Regression tests cover overlapping hit radii, reversed input order,
+  equidistant pins, hidden pins, disabled pins, and screen-space lookup.
 
 ## In-progress work
 
@@ -231,6 +245,14 @@ After the initial R11 update-locality fix:
 After R7:
 
 - `cargo test --workspace --all-features --locked`: **417 tests passed** plus
+  **14 executable doctests passed**.
+- `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`:
+  passed.
+- `git diff --check`: passed.
+
+After R8:
+
+- `cargo test --workspace --all-features --locked`: **420 tests passed** plus
   **14 executable doctests passed**.
 - `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`:
   passed.

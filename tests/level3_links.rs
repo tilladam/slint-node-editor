@@ -492,6 +492,35 @@ fn hidden_pin_remains_a_route_endpoint_but_cannot_be_picked() {
 }
 
 #[test]
+fn disabled_pin_remains_a_route_endpoint_but_cannot_be_picked() {
+    let harness = MinimalTestHarness::new();
+    realize(&harness);
+    let position = harness.pin_position(2).unwrap();
+
+    harness.window.set_test_input_pin_enabled(false);
+    flush_geometry(&harness);
+
+    {
+        let cache = harness.ctrl.cache();
+        let cache = cache.borrow();
+        assert!(cache.pin_positions.contains_key(&2));
+        assert_eq!(cache.find_pin_at(position.0, position.1, 2.0), 0);
+        assert!(cache.compute_link_path_world(2, 5, 50.0).is_some());
+    }
+
+    harness.window.set_test_input_pin_enabled(true);
+    flush_geometry(&harness);
+    assert_eq!(
+        harness
+            .ctrl
+            .cache()
+            .borrow()
+            .find_pin_at(position.0, position.1, 2.0),
+        2
+    );
+}
+
+#[test]
 fn graph_reset_clears_the_disposable_projection() {
     let harness = MinimalTestHarness::new();
     realize(&harness);

@@ -993,6 +993,8 @@ export component Pin inherits Rectangle {
     in property <int> pin-id;
     in property <int> node-id;  // Node this pin belongs to (for position reporting)
     in property <int> pin-type;  // Type of pin (input/output/custom)
+    /// Whether the pin accepts input and participates in hit testing.
+    in property <bool> enabled: true;
 
     // === Accessibility ===
     accessible-role: button;
@@ -1033,7 +1035,7 @@ export component Pin inherits Rectangle {
             reported-pin-id = pin-id;
         }
         if pin-id > 0 {
-            NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y, self.visible);
+            NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, center-x, center-y, self.visible && self.enabled);
             if (!DragState.is-dragging) {
                 GeometryVersion.request-version += 1;
             }
@@ -1059,6 +1061,9 @@ export component Pin inherits Rectangle {
     changed visible => {
         root.report-geometry();
     }
+    changed enabled => {
+        root.report-geometry();
+    }
     changed center-x => {
         root.report-geometry();
     }
@@ -1076,6 +1081,7 @@ export component Pin inherits Rectangle {
     }
 
     touch := TouchArea {
+        enabled: root.enabled;
         property <bool> forwarding-box-selection: false;
 
         moved => {

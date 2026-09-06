@@ -211,26 +211,36 @@ where
     find_link_route_at((mouse_x, mouse_y), routes, hover_distance, hit_samples)
 }
 
-/// Find a pin at the given position
+/// Find the nearest pin at the given position.
 ///
-/// Returns the ID of the closest pin within hit_radius, or 0 if none.
+/// Returns the ID of the closest pin within `hit_radius`, or 0 if none. When
+/// pins are exactly equidistant, the lowest pin ID wins. The result therefore
+/// does not depend on iterator or cache insertion order.
 pub fn find_pin_at<P, I>(mouse_x: f32, mouse_y: f32, pins: I, hit_radius: f32) -> i32
 where
     P: PinGeometry,
     I: IntoIterator<Item = P>,
 {
     let hit_radius_sq = hit_radius * hit_radius;
+    let mut closest: Option<(f32, i32)> = None;
 
     for pin in pins {
         let (pin_x, pin_y) = pin.position();
         let dx = mouse_x - pin_x;
         let dy = mouse_y - pin_y;
-        if dx * dx + dy * dy <= hit_radius_sq {
-            return pin.id();
+        let distance_sq = dx * dx + dy * dy;
+        let pin_id = pin.id();
+        if distance_sq <= hit_radius_sq
+            && closest.is_none_or(|(best_distance_sq, best_id)| {
+                distance_sq < best_distance_sq
+                    || (distance_sq == best_distance_sq && pin_id < best_id)
+            })
+        {
+            closest = Some((distance_sq, pin_id));
         }
     }
 
-    0 // No pin found
+    closest.map_or(0, |(_, pin_id)| pin_id)
 }
 
 /// Find all nodes that intersect with a selection box
@@ -333,13 +343,21 @@ mod tests {
     }
 
     #[test]
-    fn test_find_pin_at_first_match_wins() {
-        // Two overlapping pins - first one should be returned
-        let pins = vec![
-            SimplePinGeometry { id: 1001, x: 50.0, y: 50.0 },
-            SimplePinGeometry { id: 2001, x: 50.0, y: 50.0 },
-        ];
-        assert_eq!(find_pin_at(50.0, 50.0, pins, 10.0), 1001);
+    fn test_find_pin_at_picks_nearest_regardless_of_iteration_order() {
+        let farther = SimplePinGeometry { id: 1001, x: 59.0, y: 50.0 };
+        let exact = SimplePinGeometry { id: 2001, x: 50.0, y: 50.0 };
+
+        assert_eq!(find_pin_at(50.0, 50.0, [farther, exact], 10.0), 2001);
+        assert_eq!(find_pin_at(50.0, 50.0, [exact, farther], 10.0), 2001);
+    }
+
+    #[test]
+    fn test_find_pin_at_breaks_distance_ties_by_lowest_id() {
+        let lower_id = SimplePinGeometry { id: 1001, x: 45.0, y: 50.0 };
+        let higher_id = SimplePinGeometry { id: 2001, x: 55.0, y: 50.0 };
+
+        assert_eq!(find_pin_at(50.0, 50.0, [higher_id, lower_id], 10.0), 1001);
+        assert_eq!(find_pin_at(50.0, 50.0, [lower_id, higher_id], 10.0), 1001);
     }
 
     #[test]

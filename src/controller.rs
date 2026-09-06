@@ -410,7 +410,8 @@ impl NodeEditorController {
 
     /// Find the pin closest to the given screen-space position.
     ///
-    /// Returns the pin ID, or 0 if no pin is within `hit_radius`.
+    /// Returns the nearest hit-testable pin ID, or 0 if no pin is within
+    /// `hit_radius`. Exact distance ties choose the lowest pin ID.
     pub fn find_pin_at_screen(&self, mouse_x: f32, mouse_y: f32, hit_radius: f32) -> i32 {
         let s = self.state.borrow();
         let zoom = s.safe_zoom();
@@ -419,16 +420,15 @@ impl NodeEditorController {
         drop(s);
         let cache = self.cache.borrow();
 
-        let pins = cache.pin_positions.iter().filter_map(|(&pin_id, pin)| {
-            let rect = cache.node_rects.get(&pin.node_id)?.rect();
-            // World→screen: (node_world + pin_rel) * zoom + pan
-            let sx = (rect.0 + pin.rel_x) * zoom + pan_x;
-            let sy = (rect.1 + pin.rel_y) * zoom + pan_y;
-            Some(crate::hit_test::SimplePinGeometry {
-                id: pin_id,
+        let pins = cache.get_absolute_pins().map(|pin| {
+            // World→screen: pin_world * zoom + pan
+            let sx = pin.x * zoom + pan_x;
+            let sy = pin.y * zoom + pan_y;
+            crate::hit_test::SimplePinGeometry {
+                id: pin.id,
                 x: sx,
                 y: sy,
-            })
+            }
         });
 
         crate::hit_test::find_pin_at(mouse_x, mouse_y, pins, hit_radius)
@@ -867,6 +867,14 @@ mod tests {
         // Pin 1001 screen pos = 100+50=150, 25+30=55
         let result = ctrl.find_pin_at_screen(150.0, 55.0, 10.0);
         assert_eq!(result, 1001);
+    }
+
+    #[test]
+    fn test_find_pin_at_screen_skips_non_hit_testable_pins() {
+        let ctrl = setup_controller();
+        ctrl.handle_pin_position_with_hit_testable(1001, 1, 2, 100.0, 25.0, false);
+
+        assert_eq!(ctrl.find_pin_at_screen(100.0, 25.0, 10.0), 0);
     }
 
     // ========================================================================

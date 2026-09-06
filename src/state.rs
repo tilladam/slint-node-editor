@@ -114,7 +114,8 @@ where
         })
     }
 
-    /// Find pin at position
+    /// Find the nearest hit-testable pin at a world-space position.
+    /// Exact distance ties choose the lowest pin ID.
     pub fn find_pin_at(&self, x: f32, y: f32, hit_radius: f32) -> i32 {
         find_pin_at(x, y, self.get_absolute_pins(), hit_radius)
     }

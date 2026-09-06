@@ -42,6 +42,7 @@ component SimpleNode inherits BaseNode {
     in property <int> input-pin-node-id: root.node-id;
     in property <int> input-pin-type: PinTypes.input;
     in property <bool> input-pin-visible: true;
+    in property <bool> input-pin-enabled: true;
     node-width: configured-width;
     node-height: configured-height;
 
@@ -68,6 +69,7 @@ component SimpleNode inherits BaseNode {
         node-id: root.input-pin-node-id;
         pin-type: root.input-pin-type;
         visible: root.input-pin-visible;
+        enabled: root.input-pin-enabled;
         node-screen-x: root.screen-x;
         node-screen-y: root.screen-y;
     }
@@ -123,6 +125,7 @@ export component MainWindow inherits Window {
     in-out property <int> test-input-pin-node-id: 1;
     in-out property <int> test-input-pin-type: PinTypes.input;
     in-out property <bool> test-input-pin-visible: true;
+    in-out property <bool> test-input-pin-enabled: true;
     out property <LinkPath> observed-link-geometry: NodeEditorComputations.compute-link-path(3, 4, GeometryVersion.version);
 
     // Additional callbacks for testing
@@ -172,6 +175,7 @@ export component MainWindow inherits Window {
             input-pin-node-id: data.id == 1 ? root.test-input-pin-node-id : data.id;
             input-pin-type: data.id == 1 ? root.test-input-pin-type : PinTypes.input;
             input-pin-visible: data.id == 1 ? root.test-input-pin-visible : true;
+            input-pin-enabled: data.id == 1 ? root.test-input-pin-enabled : true;
             selected: data.selected;
             embedded-control-clicked => {
                 if data.id == 1 {
