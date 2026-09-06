@@ -1,6 +1,8 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::path::CubicBezier;
-use slint_node_editor::{wire_node_editor, LinkData, LinkPath, NodeEditorSetup, NodeGeometry};
+use slint_node_editor::{
+    find_link_route_at, wire_node_editor, LinkData, LinkPath, NodeEditorSetup,
+    PolylineLinkRoute,
+};
 use std::rc::Rc;
 
 slint::include_modules!();
@@ -13,8 +15,23 @@ slint::include_modules!();
 /// left stale by partial rendering. The staircase turns at the midpoint in x
 /// and never leaves the rectangle the two endpoints span, so that rectangle is
 /// the box.
-fn generate_manhattan_path(start_x: f32, start_y: f32, end_x: f32, end_y: f32) -> LinkPath {
+fn manhattan_points(
+    start_x: f32,
+    start_y: f32,
+    end_x: f32,
+    end_y: f32,
+) -> [(f32, f32); 4] {
     let mid_x = (start_x + end_x) / 2.0;
+    [
+        (start_x, start_y),
+        (mid_x, start_y),
+        (mid_x, end_y),
+        (end_x, end_y),
+    ]
+}
+
+fn generate_manhattan_path(start_x: f32, start_y: f32, end_x: f32, end_y: f32) -> LinkPath {
+    let points = manhattan_points(start_x, start_y, end_x, end_y);
     let x = start_x.min(end_x);
     let y = start_y.min(end_y);
 
@@ -25,14 +42,14 @@ fn generate_manhattan_path(start_x: f32, start_y: f32, end_x: f32, end_y: f32) -
     LinkPath {
         commands: format!(
             "M {} {} L {} {} L {} {} L {} {}",
-            start_x - x,
-            start_y - y,
-            mid_x - x,
-            start_y - y,
-            mid_x - x,
-            end_y - y,
-            end_x - x,
-            end_y - y
+            points[0].0 - x,
+            points[0].1 - y,
+            points[1].0 - x,
+            points[1].1 - y,
+            points[2].0 - x,
+            points[2].1 - y,
+            points[3].0 - x,
+            points[3].1 - y
         )
         .into(),
         x,
@@ -70,7 +87,7 @@ fn main() {
     window.set_nodes(ModelRc::from(nodes.clone()));
 
     // Set up links
-    window.set_links(ModelRc::from(Rc::new(VecModel::from(vec![
+    let links = Rc::new(VecModel::from(vec![
         LinkData {
             id: 1,
             start_pin_id: 3, // Node 1 output
@@ -89,7 +106,8 @@ fn main() {
             status: -1,
             selected: false,
         },
-    ]))));
+    ]));
+    window.set_links(ModelRc::from(links.clone()));
 
     // Create setup with model update logic
     let setup = NodeEditorSetup::new({
@@ -127,43 +145,107 @@ fn main() {
 
                 let cache = ctrl.cache();
                 let cache = cache.borrow();
+                let Some((sx, sy, ex, ey)) =
+                    cache.resolve_link_endpoints_world(start_pin, end_pin)
+                else {
+                    return LinkPath::default();
+                };
 
-                let start_pos = cache.pin_positions.get(&start_pin);
-                let end_pos = cache.pin_positions.get(&end_pin);
-
-                if let (Some(start), Some(end)) = (start_pos, end_pos) {
-                    if let (Some(start_rect), Some(end_rect)) = (
-                        cache.node_rects.get(&start.node_id).map(|n| n.rect()),
-                        cache.node_rects.get(&end.node_id).map(|n| n.rect()),
-                    ) {
-                        let sx = start_rect.0 + start.rel_x;
-                        let sy = start_rect.1 + start.rel_y;
-                        let ex = end_rect.0 + end.rel_x;
-                        let ey = end_rect.1 + end.rel_y;
-
-                        if style == "orthogonal" {
-                            generate_manhattan_path(sx, sy, ex, ey)
-                        } else {
-                            // Use zoom=1.0 since transform-scale handles zoom
-                            let curve =
-                                CubicBezier::from_endpoints(sx, sy, ex, ey, 1.0, bezier_offset);
-                            let (x, y, width, height) = curve.bounds();
-                            LinkPath {
-                                commands: curve.commands_from((x, y)).into(),
+                if style == "orthogonal" {
+                    generate_manhattan_path(sx, sy, ex, ey)
+                } else {
+                    cache
+                        .link_curve_world(start_pin, end_pin, bezier_offset)
+                        .map(|curve| {
+                            curve.to_link_path(|commands, x, y, width, height| LinkPath {
+                                commands: commands.into(),
                                 x,
                                 y,
                                 width,
                                 height,
-                            }
-                        }
-                    } else {
-                        LinkPath::default()
-                    }
-                } else {
-                    LinkPath::default()
+                            })
+                        })
+                        .unwrap_or_default()
                 }
             }
         });
 
+    window.on_compute_link_at({
+        let ctrl = setup.controller().clone();
+        let links = links.clone();
+        let w = w.clone();
+        move |world_x, world_y| {
+            let Some(w) = w.upgrade() else {
+                return -1;
+            };
+            let world_hover_distance =
+                ctrl.screen_distance_to_world(w.get_link_hover_distance());
+            let hit_samples = w.get_link_hit_samples() as usize;
+            let rows = (0..links.row_count()).filter_map(|i| links.row_data(i));
+            let cache = ctrl.cache();
+            let cache = cache.borrow();
+
+            if w.get_link_style() == "orthogonal" {
+                let routes = rows.filter_map(|link| {
+                    let (sx, sy, ex, ey) = cache.resolve_link_endpoints_world(
+                        link.start_pin_id,
+                        link.end_pin_id,
+                    )?;
+                    Some(PolylineLinkRoute {
+                        id: link.id,
+                        points: manhattan_points(sx, sy, ex, ey),
+                    })
+                });
+                find_link_route_at(
+                    (world_x, world_y),
+                    routes,
+                    world_hover_distance,
+                    hit_samples,
+                )
+            } else {
+                let rows = rows.map(|link| (link.id, link.start_pin_id, link.end_pin_id));
+                cache.find_bezier_link_at_world(
+                    world_x,
+                    world_y,
+                    rows,
+                    world_hover_distance,
+                    w.get_bezier_min_offset(),
+                    hit_samples,
+                )
+            }
+        }
+    });
+
     window.run().unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn orthogonal_picker_uses_the_rendered_segments() {
+        let route = PolylineLinkRoute {
+            id: 7,
+            points: manhattan_points(100.0, 80.0, -20.0, 240.0),
+        };
+
+        for zoom in [0.1, 0.25, 1.0, 3.0] {
+            let world_hover_distance = 8.0 / zoom;
+            assert_eq!(
+                find_link_route_at((40.0, 170.0), [route], world_hover_distance, 0),
+                7,
+            );
+            assert_eq!(
+                find_link_route_at(
+                    (40.0 + 9.0 / zoom, 170.0),
+                    [route],
+                    world_hover_distance,
+                    0,
+                ),
+                -1,
+                "nine-screen-pixel offset hit at zoom {zoom}",
+            );
+        }
+    }
 }

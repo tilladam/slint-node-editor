@@ -77,10 +77,13 @@ export component MainWindow inherits Window {
     out property <float> height_: self.height / 1px;
     out property <float> zoom: editor.zoom;
     out property <float> bezier-min-offset: editor.bezier-min-offset;
+    out property <length> link-hover-distance: editor.link-hover-distance;
+    out property <int> link-hit-samples: editor.link-hit-samples;
     in-out property <int> geometry-version <=> editor.geometry-version;
 
     // Callbacks to Rust
     callback request-grid-update <=> editor.request-grid-update;
+    callback compute-link-at <=> editor.compute-link-at;
     // Note: geometry tracking and viewport changes are now handled via globals
 
     // Function to refresh links after geometry is reported
@@ -91,6 +94,7 @@ export component MainWindow inherits Window {
     editor := NodeEditor {
         width: 100%;
         height: 100%;
+        has-link-selection: true;
 
         for data in root.nodes: SimpleNode {
             node-id: data.id;

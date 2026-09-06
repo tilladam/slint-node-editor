@@ -1,9 +1,10 @@
-use std::collections::{HashMap, HashSet};
 use crate::hit_test::{
-    find_link_at, find_pin_at, links_in_selection_box, nodes_in_selection_box, SimpleLinkGeometry,
-    SimpleNodeGeometry, SimplePinGeometry, NodeGeometry,
+    find_link_at, find_link_route_at, find_pin_at, links_in_selection_box,
+    nodes_in_selection_box, BezierLinkRoute, NodeGeometry, SimpleLinkGeometry,
+    SimpleNodeGeometry, SimplePinGeometry,
 };
 use crate::path::{generate_bezier_path, CubicBezier};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Copy, Debug)]
 pub struct StoredPin {
@@ -144,6 +145,37 @@ where
         )
     }
 
+    /// Find a default rendered Bézier route in world coordinates.
+    ///
+    /// The mouse position and `world_hover_distance` are both world-space.
+    /// Routes use the same zoom-independent curve as [`Self::link_curve_world`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn find_bezier_link_at_world<'a, I>(
+        &'a self,
+        world_x: f32,
+        world_y: f32,
+        links: I,
+        world_hover_distance: f32,
+        bezier_min_offset: f32,
+        hit_samples: usize,
+    ) -> i32
+    where
+        I: Iterator<Item = (i32, i32, i32)> + 'a,
+    {
+        let routes = links.filter_map(|(id, start_pin, end_pin)| {
+            Some(BezierLinkRoute {
+                id,
+                curve: self.link_curve_world(start_pin, end_pin, bezier_min_offset)?,
+            })
+        });
+        find_link_route_at(
+            (world_x, world_y),
+            routes,
+            world_hover_distance,
+            hit_samples,
+        )
+    }
+
     /// Compute nodes in selection box
     pub fn nodes_in_selection_box(
         &self,
@@ -184,7 +216,11 @@ where
 
     /// Resolve absolute world-space positions for a link's start and end pins.
     /// Returns `(start_x, start_y, end_x, end_y)` or `None` if pins/nodes are missing.
-    fn resolve_link_endpoints(&self, start_pin: i32, end_pin: i32) -> Option<(f32, f32, f32, f32)> {
+    pub fn resolve_link_endpoints_world(
+        &self,
+        start_pin: i32,
+        end_pin: i32,
+    ) -> Option<(f32, f32, f32, f32)> {
         let start_pos = self.pin_positions.get(&start_pin)?;
         let end_pos = self.pin_positions.get(&end_pin)?;
 
@@ -207,7 +243,7 @@ where
         zoom: f32,
         bezier_min_offset: f32,
     ) -> Option<String> {
-        let (sx, sy, ex, ey) = self.resolve_link_endpoints(start_pin, end_pin)?;
+        let (sx, sy, ex, ey) = self.resolve_link_endpoints_world(start_pin, end_pin)?;
         Some(generate_bezier_path(sx, sy, ex, ey, zoom, bezier_min_offset))
     }
 
@@ -223,7 +259,7 @@ where
         pan_y: f32,
         bezier_min_offset: f32,
     ) -> Option<String> {
-        let (sx, sy, ex, ey) = self.resolve_link_endpoints(start_pin, end_pin)?;
+        let (sx, sy, ex, ey) = self.resolve_link_endpoints_world(start_pin, end_pin)?;
         Some(generate_bezier_path(
             sx * zoom + pan_x, sy * zoom + pan_y,
             ex * zoom + pan_x, ey * zoom + pan_y,
@@ -241,7 +277,7 @@ where
         end_pin: i32,
         bezier_min_offset: f32,
     ) -> Option<CubicBezier> {
-        let (sx, sy, ex, ey) = self.resolve_link_endpoints(start_pin, end_pin)?;
+        let (sx, sy, ex, ey) = self.resolve_link_endpoints_world(start_pin, end_pin)?;
         Some(CubicBezier::from_endpoints(sx, sy, ex, ey, 1.0, bezier_min_offset))
     }
 

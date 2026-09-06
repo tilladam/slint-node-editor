@@ -7,6 +7,56 @@ pub trait LinkGeometry {
     fn end(&self) -> (f32, f32);
 }
 
+/// A resolved link route that can measure a point in the same coordinate space.
+///
+/// Rendering and picking should construct the same route representation. The
+/// picker supplies `hit_samples` so curved implementations can choose their
+/// approximation quality; exact polyline implementations can ignore it.
+pub trait LinkRoute {
+    /// Stable application link identifier returned after a hit.
+    fn id(&self) -> i32;
+    /// Distance from `point` to this route in their shared coordinate space.
+    fn distance_to(&self, point: (f32, f32), hit_samples: usize) -> f32;
+}
+
+/// A link route backed by the same cubic Bézier used for rendering.
+#[derive(Clone, Copy, Debug)]
+pub struct BezierLinkRoute {
+    /// Stable application link identifier.
+    pub id: i32,
+    /// The curve used to render the link.
+    pub curve: CubicBezier,
+}
+
+impl LinkRoute for BezierLinkRoute {
+    fn id(&self) -> i32 {
+        self.id
+    }
+
+    fn distance_to(&self, point: (f32, f32), hit_samples: usize) -> f32 {
+        distance_to_bezier(point, &self.curve, hit_samples)
+    }
+}
+
+/// An owned polyline route for orthogonal and other segmented custom links.
+#[derive(Clone, Copy, Debug)]
+pub struct PolylineLinkRoute<const N: usize> {
+    /// Stable application link identifier.
+    pub id: i32,
+    /// Ordered vertices of the rendered route.
+    pub points: [(f32, f32); N],
+}
+
+impl<const N: usize> LinkRoute for PolylineLinkRoute<N> {
+    fn id(&self) -> i32 {
+        self.id
+    }
+
+    fn distance_to(&self, point: (f32, f32), _hit_samples: usize) -> f32 {
+        distance_to_polyline(point, &self.points)
+    }
+}
+
 /// Trait for pin geometry data needed for hit-testing
 pub trait PinGeometry {
     fn id(&self) -> i32;
@@ -65,9 +115,71 @@ impl NodeGeometry for SimpleNodeGeometry {
     fn rect(&self) -> (f32, f32, f32, f32) { (self.x, self.y, self.width, self.height) }
 }
 
-/// Find a link at the given position
+/// Find the closest resolved link route at a point.
 ///
-/// Returns the ID of the closest link within hover_distance, or -1 if none.
+/// `point`, every route, and `hover_distance` must use the same coordinate
+/// space. For a world-space route and a screen-pixel tolerance, divide the
+/// tolerance by the viewport zoom before calling this function.
+pub fn find_link_route_at<R, I>(
+    point: (f32, f32),
+    routes: I,
+    hover_distance: f32,
+    hit_samples: usize,
+) -> i32
+where
+    R: LinkRoute,
+    I: IntoIterator<Item = R>,
+{
+    let mut closest_link_id = -1;
+    let mut closest_distance = hover_distance;
+
+    for route in routes {
+        let distance = route.distance_to(point, hit_samples);
+        if distance < closest_distance {
+            closest_distance = distance;
+            closest_link_id = route.id();
+        }
+    }
+
+    closest_link_id
+}
+
+/// Distance from a point to a polyline in their shared coordinate space.
+pub fn distance_to_polyline(point: (f32, f32), points: &[(f32, f32)]) -> f32 {
+    match points {
+        [] => f32::INFINITY,
+        [only] => squared_distance(point, *only).sqrt(),
+        _ => points
+            .windows(2)
+            .map(|segment| distance_to_segment(point, segment[0], segment[1]))
+            .fold(f32::INFINITY, f32::min),
+    }
+}
+
+fn squared_distance(a: (f32, f32), b: (f32, f32)) -> f32 {
+    let dx = a.0 - b.0;
+    let dy = a.1 - b.1;
+    dx * dx + dy * dy
+}
+
+fn distance_to_segment(point: (f32, f32), start: (f32, f32), end: (f32, f32)) -> f32 {
+    let segment = (end.0 - start.0, end.1 - start.1);
+    let length_sq = segment.0 * segment.0 + segment.1 * segment.1;
+    if length_sq == 0.0 {
+        return squared_distance(point, start).sqrt();
+    }
+    let from_start = (point.0 - start.0, point.1 - start.1);
+    let t = ((from_start.0 * segment.0 + from_start.1 * segment.1) / length_sq)
+        .clamp(0.0, 1.0);
+    let closest = (start.0 + t * segment.0, start.1 + t * segment.1);
+    squared_distance(point, closest).sqrt()
+}
+
+/// Find a default Bézier link from endpoint geometry.
+///
+/// All inputs use one coordinate space. `zoom` affects curve construction; it
+/// must be the same value used when the route was rendered. World-space links
+/// rendered inside a scaled container use `zoom = 1.0` here.
 pub fn find_link_at<L, I>(
     mouse_x: f32,
     mouse_y: f32,
@@ -81,30 +193,22 @@ where
     L: LinkGeometry,
     I: IntoIterator<Item = L>,
 {
-    let mut closest_link_id: i32 = -1;
-    let mut closest_distance = hover_distance;
-
-    for link in links {
+    let routes = links.into_iter().map(|link| {
         let (start_x, start_y) = link.start();
         let (end_x, end_y) = link.end();
-
-        let bezier = CubicBezier::from_endpoints(
-            start_x,
-            start_y,
-            end_x,
-            end_y,
-            zoom,
-            bezier_min_offset,
-        );
-        let distance = distance_to_bezier((mouse_x, mouse_y), &bezier, hit_samples);
-
-        if distance < closest_distance {
-            closest_distance = distance;
-            closest_link_id = link.id();
+        BezierLinkRoute {
+            id: link.id(),
+            curve: CubicBezier::from_endpoints(
+                start_x,
+                start_y,
+                end_x,
+                end_y,
+                zoom,
+                bezier_min_offset,
+            ),
         }
-    }
-
-    closest_link_id
+    });
+    find_link_route_at((mouse_x, mouse_y), routes, hover_distance, hit_samples)
 }
 
 /// Find a pin at the given position

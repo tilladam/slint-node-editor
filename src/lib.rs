@@ -55,8 +55,8 @@
 //!
 //! - [`generate_grid_commands`] - Generate SVG path for grid rendering
 //! - [`generate_bezier_path`] - Generate SVG path for bezier curves
-//! - [`find_pin_at`] - Hit-test pins at screen coordinates
-//! - [`find_link_at`] - Hit-test links at screen coordinates
+//! - [`find_pin_at`] - Hit-test pins in a shared coordinate space
+//! - [`find_link_route_at`] - Hit-test rendered link routes in a shared coordinate space
 //! - [`GeometryCache`] - Cache node and pin geometry for fast lookups
 //! - [`selection`] - Resolve selection gestures and project the result into rows
 //! - [`GraphLogic`] - Helper for managing node graph state
@@ -109,8 +109,9 @@ pub use nodeeditor::{
 // Re-export traits and functions
 pub use grid::generate_grid_commands;
 pub use hit_test::{
-    find_link_at, find_pin_at, links_in_selection_box, nodes_in_selection_box, LinkGeometry,
-    NodeGeometry, PinGeometry, SimpleLinkGeometry, SimpleNodeGeometry,
+    distance_to_polyline, find_link_at, find_link_route_at, find_pin_at, links_in_selection_box,
+    nodes_in_selection_box, BezierLinkRoute, LinkGeometry, LinkRoute, NodeGeometry, PinGeometry,
+    PolylineLinkRoute, SimpleLinkGeometry, SimpleNodeGeometry,
 };
 pub use path::{generate_bezier_path, generate_partial_bezier_path};
 pub use state::{GeometryCache, StoredPin};

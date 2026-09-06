@@ -357,12 +357,11 @@ fn build_app() -> App {
             let link_iter = (0..links.row_count())
                 .filter_map(|i| links.row_data(i))
                 .map(|l| (l.id, l.start_pin_id, l.end_pin_id));
-            cache.find_link_at(
+            cache.find_bezier_link_at_world(
                 x,
                 y,
                 link_iter,
-                w.get_link_hover_distance(),
-                w.get_zoom(),
+                ctrl.screen_distance_to_world(w.get_link_hover_distance()),
                 w.get_bezier_min_offset(),
                 w.get_link_hit_samples() as usize,
             )

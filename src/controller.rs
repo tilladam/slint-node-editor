@@ -68,7 +68,7 @@
 //! }
 //! ```
 
-use crate::hit_test::{find_link_at, NodeGeometry, SimpleLinkGeometry};
+use crate::hit_test::{NodeGeometry, SimpleLinkGeometry};
 use crate::state::GeometryCache;
 use slint::SharedString;
 use std::cell::RefCell;
@@ -157,6 +157,11 @@ impl NodeEditorController {
     /// Get the current zoom level.
     pub fn zoom(&self) -> f32 {
         self.state.borrow().zoom
+    }
+
+    /// Convert a screen-space distance in pixels to world-space units.
+    pub fn screen_distance_to_world(&self, screen_distance: f32) -> f32 {
+        screen_distance / self.state.borrow().safe_zoom()
     }
 
     /// Get access to the geometry cache.
@@ -367,52 +372,32 @@ impl NodeEditorController {
         crate::generate_grid_commands(width, height, 1.0, 0.0, 0.0, spacing).into()
     }
 
-    // === Screen-space hit-testing facades ===
-    //
-    // These methods accept screen-space mouse coordinates and handle all
-    // coordinate conversion internally using the stored viewport state.
+    // === Hit-testing facades ===
 
-    /// Find the link closest to the given screen-space position.
-    ///
-    /// Returns the link ID, or -1 if no link is within `hover_distance`.
-    /// Internally converts world-space cache data to screen space for accurate
-    /// bezier hit testing that matches the rendered curves.
     /// Find the link closest to the given world-space position.
     ///
-    /// Returns the link ID, or -1 if no link is within `hover_distance`.
+    /// Returns the link ID, or -1 if no link is within
+    /// `world_hover_distance`. The route is the same zoom-independent world
+    /// curve produced by the standard renderer callback.
     pub fn find_link_at_world(
         &self,
-        mouse_x: f32,
-        mouse_y: f32,
-        hover_distance: f32,
+        world_x: f32,
+        world_y: f32,
+        world_hover_distance: f32,
         bezier_min_offset: f32,
         hit_samples: usize,
     ) -> i32 {
         let s = self.state.borrow();
-        let zoom = s.safe_zoom();
         let cache = self.cache.borrow();
-
-        let link_geometries = s.links.iter().filter_map(|(&id, &(start_pin, end_pin))| {
-            let start_pos = cache.pin_positions.get(&start_pin)?;
-            let end_pos = cache.pin_positions.get(&end_pin)?;
-            let start_rect = cache.node_rects.get(&start_pos.node_id)?.rect();
-            let end_rect = cache.node_rects.get(&end_pos.node_id)?.rect();
-
-            Some(SimpleLinkGeometry {
-                id,
-                start_x: start_rect.0 + start_pos.rel_x,
-                start_y: start_rect.1 + start_pos.rel_y,
-                end_x: end_rect.0 + end_pos.rel_x,
-                end_y: end_rect.1 + end_pos.rel_y,
-            })
-        });
-
-        find_link_at(
-            mouse_x,
-            mouse_y,
-            link_geometries,
-            hover_distance,
-            zoom,
+        let links = s
+            .links
+            .iter()
+            .map(|(&id, &(start_pin, end_pin))| (id, start_pin, end_pin));
+        cache.find_bezier_link_at_world(
+            world_x,
+            world_y,
+            links,
+            world_hover_distance,
             bezier_min_offset,
             hit_samples,
         )
@@ -420,13 +405,14 @@ impl NodeEditorController {
 
     /// Find the link closest to the given screen-space position.
     ///
-    /// Returns the link ID, or -1 if no link is within `hover_distance`.
-    /// Converts screen→world and delegates to [`find_link_at_world`](Self::find_link_at_world).
+    /// Returns the link ID, or -1 if no link is within the screen-pixel
+    /// `screen_hover_distance`. Converts the point and tolerance to world space
+    /// once, then tests the same world curve used for rendering.
     pub fn find_link_at_screen(
         &self,
         mouse_x: f32,
         mouse_y: f32,
-        hover_distance: f32,
+        screen_hover_distance: f32,
         bezier_min_offset: f32,
         hit_samples: usize,
     ) -> i32 {
@@ -438,7 +424,14 @@ impl NodeEditorController {
 
         let world_x = (mouse_x - pan_x) / zoom;
         let world_y = (mouse_y - pan_y) / zoom;
-        self.find_link_at_world(world_x, world_y, hover_distance, bezier_min_offset, hit_samples)
+        let world_hover_distance = screen_hover_distance / zoom;
+        self.find_link_at_world(
+            world_x,
+            world_y,
+            world_hover_distance,
+            bezier_min_offset,
+            hit_samples,
+        )
     }
 
     /// Find the pin closest to the given screen-space position.
@@ -573,6 +566,19 @@ mod tests {
 
         // Register a link between the pins
         ctrl.register_link(1, 1001, 2001);
+        ctrl
+    }
+
+    fn setup_controller_with_link(
+        start: (f32, f32),
+        end: (f32, f32),
+    ) -> NodeEditorController {
+        let ctrl = NodeEditorController::new();
+        ctrl.handle_node_rect(1, start.0, start.1, 1.0, 1.0);
+        ctrl.handle_node_rect(2, end.0, end.1, 1.0, 1.0);
+        ctrl.handle_pin_position(1, 1, 2, 0.0, 0.0);
+        ctrl.handle_pin_position(2, 2, 1, 0.0, 0.0);
+        ctrl.register_link(7, 1, 2);
         ctrl
     }
 
@@ -727,6 +733,119 @@ mod tests {
         // At zoom=1, pan=(50,30): pin 1001 screen pos = (0+100)*1+50 = 150, (0+25)*1+30 = 55
         let result = ctrl.find_link_at_screen(150.0, 55.0, 10.0, 50.0, 20);
         assert_eq!(result, 1);
+    }
+
+    #[test]
+    fn screen_hit_test_uses_the_rendered_world_curve() {
+        let ctrl = NodeEditorController::new();
+        ctrl.handle_node_rect(1, 0.0, 0.0, 1.0, 1.0);
+        ctrl.handle_node_rect(2, 30.0, 100.0, 1.0, 1.0);
+        ctrl.handle_pin_position(1, 1, 2, 0.0, 0.0);
+        ctrl.handle_pin_position(2, 2, 1, 0.0, 0.0);
+        ctrl.register_link(7, 1, 2);
+        ctrl.set_viewport(3.0, 17.0, -11.0);
+        let rendered = crate::path::CubicBezier::from_endpoints(
+            0.0, 0.0, 30.0, 100.0, 1.0, 50.0,
+        );
+        let (world_x, world_y) = rendered.eval(0.2);
+
+        assert_eq!(
+            ctrl.find_link_at_screen(
+                world_x * 3.0 + 17.0,
+                world_y * 3.0 - 11.0,
+                1.0,
+                50.0,
+                1000,
+            ),
+            7
+        );
+    }
+
+    #[test]
+    fn screen_hit_tolerance_does_not_grow_with_zoom() {
+        let ctrl = NodeEditorController::new();
+        ctrl.handle_node_rect(1, 0.0, 0.0, 1.0, 1.0);
+        ctrl.handle_node_rect(2, 200.0, 0.0, 1.0, 1.0);
+        ctrl.handle_pin_position(1, 1, 2, 0.0, 0.0);
+        ctrl.handle_pin_position(2, 2, 1, 0.0, 0.0);
+        ctrl.register_link(7, 1, 2);
+        ctrl.set_viewport(3.0, 0.0, 0.0);
+
+        assert_eq!(
+            ctrl.find_link_at_screen(300.0, 20.0, 8.0, 50.0, 100),
+            -1
+        );
+    }
+
+    #[test]
+    fn rendered_world_curves_are_pickable_across_viewports_and_edge_shapes() {
+        let edges = [
+            ((0.0, 0.0), (200.0, 0.0), "horizontal"),
+            ((0.0, 0.0), (10.0, 5.0), "short"),
+            ((25.0, -75.0), (25.0, 125.0), "vertical"),
+            ((180.0, 90.0), (-70.0, -30.0), "reversed"),
+        ];
+
+        for (start, end, shape) in edges {
+            let rendered = crate::path::CubicBezier::from_endpoints(
+                start.0, start.1, end.0, end.1, 1.0, 50.0,
+            );
+            let ctrl = setup_controller_with_link(start, end);
+
+            for zoom in [0.1, 0.25, 1.0, 3.0] {
+                let pan = (37.0, -29.0);
+                ctrl.set_viewport(zoom, pan.0, pan.1);
+
+                for t in [0.0, 0.2, 0.5, 0.8, 1.0] {
+                    let (world_x, world_y) = rendered.eval(t);
+                    assert_eq!(
+                        ctrl.find_link_at_screen(
+                            world_x * zoom + pan.0,
+                            world_y * zoom + pan.1,
+                            2.0,
+                            50.0,
+                            1000,
+                        ),
+                        7,
+                        "failed to pick {shape} edge at zoom {zoom} and t {t}",
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn screen_tolerance_is_constant_across_zoom_levels_and_pan() {
+        let ctrl = setup_controller_with_link((0.0, 0.0), (200.0, 0.0));
+
+        for zoom in [0.1, 0.25, 1.0, 3.0] {
+            let pan = (37.0, -29.0);
+            ctrl.set_viewport(zoom, pan.0, pan.1);
+            let midpoint_screen = (100.0 * zoom + pan.0, pan.1);
+
+            assert_eq!(
+                ctrl.find_link_at_screen(
+                    midpoint_screen.0,
+                    midpoint_screen.1 + 7.0,
+                    8.0,
+                    50.0,
+                    1000,
+                ),
+                7,
+                "seven-screen-pixel offset missed at zoom {zoom}",
+            );
+            assert_eq!(
+                ctrl.find_link_at_screen(
+                    midpoint_screen.0,
+                    midpoint_screen.1 + 9.0,
+                    8.0,
+                    50.0,
+                    1000,
+                ),
+                -1,
+                "nine-screen-pixel offset hit at zoom {zoom}",
+            );
+        }
     }
 
     // ========================================================================

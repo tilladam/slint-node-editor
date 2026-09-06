@@ -11,6 +11,7 @@ const STRAIGHT_THRESHOLD: f32 = 20.0;
 /// four points are the single description of the curve — the drawn commands,
 /// the bounding box and the hit test all read them, so a click lands on the
 /// stroke the eye sees.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CubicBezier {
     pub p0: (f32, f32), // Start point
     pub p1: (f32, f32), // Control point 1

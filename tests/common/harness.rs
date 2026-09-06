@@ -241,7 +241,14 @@ impl MinimalTestHarness {
                 });
                 ctrl.cache()
                     .borrow()
-                    .find_link_at(x, y, links_iter, 8.0, ctrl.zoom(), 50.0, 20)
+                    .find_bezier_link_at_world(
+                        x,
+                        y,
+                        links_iter,
+                        ctrl.screen_distance_to_world(8.0),
+                        50.0,
+                        20,
+                    )
             }
         });
 
