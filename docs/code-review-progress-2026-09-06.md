@@ -4,7 +4,7 @@ This document tracks work against the findings in
 [code-review-2026-09-06.md](code-review-2026-09-06.md). Update it when a finding
 is started, completed, reopened, or intentionally deferred.
 
-Last updated: 2026-09-06 through R5.
+Last updated: 2026-09-06 through R6.
 
 ## Status
 
@@ -20,8 +20,8 @@ Last updated: 2026-09-06 through R5.
 | R2 | P1 | Complete | 1. Correctness | `1363ce7` | Added explicit node, pin, and graph-reset lifecycle operations; identity replacement; cache and registered-link cleanup; interaction-state cleanup; advanced-example deletion wiring; and a tested hidden-pin policy. |
 | R3 | P1 | Complete | 1. Correctness | `ff274c9` | Default picking now uses the rendered world curve and converts screen tolerance once. Custom routes can supply their rendered geometry; the orthogonal example shares one route with its picker. |
 | R4 | P1 | Complete | 2. Interaction and public contract | `0b454a9` | Globals are canonical for computations and building-block events; component configuration synchronizes with the controller; public geometry functions use the lifecycle; obsolete members were removed or documented as host conveniences. |
-| R5 | P1 | Complete | 2. Interaction and public contract | This commit | The quick start is a tested downstream crate using exact git dependencies; its docs cover generated members, ownership, callback replacement, units, IDs, and lifecycle. |
-| R6 | P2 | Open | 1. Correctness | — | Normalize endpoints before duplicate checking. |
+| R5 | P1 | Complete | 2. Interaction and public contract | `5a4b483` | The quick start is a tested downstream crate using exact git dependencies; its docs cover generated members, ownership, callback replacement, units, IDs, and lifecycle. |
+| R6 | P2 | Complete | 1. Correctness | This commit | Link validation now returns canonical output/input endpoints before topology rules run; the advanced and pin-compatibility examples create links from those validated endpoints. |
 | R7 | P2 | Open | 2. Interaction and public contract | — | Apply gesture ownership and configured modifiers consistently. |
 | R8 | P2 | Open | 1. Correctness | — | Pick the nearest eligible pin with a deterministic tie rule. |
 | R9 | P2 | Open | 2. Interaction and public contract | — | Normalize layout inputs and make result ordering deterministic. |
@@ -33,9 +33,9 @@ Last updated: 2026-09-06 through R5.
 | R15 | P1 release | Open | 3. Release hardening | — | Complete packaging gates and document the currently usable dependency source. |
 | R16 | P3 | Open | 3. Release hardening | — | Clean up examples and make maintenance checks reliable teaching material. |
 
-Overall: **5 of 16 findings complete**. Correctness batch: **3 of 5
+Overall: **6 of 16 findings complete**. Correctness batch: **4 of 5
 findings complete**. Interaction and public contract batch: **2 of 5 findings
-complete**. The next item by review order is **R6**.
+complete**. The next item by review order is **R7**.
 
 ## Completed work
 
@@ -115,7 +115,7 @@ Completed in `0b454a9`.
 
 ### R5 — replace the quick start with a compiled consumer
 
-Completed in this commit.
+Completed in `5a4b483`.
 
 - The downstream smoke crate is now the complete quick-start application. It
   resolves `@nodeeditor` through dependency metadata and pins the currently
@@ -131,6 +131,20 @@ Completed in this commit.
 - Obsolete component wiring was removed from the controller, tracker, and link
   manager documentation. Complete Rust examples are executable doctests;
   generated-UI fragments are labeled and linked to the downstream fixture.
+
+### R6 — normalize endpoints before duplicate checking
+
+Completed in this commit.
+
+- `validate_and_normalize_link` performs basic endpoint checks, normalizes the
+  gesture to output/input order, and only then calls topology validators.
+- Successful validation returns a `NormalizedLink` with named output and input
+  fields, so hosts create the exact logical edge their policies approved.
+- The advanced example uses the operation for link creation. Its real callback
+  test creates a connection in one direction, retries it in reverse, and
+  verifies that exactly one canonical link exists.
+- The pin-compatibility example now applies type compatibility and duplicate
+  checks to normalized endpoints and uses the returned endpoints for creation.
 
 ## Verification
 
@@ -165,6 +179,14 @@ After R5:
 - `./smoke/run.sh git`: the exact documented git consumer passed its end-to-end
   edit test outside the workspace.
 - Workspace and downstream `cargo clippy --all-targets ... -- -D warnings`:
+  passed.
+- `git diff --check`: passed.
+
+After R6:
+
+- `cargo test --workspace --all-features --locked`: **406 tests passed** plus
+  **14 executable doctests passed**.
+- `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`:
   passed.
 - `git diff --check`: passed.
 

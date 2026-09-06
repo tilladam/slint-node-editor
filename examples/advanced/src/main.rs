@@ -4,13 +4,12 @@
 // computation callbacks.
 
 use slint::{Color, ComponentHandle, Model, ModelRc, SharedString, VecModel};
-use slint_node_editor::{
-    selection, wire_node_editor, BasicLinkValidator, CompositeValidator, GraphLogic, LinkData,
-    LinkPath, LinkValidator, MinimapNode, MovableNode, NoDuplicatesValidator, NodeEditorSetup,
-    ValidationResult,
-};
 #[cfg(test)]
 use slint_node_editor::NodeEditorController;
+use slint_node_editor::{
+    selection, validate_and_normalize_link, wire_node_editor, GraphLogic, LinkData, LinkPath,
+    MinimapNode, MovableNode, NoDuplicatesValidator, NodeEditorSetup,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -492,26 +491,21 @@ fn build_app() -> App {
             let pin_types = PinTypes::get(&w);
             let output_type = pin_types.get_output();
 
-            // Validate link using the new validator framework
-            let validator: CompositeValidator<_, LinkData> = CompositeValidator::new()
-                .with(BasicLinkValidator::new(output_type))
-                .with(NoDuplicatesValidator);
-
             let links_vec: Vec<LinkData> = links.iter().collect();
-            match validator.validate(start_pin, end_pin, &cache, &links_vec) {
-                ValidationResult::Valid => {}
-                ValidationResult::Invalid(_err) => {
+            let normalized = match validate_and_normalize_link(
+                start_pin,
+                end_pin,
+                &cache,
+                &links_vec,
+                output_type,
+                &NoDuplicatesValidator,
+            ) {
+                Ok(link) => link,
+                Err(_err) => {
                     // Could log or display error here: eprintln!("Cannot create link: {}", err);
                     return;
                 }
-            }
-
-            let (output_pin, input_pin) =
-                match GraphLogic::normalize_link_direction(start_pin, end_pin, &cache, output_type)
-                {
-                    Some(p) => p,
-                    None => return,
-                };
+            };
 
             let id = *next_link_id.borrow();
             *next_link_id.borrow_mut() += 1;
@@ -520,15 +514,15 @@ fn build_app() -> App {
             let color = link_colors[idx];
 
             if let Some(_path) = cache.compute_link_path(
-                output_pin,
-                input_pin,
+                normalized.output_pin_id,
+                normalized.input_pin_id,
                 w.get_zoom(),
                 w.get_bezier_min_offset(),
             ) {
                 let data = LinkData {
                     id,
-                    start_pin_id: output_pin,
-                    end_pin_id: input_pin,
+                    start_pin_id: normalized.output_pin_id,
+                    end_pin_id: normalized.input_pin_id,
                     color,
                     line_width: 2.0,
                     status: -1,
@@ -707,6 +701,26 @@ mod tests {
             GraphLogic::find_node_by_id(nodes, id, |n| n.id).expect("node to select");
         node.selected = true;
         nodes.set_row_data(i, node);
+    }
+
+    #[test]
+    fn link_callback_rejects_the_same_connection_from_the_reverse_gesture() {
+        let app = app();
+        app.window.show().unwrap();
+        slint::platform::update_timers_and_animations();
+        slint::platform::update_timers_and_animations();
+
+        let before = app.links.row_count();
+        app.window.invoke_create_link(1002, 3001);
+        app.window.invoke_create_link(3001, 1002);
+
+        assert_eq!(app.links.row_count(), before + 1);
+        let matching_links = app
+            .links
+            .iter()
+            .filter(|link| link.start_pin_id == 1002 && link.end_pin_id == 3001)
+            .count();
+        assert_eq!(matching_links, 1);
     }
 
     /// The minimap is a snapshot of the node models, so a committed drag has to

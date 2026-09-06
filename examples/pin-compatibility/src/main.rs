@@ -15,8 +15,9 @@
 
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    wire_node_editor, BasicLinkValidator, CompositeValidator, GeometryCache, LinkData, LinkPath,
-    LinkValidator, NodeEditorSetup, SimpleNodeGeometry, ValidationError, ValidationResult,
+    validate_and_normalize_link, wire_node_editor, CompositeValidator, GeometryCache, LinkData,
+    LinkPath, LinkValidator, NoDuplicatesValidator, NodeEditorSetup, SimpleNodeGeometry,
+    ValidationError, ValidationResult,
 };
 use std::rc::Rc;
 
@@ -198,17 +199,14 @@ fn main() {
             let cache = ctrl.cache();
             let cache = cache.borrow();
 
-            // Create composite validator with basic checks + type compatibility
-            let validator: CompositeValidator<SimpleNodeGeometry, LinkData> =
+            let topology: CompositeValidator<SimpleNodeGeometry, LinkData> =
                 CompositeValidator::new()
-                    .with(BasicLinkValidator::new(2)) // 2 = output pin type
-                    .with(TypeCompatibilityValidator);
+                    .with(TypeCompatibilityValidator)
+                    .with(NoDuplicatesValidator);
 
             let links_vec: Vec<LinkData> = links.iter().collect();
-            matches!(
-                validator.validate(start_pin, end_pin, &cache, &links_vec),
-                ValidationResult::Valid
-            )
+            validate_and_normalize_link(start_pin, end_pin, &cache, &links_vec, 2, &topology)
+                .is_ok()
         }
     });
 
@@ -222,28 +220,20 @@ fn main() {
             let cache = ctrl.cache();
             let cache = cache.borrow();
 
-            // Create composite validator with basic checks + type compatibility
-            let validator: CompositeValidator<SimpleNodeGeometry, LinkData> =
+            let topology: CompositeValidator<SimpleNodeGeometry, LinkData> =
                 CompositeValidator::new()
-                    .with(BasicLinkValidator::new(2)) // 2 = output pin type
-                    .with(TypeCompatibilityValidator);
+                    .with(TypeCompatibilityValidator)
+                    .with(NoDuplicatesValidator);
 
             let links_vec: Vec<LinkData> = links.iter().collect();
-            match validator.validate(start_pin, end_pin, &cache, &links_vec) {
-                ValidationResult::Valid => {
-                    // Determine output and input pins
-                    let start_info = cache.pin_positions.get(&start_pin);
-                    let (output_pin, input_pin) = if start_info.map(|s| s.pin_type) == Some(2) {
-                        (start_pin, end_pin)
-                    } else {
-                        (end_pin, start_pin)
-                    };
-
+            match validate_and_normalize_link(start_pin, end_pin, &cache, &links_vec, 2, &topology)
+            {
+                Ok(normalized) => {
                     let link = LinkData {
                         id: next_link_id.get(),
-                        start_pin_id: output_pin,
-                        end_pin_id: input_pin,
-                        color: get_link_color(output_pin),
+                        start_pin_id: normalized.output_pin_id,
+                        end_pin_id: normalized.input_pin_id,
+                        color: get_link_color(normalized.output_pin_id),
                         line_width: 2.5,
                         status: -1,
                         selected: false,
@@ -251,15 +241,15 @@ fn main() {
 
                     println!(
                         "Link created: {} -> {} ({})",
-                        type_name(get_data_type(output_pin)),
-                        type_name(get_data_type(input_pin)),
+                        type_name(get_data_type(normalized.output_pin_id)),
+                        type_name(get_data_type(normalized.input_pin_id)),
                         link.id
                     );
 
                     links.push(link);
                     next_link_id.set(next_link_id.get() + 1);
                 }
-                ValidationResult::Invalid(err) => match &err {
+                Err(err) => match &err {
                     ValidationError::TypeMismatch { expected, found } => {
                         println!(
                             "Cannot connect: {} is not compatible with {}",

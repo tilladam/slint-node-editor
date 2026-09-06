@@ -124,6 +124,7 @@ pub use state::{GeometryCache, StoredPin};
 // would say nothing about what it resolves.
 pub use controller::NodeEditorController;
 pub use graph::{
+    validate_and_normalize_link,
     BasicLinkValidator,
     CompositeValidator,
     GraphLogic,
@@ -132,6 +133,7 @@ pub use graph::{
     LinkValidator,
     MovableNode,
     NoDuplicatesValidator,
+    NormalizedLink,
     SimpleLink,
     ValidationError,
     ValidationResult,

@@ -362,6 +362,20 @@ pub enum ValidationError {
     Custom(String),
 }
 
+/// Endpoints of a valid link in the canonical output-to-input order.
+///
+/// [`validate_and_normalize_link`] returns this value only after basic pin
+/// validation and the supplied topology rules have both succeeded. Using the
+/// returned endpoints for link creation keeps duplicate checks and stored link
+/// direction in agreement regardless of which pin started the gesture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NormalizedLink {
+    /// Output pin ID, suitable for [`LinkModel::start_pin_id`].
+    pub output_pin_id: i32,
+    /// Input pin ID, suitable for [`LinkModel::end_pin_id`].
+    pub input_pin_id: i32,
+}
+
 impl fmt::Display for ValidationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -384,7 +398,8 @@ impl fmt::Display for ValidationError {
 /// Trait for custom link validation logic.
 ///
 /// Implement this to add custom validation rules for connecting pins.
-/// Use with `validate_link()` function or compose with `CompositeValidator`.
+/// Pass topology rules to [`validate_and_normalize_link`] directly or compose
+/// several rules with [`CompositeValidator`].
 ///
 /// The trait is generic over:
 /// - `N`: The node geometry type (defaults to `SimpleNodeGeometry`)
@@ -517,9 +532,93 @@ where
     }
 }
 
+/// Validate a gesture, normalize it to output-to-input order, then apply
+/// topology rules.
+///
+/// The topology validator always receives `(output_pin_id, input_pin_id)`.
+/// Create the logical link from the returned [`NormalizedLink`] so the exact
+/// endpoints checked for duplicates, fan-out limits, or custom policies are
+/// also the endpoints stored by the host.
+///
+/// # Example
+///
+/// ```
+/// use slint::Color;
+/// use slint_node_editor::{
+///     validate_and_normalize_link, GeometryCache, NoDuplicatesValidator,
+///     NormalizedLink, SimpleLink, SimpleNodeGeometry, ValidationError,
+/// };
+///
+/// let mut cache = GeometryCache::<SimpleNodeGeometry>::new();
+/// cache.update_node_rect(1, 0.0, 0.0, 100.0, 60.0);
+/// cache.update_node_rect(2, 200.0, 0.0, 100.0, 60.0);
+/// cache.handle_pin_report(3, 1, 2, 100.0, 30.0);
+/// cache.handle_pin_report(4, 2, 1, 0.0, 30.0);
+/// let links = vec![SimpleLink::new(1, 3, 4, Color::from_rgb_u8(1, 2, 3))];
+///
+/// assert_eq!(
+///     validate_and_normalize_link(
+///         4,
+///         3,
+///         &cache,
+///         &links,
+///         2,
+///         &NoDuplicatesValidator,
+///     ),
+///     Err(ValidationError::DuplicateLink),
+/// );
+///
+/// let normalized = validate_and_normalize_link(
+///     4,
+///     3,
+///     &cache,
+///     &Vec::<SimpleLink>::new(),
+///     2,
+///     &NoDuplicatesValidator,
+/// )?;
+/// assert_eq!(normalized, NormalizedLink {
+///     output_pin_id: 3,
+///     input_pin_id: 4,
+/// });
+/// # Ok::<(), ValidationError>(())
+/// ```
+pub fn validate_and_normalize_link<N, L, V>(
+    pin_a: i32,
+    pin_b: i32,
+    cache: &GeometryCache<N>,
+    links: &[L],
+    output_type: i32,
+    topology_validator: &V,
+) -> Result<NormalizedLink, ValidationError>
+where
+    N: NodeGeometry + Copy,
+    V: LinkValidator<N, L>,
+{
+    match BasicLinkValidator::new(output_type).validate(pin_a, pin_b, cache, links) {
+        ValidationResult::Valid => {}
+        ValidationResult::Invalid(error) => return Err(error),
+    }
+
+    let Some((output_pin_id, input_pin_id)) =
+        GraphLogic::normalize_link_direction(pin_a, pin_b, cache, output_type)
+    else {
+        return Err(ValidationError::PinNotFound(pin_a));
+    };
+
+    match topology_validator.validate(output_pin_id, input_pin_id, cache, links) {
+        ValidationResult::Valid => Ok(NormalizedLink {
+            output_pin_id,
+            input_pin_id,
+        }),
+        ValidationResult::Invalid(error) => Err(error),
+    }
+}
+
 /// Validator that prevents duplicate links
 ///
 /// This wraps the existing `GraphLogic::duplicate_link_exists` helper.
+/// Pass it to [`validate_and_normalize_link`] so gestures that begin at an
+/// input pin are normalized before the ordered pair is checked.
 ///
 /// # Example
 ///
@@ -580,11 +679,12 @@ where
 /// cache.handle_pin_report(3, 1, 2, 100.0, 30.0);
 /// cache.handle_pin_report(4, 2, 1, 0.0, 30.0);
 /// let links = Vec::<SimpleLink>::new();
-/// let validator = CompositeValidator::new()
-///     .with(BasicLinkValidator::new(2))
-///     .with(NoDuplicatesValidator);
+/// let validator = CompositeValidator::new().with(NoDuplicatesValidator);
 ///
-/// assert!(validator.validate(3, 4, &cache, &links).is_valid());
+/// let normalized = slint_node_editor::validate_and_normalize_link(
+///     4, 3, &cache, &links, 2, &validator,
+/// ).unwrap();
+/// assert_eq!((normalized.output_pin_id, normalized.input_pin_id), (3, 4));
 /// ```
 pub struct CompositeValidator<N = SimpleNodeGeometry, L = ()> {
     validators: Vec<Box<dyn LinkValidator<N, L>>>,
@@ -845,6 +945,69 @@ mod tests {
         assert_eq!(
             result,
             ValidationResult::Invalid(ValidationError::DuplicateLink)
+        );
+    }
+
+    #[test]
+    fn validation_returns_the_same_normalized_endpoints_for_both_gesture_directions() {
+        let cache = setup_cache();
+        let links: Vec<TestLink> = vec![];
+
+        let output_first =
+            validate_and_normalize_link(1001, 2001, &cache, &links, 2, &NoDuplicatesValidator);
+        let input_first =
+            validate_and_normalize_link(2001, 1001, &cache, &links, 2, &NoDuplicatesValidator);
+
+        let expected = Ok(NormalizedLink {
+            output_pin_id: 1001,
+            input_pin_id: 2001,
+        });
+        assert_eq!(output_first, expected);
+        assert_eq!(input_first, expected);
+    }
+
+    #[test]
+    fn reverse_gesture_is_rejected_after_normalization_when_link_exists() {
+        let cache = setup_cache();
+        let links = vec![TestLink {
+            id: 1,
+            start: 1001,
+            end: 2001,
+        }];
+
+        assert_eq!(
+            validate_and_normalize_link(2001, 1001, &cache, &links, 2, &NoDuplicatesValidator,),
+            Err(ValidationError::DuplicateLink),
+        );
+    }
+
+    #[test]
+    fn topology_rules_receive_normalized_endpoints() {
+        struct RequireExpectedOrder;
+
+        impl<N, L> LinkValidator<N, L> for RequireExpectedOrder {
+            fn validate(
+                &self,
+                start_pin: i32,
+                end_pin: i32,
+                _cache: &GeometryCache<N>,
+                _links: &[L],
+            ) -> ValidationResult {
+                if (start_pin, end_pin) == (1001, 2001) {
+                    ValidationResult::Valid
+                } else {
+                    ValidationResult::Invalid(ValidationError::Custom(format!(
+                        "received ({start_pin}, {end_pin})"
+                    )))
+                }
+            }
+        }
+
+        let cache = setup_cache();
+        let links: Vec<TestLink> = vec![];
+        assert!(
+            validate_and_normalize_link(2001, 1001, &cache, &links, 2, &RequireExpectedOrder,)
+                .is_ok()
         );
     }
 
