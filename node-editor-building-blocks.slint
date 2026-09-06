@@ -662,9 +662,14 @@ export component BaseNode inherits Rectangle {
 
     // === Computed Properties ===
     // World position (for reporting to Rust)
-    // For multi-node drag: selected nodes that aren't being directly dragged use global DragState offset
-    property <length> world-pos-x: world-x + persistent-offset-x + (DragState.is-dragging && root.selected && node-id != DragState.dragged-node-id ? DragState.drag-offset-x : drag-area.current-drag-offset-x);
-    property <length> world-pos-y: world-y + persistent-offset-y + (DragState.is-dragging && root.selected && node-id != DragState.dragged-node-id ? DragState.drag-offset-y : drag-area.current-drag-offset-y);
+    // For multi-node drag: selected nodes that aren't being directly dragged use global DragState offset.
+    // root.selected must be read FIRST: && short-circuits, and a dependency is
+    // recorded on every property read during evaluation — with the global
+    // DragState.is-dragging in front, every node in the graph re-evaluates (and
+    // repaints) on the drag start/end toggle. Selected-first scopes that toggle
+    // to the selection, which is the set that moves anyway.
+    property <length> world-pos-x: world-x + persistent-offset-x + (root.selected && DragState.is-dragging && node-id != DragState.dragged-node-id ? DragState.drag-offset-x : drag-area.current-drag-offset-x);
+    property <length> world-pos-y: world-y + persistent-offset-y + (root.selected && DragState.is-dragging && node-id != DragState.dragged-node-id ? DragState.drag-offset-y : drag-area.current-drag-offset-y);
     // Screen position (for external reference only)
     out property <length> screen-x: world-pos-x * ViewportState.zoom + ViewportState.pan-x;
     out property <length> screen-y: world-pos-y * ViewportState.zoom + ViewportState.pan-y;

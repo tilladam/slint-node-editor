@@ -21,12 +21,12 @@ Last updated: 2026-09-06 through R6.
 | R3 | P1 | Complete | 1. Correctness | `ff274c9` | Default picking now uses the rendered world curve and converts screen tolerance once. Custom routes can supply their rendered geometry; the orthogonal example shares one route with its picker. |
 | R4 | P1 | Complete | 2. Interaction and public contract | `0b454a9` | Globals are canonical for computations and building-block events; component configuration synchronizes with the controller; public geometry functions use the lifecycle; obsolete members were removed or documented as host conveniences. |
 | R5 | P1 | Complete | 2. Interaction and public contract | `5a4b483` | The quick start is a tested downstream crate using exact git dependencies; its docs cover generated members, ownership, callback replacement, units, IDs, and lifecycle. |
-| R6 | P2 | Complete | 1. Correctness | This commit | Link validation now returns canonical output/input endpoints before topology rules run; the advanced and pin-compatibility examples create links from those validated endpoints. |
+| R6 | P2 | Complete | 1. Correctness | `28eeaa3` | Link validation now returns canonical output/input endpoints before topology rules run; the advanced and pin-compatibility examples create links from those validated endpoints. |
 | R7 | P2 | Open | 2. Interaction and public contract | — | Apply gesture ownership and configured modifiers consistently. |
 | R8 | P2 | Open | 1. Correctness | — | Pick the nearest eligible pin with a deterministic tie rule. |
 | R9 | P2 | Open | 2. Interaction and public contract | — | Normalize layout inputs and make result ordering deterministic. |
 | R10 | P1 | Open | 2. Interaction and public contract | — | Replace self-confirming tests with tests through promised interfaces. |
-| R11 | P2 | Open | 5. Scale and optional UX | — | Measure complete frame behavior and localize expensive updates. |
+| R11 | P2 | In progress | 5. Scale and optional UX | This commit | Unselected nodes no longer subscribe to the global drag start/end toggle through their world-position bindings; frame baselines and broader update localization remain open. |
 | R12 | P1 roadmap | Open | 4. Embeddability | — | Implement structural accessibility and configurable keyboard policy. |
 | R13 | P2 roadmap | Open | 4. Embeddability | — | Introduce instance-scoped editor context. |
 | R14 | P2 | Open | 3/4 | — | Simplify ownership, typing, and the public Rust integration surface. |
@@ -134,7 +134,7 @@ Completed in `5a4b483`.
 
 ### R6 — normalize endpoints before duplicate checking
 
-Completed in this commit.
+Completed in `28eeaa3`.
 
 - `validate_and_normalize_link` performs basic endpoint checks, normalizes the
   gesture to output/input order, and only then calls topology validators.
@@ -145,6 +145,19 @@ Completed in this commit.
   verifies that exactly one canonical link exists.
 - The pin-compatibility example now applies type compatibility and duplicate
   checks to normalized endpoints and uses the returned endpoints for creation.
+
+## In-progress work
+
+### R11 — measure the whole frame and make updates local
+
+Started in this commit.
+
+- `BaseNode.world-pos-x/y` now read `selected` before the global drag state.
+  Slint's short-circuit evaluation therefore keeps unselected nodes from
+  subscribing to drag start/end changes that cannot move them.
+- The selected nodes and directly dragged node retain their existing live
+  geometry behavior. Frame baselines, route-local invalidation, and the other
+  measured optimizations required by R11 remain open.
 
 ## Verification
 
@@ -188,6 +201,12 @@ After R6:
   **14 executable doctests passed**.
 - `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`:
   passed.
+- `git diff --check`: passed.
+
+After the initial R11 update-locality fix:
+
+- `cargo test --workspace --all-features --locked`: **406 tests passed** plus
+  **14 executable doctests passed**.
 - `git diff --check`: passed.
 
 The original review's packaging, formatting, platform, accessibility, and
