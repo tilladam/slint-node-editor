@@ -253,7 +253,9 @@ impl MinimalTestHarness {
         });
 
         // Initialize grid
-        window.invoke_request_grid_update();
+        window
+            .global::<NodeEditorComputations>()
+            .invoke_request_grid_update();
 
         Self {
             window,

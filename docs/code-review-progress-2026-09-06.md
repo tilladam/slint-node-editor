@@ -4,7 +4,7 @@ This document tracks work against the findings in
 [code-review-2026-09-06.md](code-review-2026-09-06.md). Update it when a finding
 is started, completed, reopened, or intentionally deferred.
 
-Last updated: 2026-09-06 through R3.
+Last updated: 2026-09-06 through R4.
 
 ## Status
 
@@ -18,8 +18,8 @@ Last updated: 2026-09-06 through R3.
 |---|---|---|---|---|---|
 | R1 | P1 | Complete | 1. Correctness | `83f7145`, `b097948` | Geometry changes now invalidate link bindings after updating the cache. Programmatic movement, sizing, pointer dragging, drag commits, and batched updates have regression coverage. |
 | R2 | P1 | Complete | 1. Correctness | `1363ce7` | Added explicit node, pin, and graph-reset lifecycle operations; identity replacement; cache and registered-link cleanup; interaction-state cleanup; advanced-example deletion wiring; and a tested hidden-pin policy. |
-| R3 | P1 | Complete | 1. Correctness | This commit | Default picking now uses the rendered world curve and converts screen tolerance once. Custom routes can supply their rendered geometry; the orthogonal example shares one route with its picker. |
-| R4 | P1 | Open | 2. Interaction and public contract | — | Reconcile public callbacks and settings with the globals implementation. |
+| R3 | P1 | Complete | 1. Correctness | `ff274c9` | Default picking now uses the rendered world curve and converts screen tolerance once. Custom routes can supply their rendered geometry; the orthogonal example shares one route with its picker. |
+| R4 | P1 | Complete | 2. Interaction and public contract | This commit | Globals are canonical for computations and building-block events; component configuration synchronizes with the controller; public geometry functions use the lifecycle; obsolete members were removed or documented as host conveniences. |
 | R5 | P1 | Open | 2. Interaction and public contract | — | Replace the quick start with a compiled, working consumer. |
 | R6 | P2 | Open | 1. Correctness | — | Normalize endpoints before duplicate checking. |
 | R7 | P2 | Open | 2. Interaction and public contract | — | Apply gesture ownership and configured modifiers consistently. |
@@ -33,8 +33,9 @@ Last updated: 2026-09-06 through R3.
 | R15 | P1 release | Open | 3. Release hardening | — | Complete packaging gates and document the currently usable dependency source. |
 | R16 | P3 | Open | 3. Release hardening | — | Clean up examples and make maintenance checks reliable teaching material. |
 
-Overall: **3 of 16 findings complete**. Correctness batch: **3 of 5
-findings complete**. The next item by review order is **R4**.
+Overall: **4 of 16 findings complete**. Correctness batch: **3 of 5
+findings complete**. Interaction and public contract batch: **1 of 5 findings
+complete**. The next item by review order is **R5**.
 
 ## Completed work
 
@@ -90,6 +91,28 @@ Completed in this commit.
   zoom 0.1, 0.25, 1, and 3 with nonzero pan, plus short, vertical, reversed,
   and orthogonal routes.
 
+### R4 — reconcile public component APIs with globals
+
+Completed in this commit.
+
+- `NodeEditorComputations` is the canonical computation surface. It now owns
+  grid update requests and the synchronized grid-spacing and Bézier settings
+  consumed by `wire_node_editor!` and `NodeEditorController`.
+- The component `geometry-version` aliases the global version used by link
+  bindings. Public node and pin reporting functions call the same internal
+  lifecycle as BaseNode and Pin before requesting invalidation.
+- BaseNode double-clicks use the new public `NodeEditorEvents` global. Obsolete
+  component computation/report callbacks and unused internal callbacks were
+  removed.
+- The unused BaseNode viewport width/height inputs were removed. Node minimums
+  and LOD thresholds are documented as values hosts may pass to custom node
+  delegates, rather than behavior supplied by NodeEditor.
+- The minimal example acts as an external consumer fixture. It sets nondefault
+  configuration, applies the documented host-side LOD and minimum-size values,
+  observes the resulting controller/grid/path/node geometry, exercises public
+  reporting and pin computation, and receives a real BaseNode double-click
+  through the public event global.
+
 ## Verification
 
 After R2:
@@ -103,6 +126,14 @@ After R2:
 After R3:
 
 - `cargo test --workspace --all-features --locked`: **398 tests passed**; 18
+  doctests remained ignored.
+- `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`:
+  passed.
+- `git diff --check`: passed.
+
+After R4:
+
+- `cargo test --workspace --all-features --locked`: **402 tests passed**; 18
   doctests remained ignored.
 - `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`:
   passed.

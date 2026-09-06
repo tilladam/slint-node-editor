@@ -4,6 +4,8 @@ import {
     Pin,
     PinTypes,
     DragState,
+    ViewportState,
+    NodeEditorEvents,
     NodeEditorInternalCallbacks,
     NodeEditorComputations,
     LinkData,
@@ -19,14 +21,22 @@ export struct NodeData {
 }
 
 // Re-export for Rust
-export { LinkData, DragState, NodeEditorInternalCallbacks, NodeEditorComputations }
+export { LinkData, DragState, NodeEditorEvents, NodeEditorInternalCallbacks, NodeEditorComputations }
 
 component SimpleNode inherits BaseNode {
     in property <string> title: "Node";
+    in property <float> configured-lod-full-threshold: 0.5;
+    in property <float> configured-lod-simplified-threshold: 0.25;
+    in property <length> configured-min-width: 80px;
+    in property <length> configured-min-height: 40px;
     accessible-label: title;
     // Set node size for BaseNode
-    node-width: 250px;
-    node-height: 80px;
+    node-width: max(250px, configured-min-width);
+    node-height: max(
+        ViewportState.zoom >= configured-lod-full-threshold ? 80px
+            : ViewportState.zoom >= configured-lod-simplified-threshold ? 60px
+            : 40px,
+        configured-min-height);
 
     // Visual content - Add any bespoke UI here!
     Rectangle {
@@ -79,6 +89,25 @@ export component MainWindow inherits Window {
     out property <float> width_: self.width / 1px;
     out property <float> height_: self.height / 1px;
 
+    // Public NodeEditor configuration. Minimum dimensions are host-side
+    // convenience values and are explicitly passed to the custom node below.
+    in-out property <length> grid-spacing: 37px;
+    in-out property <float> bezier-min-offset: 120.0;
+    in-out property <float> zoom <=> editor.zoom;
+    in-out property <float> lod-full-threshold: 0.8;
+    in-out property <float> lod-simplified-threshold: 0.4;
+    in-out property <length> min-node-width: 80px;
+    in-out property <length> min-node-height: 40px;
+    out property <int> geometry-version: editor.geometry-version;
+
+    public function report-node-geometry(id: int, x: float, y: float, w: float, h: float) {
+        editor.report-node-rect(id, x * 1px, y * 1px, w * 1px, h * 1px);
+    }
+
+    public function report-pin-geometry(pin-id: int, node-id: int, pin-type: int, x: float, y: float) {
+        editor.report-pin-position(pin-id, node-id, pin-type, x * 1px, y * 1px);
+    }
+
     // Selection intents — Rust applies them and projects the result back into
     // `nodes`, which is where `selected` below comes from.
     callback node-selected <=> editor.node-selected;
@@ -88,6 +117,12 @@ export component MainWindow inherits Window {
     editor := NodeEditor {
         width: 100%;
         height: 100%;
+        grid-spacing: root.grid-spacing;
+        bezier-min-offset: root.bezier-min-offset;
+        lod-full-threshold: root.lod-full-threshold;
+        lod-simplified-threshold: root.lod-simplified-threshold;
+        min-node-width: root.min-node-width;
+        min-node-height: root.min-node-height;
 
         // Zero boilerplate! Drag offsets computed automatically in BaseNode
         for data in root.nodes: SimpleNode {
@@ -95,8 +130,10 @@ export component MainWindow inherits Window {
             title: data.title;
             world-x: data.x * 1px;
             world-y: data.y * 1px;
-            viewport-width: editor.width;
-            viewport-height: editor.height;
+            configured-lod-full-threshold: editor.lod-full-threshold;
+            configured-lod-simplified-threshold: editor.lod-simplified-threshold;
+            configured-min-width: editor.min-node-width;
+            configured-min-height: editor.min-node-height;
             selected: data.selected;
         }
     }

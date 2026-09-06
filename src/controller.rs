@@ -149,9 +149,19 @@ impl NodeEditorController {
         self.state.borrow_mut().bezier_offset = offset;
     }
 
+    /// Get the bezier curve offset used for rendered link paths.
+    pub fn bezier_offset(&self) -> f32 {
+        self.state.borrow().bezier_offset
+    }
+
     /// Set the grid spacing (default: 24.0).
     pub fn set_grid_spacing(&self, spacing: f32) {
         self.state.borrow_mut().grid_spacing = spacing;
+    }
+
+    /// Get the grid spacing used by grid generation.
+    pub fn grid_spacing(&self) -> f32 {
+        self.state.borrow().grid_spacing
     }
 
     /// Get the current zoom level.
@@ -222,7 +232,7 @@ impl NodeEditorController {
             .handle_node_rect_report(id, x, y, w, h);
     }
 
-    /// Handle pin-position-changed: update cache.
+    /// Handle a world-space pin geometry report by updating the cache.
     ///
     /// The Slint `Pin` component reports `rel_x`/`rel_y` as **world-space**
     /// offsets relative to the node origin. The Pin component divides by zoom
@@ -364,6 +374,20 @@ impl NodeEditorController {
     pub fn generate_grid(&self, width: f32, height: f32, pan_x: f32, pan_y: f32) -> SharedString {
         let s = self.state.borrow();
         crate::generate_grid_commands(width, height, s.zoom, pan_x, pan_y, s.grid_spacing).into()
+    }
+
+    /// Generate grid commands from the controller's current viewport and spacing.
+    pub fn generate_current_grid(&self, width: f32, height: f32) -> SharedString {
+        let s = self.state.borrow();
+        crate::generate_grid_commands(
+            width,
+            height,
+            s.zoom,
+            s.pan_x,
+            s.pan_y,
+            s.grid_spacing,
+        )
+        .into()
     }
 
     /// Generate initial grid commands (zoom=1, pan=0).

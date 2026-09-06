@@ -10,3 +10,6 @@ slint-node-editor = { workspace = true }
 
 [build-dependencies]
 slint-build = { workspace = true }
+
+[dev-dependencies]
+i-slint-backend-testing = { workspace = true }

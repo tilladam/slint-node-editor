@@ -48,9 +48,7 @@ export component MainWindow inherits Window {
     out property <float> width_: self.width / 1px;
     out property <float> height_: self.height / 1px;
 
-    // Callbacks to Rust
-    callback request-grid-update <=> editor.request-grid-update;
-    // Note: geometry tracking and viewport changes are now handled via globals
+    // Geometry, computation, and viewport callbacks use the exported globals.
 
     // Input node callbacks
     callback input-text-changed(int, string);

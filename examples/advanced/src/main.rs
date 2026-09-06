@@ -3,7 +3,7 @@
 // Demonstrates the pure Slint NodeEditor component with application-provided
 // computation callbacks.
 
-use slint::{Color, Model, ModelRc, SharedString, VecModel};
+use slint::{Color, ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
     selection, wire_node_editor, BasicLinkValidator, CompositeValidator, GraphLogic, LinkData,
     LinkPath, LinkValidator, MinimapNode, MovableNode, NoDuplicatesValidator, NodeEditorSetup,
@@ -658,7 +658,9 @@ fn build_app() -> App {
 
 fn main() {
     let app = build_app();
-    app.window.invoke_request_grid_update();
+    app.window
+        .global::<NodeEditorComputations>()
+        .invoke_request_grid_update();
     app.window.run().unwrap();
 }
 

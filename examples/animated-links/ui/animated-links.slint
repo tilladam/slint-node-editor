@@ -175,8 +175,6 @@ export component MainWindow inherits Window {
     out property <float> zoom: editor.zoom;
 
     // Callbacks to Rust
-    callback node-rect-changed <=> editor.node-rect-changed;
-    callback request-grid-update <=> editor.request-grid-update;
     callback link-requested <=> editor.link-requested;
 
     public function refresh-links() {
@@ -184,7 +182,6 @@ export component MainWindow inherits Window {
     }
 
     // Note: viewport-changed and compute-link-path are now in NodeEditorComputations global
-    callback compute-pin-at <=> editor.compute-pin-at;
     callback add-animated-link(/* from-pin */ int, /* to-pin */ int);
     // Animated link path with progress (0.0-1.0)
     pure callback compute-animated-link-path(/* start-pin */ int, /* end-pin */ int, /* progress */ float, /* version */ int) -> string;
@@ -216,8 +213,6 @@ export component MainWindow inherits Window {
             accent-color: data.id == 1 ? #ff6b6b : data.id == 2 ? #4ecdc4 : data.id == 3 ? #ffe66d : data.id == 4 ? #a855f7 : #4a9eff;
             world-x: data.x * 1px;
             world-y: data.y * 1px;
-            viewport-width: root.width;
-            viewport-height: root.height;
         }
     }
 

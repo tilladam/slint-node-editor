@@ -191,8 +191,6 @@ export component MainWindow inherits Window {
     callback filter-reset(int);               // node-id
 
     // === Computation callbacks (implemented by Rust) ===
-    callback request-grid-update <=> editor.request-grid-update;
-    callback compute-pin-at <=> editor.compute-pin-at;
     callback compute-link-at <=> editor.compute-link-at;
     // Note: compute-link-path, compute-link-preview-path, node-rect, and pin-position are now handled via globals
 
@@ -321,8 +319,6 @@ export component MainWindow inherits Window {
             selected: node-data.selected;
             world-x: node-data.world-x * 1px;
             world-y: node-data.world-y * 1px;
-            viewport-width: editor.width;
-            viewport-height: editor.height;
         }
 
         // Filter nodes - complex nodes with widgets
@@ -332,8 +328,6 @@ export component MainWindow inherits Window {
             selected: filter-data.selected;
             world-x: filter-data.world-x * 1px;
             world-y: filter-data.world-y * 1px;
-            viewport-width: editor.width;
-            viewport-height: editor.height;
             filter-type-index: filter-data.filter-type-index;
             enabled: filter-data.enabled;
             processed-count: filter-data.processed-count;

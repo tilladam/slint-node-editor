@@ -100,6 +100,13 @@ export global HoverState {
     in-out property <int> hovered-node-id: 0;
 }
 
+/// Public events emitted by node editor building blocks.
+/// Applications may install handlers directly on this global.
+export global NodeEditorEvents {
+    /// A consumer-provided BaseNode was double-clicked.
+    callback node-double-clicked(/* node-id */ int);
+}
+
 /// Internal callback registry for BaseNode/Pin → Rust communication.
 /// Wired automatically by `wire_node_editor!` — examples don't touch this.
 /// A link's drawn curve and the box it fits in.
@@ -135,17 +142,6 @@ export global NodeEditorInternalCallbacks {
     /// the host moves the dragged node, plus whatever else its rows show as
     /// selected. Nothing depends on when the press-time selection intent landed.
     callback end-node-drag(/* node-id */ int, /* delta-x */ length, /* delta-y */ length);
-    /// Click on node
-    callback click-node(/* node-id */ int, /* shift-held */ bool);
-    /// Double-click on node
-    callback double-click-node(/* node-id */ int);
-    /// Start link from pin
-    callback start-link-from-pin(/* pin-id */ int, /* abs-x */ length, /* abs-y */ length);
-    /// Update link preview during pin drag
-    callback update-link-preview(/* x */ length, /* y */ length);
-    /// Complete link creation
-    callback complete-link();
-
     /// Remove a node from the geometry projection and clear interactions that
     /// could still refer to it. Hosts must call this when removing a model row.
     public function remove-node(node-id: int) {
@@ -199,9 +195,22 @@ export global NodeEditorInternalCallbacks {
     }
 }
 
-/// Computational callbacks wired by Rust - examples don't touch these!
-/// NodeEditor calls these for expensive operations.
+/// Computational callbacks and synchronized configuration used by NodeEditor.
+/// `wire_node_editor!` installs the default Rust implementations.
 export global NodeEditorComputations {
+    /// Current editor configuration. NodeEditor publishes these values so the
+    /// Rust controller and the Slint renderer use one source of truth.
+    in-out property <length> grid-spacing: 24px;
+    in-out property <float> bezier-min-offset: 50.0;
+
+    /// Grid generation was requested after a viewport, size, or spacing change.
+    callback request-grid-update();
+
+    /// Runtime editor configuration changed.
+    callback configuration-changed(
+        /* grid-spacing */ float,
+        /* bezier-min-offset */ float);
+
     /// Compute a link's curve and the box it fits in, between two pins.
     /// The geometry-version parameter triggers re-evaluation when geometry changes.
     pure callback compute-link-path(
@@ -215,7 +224,7 @@ export global NodeEditorComputations {
         /* pan-x */ float,
         /* pan-y */ float);
 
-    /// Compute pin ID at screen coordinates (for hit testing)
+    /// Compute pin ID at world coordinates with a world-space hit radius.
     pure callback compute-pin-at(
         /* x */ float,
         /* y */ float,
@@ -637,10 +646,6 @@ export component BaseNode inherits Rectangle {
     property <length> persistent-offset-y: 0px;
     property <int> reported-node-id: 0;
     property <int> projection-version: GeometryVersion.projection-version;
-    // === Viewport (for visibility culling) - provided by parent ===
-    in property <length> viewport-width: 10000px;
-    in property <length> viewport-height: 10000px;
-
     // === Node Size ===
     // Set these to match your node's visual dimensions.
     in property <length> node-width: 150px;
@@ -848,7 +853,7 @@ export component BaseNode inherits Rectangle {
                         }
                         // Double-click detection
                         if root.dbl-click-armed {
-                            NodeEditorInternalCallbacks.double-click-node(node-id);
+                            NodeEditorEvents.node-double-clicked(node-id);
                             root.dbl-click-armed = false;
                         } else {
                             root.dbl-click-armed = true;

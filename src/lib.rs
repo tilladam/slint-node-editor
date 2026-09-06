@@ -194,18 +194,35 @@ macro_rules! wire_node_editor {
             },
         );
 
-        // Auto grid updates
+        // Keep the Rust controller aligned with the component's public settings.
+        $setup
+            .controller()
+            .set_grid_spacing(computations.get_grid_spacing());
+        $setup
+            .controller()
+            .set_bezier_offset(computations.get_bezier_min_offset());
+
         let ctrl = $setup.controller().clone();
-        let w = $window.as_weak();
+        computations.on_configuration_changed(move |grid_spacing, bezier_offset| {
+            ctrl.set_grid_spacing(grid_spacing);
+            ctrl.set_bezier_offset(bezier_offset);
+        });
+
+        // Viewport state and grid generation are separate public contracts:
+        // viewport changes update coordinates, while request-grid-update also
+        // covers resize and spacing changes.
+        let ctrl = $setup.controller().clone();
         computations.on_viewport_changed(move |zoom, pan_x, pan_y| {
             ctrl.set_viewport(zoom, pan_x, pan_y);
+        });
+
+        let ctrl = $setup.controller().clone();
+        let w = $window.as_weak();
+        computations.on_request_grid_update(move || {
             if let Some(w) = w.upgrade() {
-                w.set_grid_commands(ctrl.generate_grid(
-                    w.get_width_(),
-                    w.get_height_(),
-                    pan_x,
-                    pan_y,
-                ));
+                w.set_grid_commands(
+                    ctrl.generate_current_grid(w.get_width_(), w.get_height_()),
+                );
             }
         });
 
@@ -213,7 +230,7 @@ macro_rules! wire_node_editor {
         let ctrl = $setup.controller().clone();
         let w = $window.as_weak();
         if let Some(w) = w.upgrade() {
-            w.set_grid_commands(ctrl.generate_initial_grid(w.get_width_(), w.get_height_()));
+            w.set_grid_commands(ctrl.generate_current_grid(w.get_width_(), w.get_height_()));
         }
     }};
 }

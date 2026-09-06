@@ -105,9 +105,6 @@ export component MainWindow inherits Window {
     in-out property <bool> test-input-pin-visible: true;
     out property <LinkPath> observed-link-geometry: NodeEditorComputations.compute-link-path(3, 4, GeometryVersion.version);
 
-    // Core callbacks to Rust
-    callback request-grid-update <=> editor.request-grid-update;
-
     // Additional callbacks for testing
     callback link-requested <=> editor.link-requested;
     callback link-cancelled <=> editor.link-cancelled;
@@ -119,8 +116,8 @@ export component MainWindow inherits Window {
     callback selection-cleared <=> editor.selection-cleared;
     callback box-selection-committed <=> editor.box-selection-committed;
 
-    // Compute callbacks (tests use globals instead of these)
-    callback compute-pin-at <=> editor.compute-pin-at;
+    // Link picking is a host callback; standard computations use the exported
+    // NodeEditorComputations global.
     callback compute-link-at <=> editor.compute-link-at;
 
     // Function to refresh links after geometry is reported
@@ -143,8 +140,6 @@ export component MainWindow inherits Window {
             input-pin-node-id: data.id == 1 ? root.test-input-pin-node-id : data.id;
             input-pin-type: data.id == 1 ? root.test-input-pin-type : PinTypes.input;
             input-pin-visible: data.id == 1 ? root.test-input-pin-visible : true;
-            viewport-width: editor.width;
-            viewport-height: editor.height;
             selected: data.selected;
         }
     }

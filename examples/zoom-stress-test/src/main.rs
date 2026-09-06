@@ -2,7 +2,7 @@
 //
 // Tests widget scaling behavior at various zoom levels with three complex nodes.
 
-use slint::{Color, ModelRc, SharedString, VecModel};
+use slint::{Color, ComponentHandle, ModelRc, SharedString, VecModel};
 use slint_node_editor::{wire_node_editor, LinkData, LinkPath, NodeEditorSetup};
 use std::rc::Rc;
 
@@ -124,7 +124,9 @@ fn main() {
     });
 
     // Initial grid generation
-    window.invoke_request_grid_update();
+    window
+        .global::<NodeEditorComputations>()
+        .invoke_request_grid_update();
 
     window.run().unwrap();
 }

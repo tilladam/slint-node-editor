@@ -394,10 +394,7 @@ export component MainWindow inherits Window {
     out property <float> height_: self.height / 1px;
     out property <float> zoom: editor.zoom;
 
-    callback node-rect-changed <=> editor.node-rect-changed;
-    callback request-grid-update <=> editor.request-grid-update;
     callback link-requested <=> editor.link-requested;
-    callback compute-pin-at <=> editor.compute-pin-at;
 
     public function refresh-links() {
         editor.refresh-links();
@@ -416,7 +413,12 @@ export component MainWindow inherits Window {
     // Update valid target pin based on current cursor position
     function update-valid-target(start-pin: int, x: length, y: length) {
         // Find pin at cursor position and validate
-        root.check-and-set-valid-target(start-pin, root.compute-pin-at(x, y));
+        root.check-and-set-valid-target(
+            start-pin,
+            NodeEditorComputations.compute-pin-at(
+                (x - editor.pan-x) / editor.zoom / 1px,
+                (y - editor.pan-y) / editor.zoom / 1px,
+                editor.pin-hit-radius / editor.zoom / 1px));
     }
 
     // Helper to check validation and set target
@@ -451,8 +453,6 @@ export component MainWindow inherits Window {
             world-y: nodes.length > 0 ? nodes[0].y * 1px : 100px;
             pin-refresh-trigger: root.pin-refresh-counter;
             valid-target-pin-id: root.valid-target-pin-id;
-            viewport-width: editor.width;
-            viewport-height: editor.height;
         }
 
         SinkNode {
@@ -462,8 +462,6 @@ export component MainWindow inherits Window {
             world-y: nodes.length > 1 ? nodes[1].y * 1px : 100px;
             pin-refresh-trigger: root.pin-refresh-counter;
             valid-target-pin-id: root.valid-target-pin-id;
-            viewport-width: editor.width;
-            viewport-height: editor.height;
         }
     }
 

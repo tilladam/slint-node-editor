@@ -82,7 +82,6 @@ export component MainWindow inherits Window {
     in-out property <int> geometry-version <=> editor.geometry-version;
 
     // Callbacks to Rust
-    callback request-grid-update <=> editor.request-grid-update;
     callback compute-link-at <=> editor.compute-link-at;
     // Note: geometry tracking and viewport changes are now handled via globals
 
@@ -101,8 +100,6 @@ export component MainWindow inherits Window {
             title: data.title;
             world-x: data.x * 1px;
             world-y: data.y * 1px;
-            viewport-width: editor.width;
-            viewport-height: editor.height;
         }
     }
 

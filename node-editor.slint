@@ -14,17 +14,12 @@
 //         pan-y: 0px;
 //         zoom: 1.0;
 //
-//         // Implement computation callbacks
-//         request-grid-update => { /* set grid-commands */ }
-//         compute-pin-at(x, y) => { /* return pin ID or 0 */ }
-//
 //         link-requested(start, end) => { /* validate and create link */ }
 //
 //         // Add nodes
 //         for node in nodes: MyNode { ... }
 //
-//         // Add links
-//         for link in links: Link { geometry: ...; }
+//         // `wire_node_editor!` installs the Rust computation callbacks.
 //     }
 // }
 // ```
@@ -40,6 +35,7 @@ import {
     LinkCreation,
     SelectionRequest,
     HoverState,
+    NodeEditorEvents,
     NodeEditorComputations,
     NodeStyleDefaults,
     MinimapNode,
@@ -53,7 +49,7 @@ import {
     BaseNode,
     Pin,
 } from "node-editor-building-blocks.slint";
-export { PinTypes, ViewportState, DragState, GeometryVersion, NodeEditorInternalCallbacks, LinkCreationState, LinkCreation, SelectionRequest, HoverState, NodeEditorComputations, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, LinkPath, LinkStatus, LinkStatusColors, Minimap, Link, BaseNode, Pin }
+export { PinTypes, ViewportState, DragState, GeometryVersion, NodeEditorInternalCallbacks, LinkCreationState, LinkCreation, SelectionRequest, HoverState, NodeEditorEvents, NodeEditorComputations, NodeStyleDefaults, MinimapNode, MinimapPosition, LinkData, LinkPath, LinkStatus, LinkStatusColors, Minimap, Link, BaseNode, Pin }
 
 /// Modifier key for triggering box selection over nodes/links
 export enum BoxSelectionModifier {
@@ -102,6 +98,8 @@ export component NodeEditor inherits FocusScope {
         ViewportState.zoom = root.zoom;
         ViewportState.pan-x = root.pan-x;
         ViewportState.pan-y = root.pan-y;
+        NodeEditorComputations.grid-spacing = root.grid-spacing;
+        NodeEditorComputations.bezier-min-offset = root.bezier-min-offset;
     }
 
     // BaseNode and Pin update the Rust cache before incrementing request-version.
@@ -149,15 +147,18 @@ export component NodeEditor inherits FocusScope {
     /// Enable pinch-to-zoom gesture (trackpad/touch)
     in property <bool> pinch-zoom-enabled: true;
 
-    // === LOD (Level of Detail) configuration ===
-    /// Zoom threshold above which nodes render full detail (all widgets)
+    // === Host-side LOD (Level of Detail) convenience settings ===
+    /// Suggested zoom threshold for custom nodes to render full detail.
+    /// NodeEditor does not apply LOD itself; pass this value to node delegates.
     in property <float> lod-full-threshold: 0.5;
-    /// Zoom threshold above which nodes render simplified detail (title + pins)
-    /// Below this threshold, nodes render minimal detail (colored box + title)
+    /// Suggested zoom threshold for custom nodes to render simplified detail.
+    /// NodeEditor does not apply LOD itself; pass this value to node delegates.
     in property <float> lod-simplified-threshold: 0.25;
-    /// Minimum width for nodes at any zoom level
+    /// Suggested minimum width for custom node delegates.
+    /// NodeEditor does not size consumer-provided nodes.
     in property <length> min-node-width: 80px;
-    /// Minimum height for nodes at any zoom level
+    /// Suggested minimum height for custom node delegates.
+    /// NodeEditor does not size consumer-provided nodes.
     in property <length> min-node-height: 40px;
 
     // === Link data (set by application) ===
@@ -260,12 +261,6 @@ export component NodeEditor inherits FocusScope {
     property <length> internal-link-end-y;
 
     // === Callbacks TO Application (for computation) ===
-    /// Called when grid needs to be regenerated (on pan/zoom/resize)
-    callback request-grid-update();
-
-    /// Compute pin at position (world coordinates), returns pin ID or 0
-    callback compute-pin-at(/* x */ length, /* y */ length) -> int;
-
     /// Compute link at position (world coordinates), returns link ID or -1
     callback compute-link-at(/* x */ length, /* y */ length) -> int;
 
@@ -299,18 +294,9 @@ export component NodeEditor inherits FocusScope {
     callback context-menu-requested();
     callback context-menu-dragged(/* x */ length, /* y */ length);
     callback context-menu-released(/* x */ length, /* y */ length);
-    callback node-double-clicked(/* node-id */ int);
-
-    /// Node rectangle reporting (for application-side tracking)
-    callback node-rect-changed(/* id */ int, /* x */ length, /* y */ length, /* width */ length, /* height */ length);
-
-    /// Pin position reporting (for application-side tracking)
-    /// Note: node-id and pin-type are passed explicitly so the library doesn't prescribe any pin ID encoding scheme
-    callback pin-position-changed(/* pin-id */ int, /* node-id */ int, /* pin-type */ int, /* rel-x */ length, /* rel-y */ length);
-
     // === Geometry version counter (for link path invalidation) ===
     // Increment this when node/pin positions change to force link path recomputation.
-    in-out property <int> geometry-version: 0;
+    in-out property <int> geometry-version <=> GeometryVersion.version;
 
     // === Geometry Reporting Functions ===
     // These functions schedule a coalesced geometry-version increment after
@@ -318,13 +304,13 @@ export component NodeEditor inherits FocusScope {
 
     /// Report node rectangle change. Schedules a link refresh after the callback.
     public function report-node-rect(id: int, x: length, y: length, w: length, h: length) {
-        root.node-rect-changed(id, x, y, w, h);
+        NodeEditorInternalCallbacks.report-node-rect(id, x, y, w, h);
         GeometryVersion.request-version += 1;
     }
 
     /// Report pin position change. Schedules a link refresh after the callback.
     public function report-pin-position(pin-id: int, node-id: int, pin-type: int, rel-x: length, rel-y: length) {
-        root.pin-position-changed(pin-id, node-id, pin-type, rel-x, rel-y);
+        NodeEditorInternalCallbacks.report-pin-position(pin-id, node-id, pin-type, rel-x, rel-y, true);
         GeometryVersion.request-version += 1;
     }
 
@@ -424,23 +410,38 @@ export component NodeEditor inherits FocusScope {
         ViewportState.pan-x = root.pan-x;
         GeometryVersion.version += 1;
         NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
+        NodeEditorComputations.request-grid-update();
     }
     changed pan-y => {
         ViewportState.pan-y = root.pan-y;
         GeometryVersion.version += 1;
         NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
+        NodeEditorComputations.request-grid-update();
     }
     changed zoom => {
         ViewportState.zoom = root.zoom;
         GeometryVersion.version += 1;
         NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
+        NodeEditorComputations.request-grid-update();
     }
     // DragState is synced by BaseNode directly (it initiates drags)
     changed width => {
-        NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
+        NodeEditorComputations.request-grid-update();
     }
     changed height => {
-        NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
+        NodeEditorComputations.request-grid-update();
+    }
+    changed grid-spacing => {
+        NodeEditorComputations.grid-spacing = root.grid-spacing;
+        NodeEditorComputations.configuration-changed(
+            root.grid-spacing / 1px, root.bezier-min-offset);
+        NodeEditorComputations.request-grid-update();
+    }
+    changed bezier-min-offset => {
+        NodeEditorComputations.bezier-min-offset = root.bezier-min-offset;
+        NodeEditorComputations.configuration-changed(
+            root.grid-spacing / 1px, root.bezier-min-offset);
+        GeometryVersion.version += 1;
     }
     
     // Watch LinkCreation global for pin-initiated link creation
@@ -467,8 +468,6 @@ export component NodeEditor inherits FocusScope {
     /// Call this after initial geometry has been reported to force link path recomputation.
     public function refresh-links() {
         GeometryVersion.version += 1;
-        // Also trigger viewport-changed to force a repaint
-        NodeEditorComputations.viewport-changed(root.zoom, root.pan-x / 1px, root.pan-y / 1px);
     }
 
     // === Minimap Positioning ===
