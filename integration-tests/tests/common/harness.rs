@@ -19,6 +19,10 @@ use std::rc::Rc;
 // Include the compiled UI from build.rs
 slint::include_modules!();
 
+// Each integration-test target uses a different subset of these shared types.
+#[allow(unused_imports)]
+pub use slint_node_editor::{BoxSelectionModifier, LinkCreationState, LinkData, LinkPath};
+
 impl MovableNode for NodeData {
     fn id(&self) -> i32 {
         self.id

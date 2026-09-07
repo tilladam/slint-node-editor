@@ -31,7 +31,7 @@ Last updated: 2026-09-07 through R10.
 | R13 | P2 roadmap | Open | 4. Embeddability | — | Introduce instance-scoped editor context. |
 | R14 | P2 | In progress | 3/4 | This change | Reconcile rejected drag commits, guard controller viewport updates, check both normalization endpoints, add colored LinkData constructor and Error support, and clarify ID/geometry/selection contracts. Broader API consolidation remains deferred. |
 | R15 | P1 release | In progress | 3. Release hardening | This change | Release verification workflow added; actual packaging remains blocked on published Slint 1.18 library-module support. |
-| R16 | P3 | In progress | 3. Release hardening | This change | Fixed pin example sizing and target feedback, added drag regression, fmt/clippy/all-feature CI, changelog, contributor guidance and bug template. Fixture separation and broader example coverage remain. |
+| R16 | P3 | In progress | 3. Release hardening | This change | Fixed pin example sizing and target feedback, added drag regression, fmt/clippy/all-feature CI, changelog, contributor guidance and bug template. Fixture separated into its own consumer package; broader example coverage remains. |
 
 Overall: **10 of 16 findings complete**. Correctness batch: **5 of 5
 findings complete**. Interaction and public contract batch: **5 of 5 findings
@@ -237,6 +237,16 @@ Completed in this commit.
 
 ### R16 — examples and maintenance gates
 
+- Extracted all integration tests into the unpublished `integration-tests`
+  workspace package. Its build script owns the test UI, using dependency module
+  imports. The library build script compiles only the distributable library;
+  the library no longer has a testing-backend dev-dependency.
+- Extraction verification: stable and Rust 1.92 each pass 416 workspace tests
+  and 14 doctests. The included-files downstream consumer passes both pointer
+  interaction tests on macOS. This is headless runtime coverage, not a visual
+  Windows/Linux platform check. Actual archive verification and final registry
+  dependency resolution remain blocked under R15.
+
 - Pin-compatibility nodes now use BaseNode dimensions; a real lower-body drag
   regression passes. Target feedback is bound to the current connection gesture.
 - CI runs formatting, clippy with warnings denied, and all-feature workspace
@@ -246,8 +256,7 @@ Completed in this commit.
   accurately describes the optional layout dependency.
 - Corrected stale link-status comments.
 - Validation: workspace tests and 14 doctests passed; the additional lower-body
-  pointer regression passed. Fixture extraction from the library build script
-  and broader example interaction coverage remain open. The focused R14
+  pointer regression passed. Broader example interaction coverage remains open. The focused R14
   contract pass has not started.
 
 

@@ -33,14 +33,12 @@ layout = ["rust-sugiyama"]
 [package.metadata.docs.rs]
 all-features = true
 
-[dev-dependencies]
-i-slint-backend-testing = { workspace = true }
-
 [build-dependencies]
 slint-build = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2", features = ["experimental-module-builds"] }
 
 [workspace]
 members = [
+    "integration-tests",
     "examples/advanced",
     "examples/minimal",
     "examples/custom-shapes",

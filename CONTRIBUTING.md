@@ -14,7 +14,10 @@ cargo test --workspace --all-features --locked
 
 The downstream fixture exercises the public @nodeeditor import and standard
 macros. Add interaction regressions there when changing consumer wiring; keep
-pure geometry and selection tests in the library. The standalone fixture can
+pure geometry and selection tests in the library. The `integration-tests`
+workspace package owns the UI fixture and resolves `@nodeeditor` through Cargo
+metadata. Run it alone with `cargo test -p node-editor-integration-tests`.
+Library builds do not compile this package or its UI. The standalone fixture can
 be formatted with `rustfmt --edition 2021 smoke/downstream/src/main.rs`.
 
 ## Supported configurations and limitations

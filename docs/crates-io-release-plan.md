@@ -8,6 +8,15 @@ complete** except for one item that cannot run until the `v1.18.0` tag lands.
 Link geometry was reworked after Phase 1 closed, which changes the
 consumer-visible API — see "Breaking changes to carry into the release notes".
 
+## Test fixture extraction — 2026-09-07
+
+Integration tests now live in an unpublished workspace package. The library's
+build script no longer detects or compiles a test UI in git checkouts. Both
+stable and Rust 1.92 pass 416 tests plus 14 doctests; the included-files consumer
+passes its two headless interaction tests on macOS. Repeat the release workflow
+on the final registry dependency resolution. Native visual platform smoke and
+actual archive verification are not established by these results.
+
 ## R15 status — 2026-09-07
 
 The registry check still reports Slint 1.17.1; the 1.18.0 API request returned
