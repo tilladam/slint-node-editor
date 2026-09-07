@@ -144,7 +144,7 @@ fn type_name(data_type: i32) -> &'static str {
     }
 }
 
-fn main() {
+fn build_app() -> MainWindow {
     let window = MainWindow::new().unwrap();
 
     // Set up nodes
@@ -285,5 +285,45 @@ fn main() {
     println!("  Any      -> All types");
     println!("\nDrag from an output pin (right side) to an input pin (left side).\n");
 
-    window.run().unwrap();
+    window
+}
+
+fn main() {
+    build_app().run().unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use slint::{
+        platform::{PointerEventButton, WindowEvent},
+        ComponentHandle, LogicalPosition,
+    };
+
+    #[test]
+    fn lower_node_body_is_draggable() {
+        i_slint_backend_testing::init_no_event_loop();
+        let window = build_app();
+        window.show().unwrap();
+        slint::platform::update_timers_and_animations();
+        slint::platform::update_timers_and_animations();
+        for event in [
+            WindowEvent::PointerPressed {
+                position: LogicalPosition::new(210.0, 340.0),
+                button: PointerEventButton::Left,
+            },
+            WindowEvent::PointerMoved {
+                position: LogicalPosition::new(240.0, 360.0),
+            },
+            WindowEvent::PointerReleased {
+                position: LogicalPosition::new(240.0, 360.0),
+                button: PointerEventButton::Left,
+            },
+        ] {
+            window.window().dispatch_event(event);
+            slint::platform::update_timers_and_animations();
+        }
+        let node = window.get_nodes().row_data(0).unwrap();
+        assert_eq!((node.x, node.y), (180.0, 170.0));
+    }
 }
