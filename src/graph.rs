@@ -49,8 +49,7 @@ pub trait LinkModel {
     }
     /// Computation status for the link (default: -1 = no status, use color field).
     /// When >= 0, the Slint side resolves the color from `LinkStatusColors`.
-    /// Standard values: -1=none, 0=idle, 1=queued, 2=running,
-    /// 3=succeeded, 4=failed.
+    /// Standard values: -1=none, 0=idle, 1=running, 2=succeeded, 3=failed.
     fn status(&self) -> i32 {
         -1
     }
@@ -207,7 +206,8 @@ impl GraphLogic {
 
     /// Normalize a link so (start, end) is always (Output, Input)
     ///
-    /// Returns (output_pin_id, input_pin_id)
+    /// Returns (output_pin_id, input_pin_id), or None if either pin is missing.
+    /// Callers must validate direction compatibility first.
     pub fn normalize_link_direction<N>(
         pin_a: i32,
         pin_b: i32,
@@ -218,7 +218,8 @@ impl GraphLogic {
         N: NodeGeometry + Copy,
     {
         let pos_a = cache.pin_positions.get(&pin_a)?;
-        // We assume validity was checked, but check existence
+        cache.pin_positions.get(&pin_b)?;
+        // Direction compatibility must already have been validated.
 
         if pos_a.pin_type == output_type {
             Some((pin_a, pin_b))
@@ -394,6 +395,8 @@ impl fmt::Display for ValidationError {
         }
     }
 }
+
+impl std::error::Error for ValidationError {}
 
 /// Trait for custom link validation logic.
 ///
@@ -1549,5 +1552,42 @@ mod tests {
         GraphLogic::commit_drag(&model, 1, -50.0, -30.0);
 
         assert_eq!(positions(&model), vec![(50.0, 70.0)]);
+    }
+}
+
+impl crate::nodeeditor::LinkData {
+    /// Construct a colored link with no status override and a 2px line width.
+    /// IDs must follow the editor domains: nonnegative link ID, positive pins.
+    pub fn new(id: i32, start_pin_id: i32, end_pin_id: i32, color: Color) -> Self {
+        Self {
+            id,
+            start_pin_id,
+            end_pin_id,
+            color,
+            line_width: 2.0,
+            status: -1,
+            selected: false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod contract_tests {
+    use super::*;
+    #[test]
+    fn normalization_requires_both_endpoints() {
+        let mut cache = GeometryCache::<SimpleNodeGeometry>::new();
+        cache.handle_pin_report(1, 1, 2, 0.0, 0.0);
+        assert_eq!(GraphLogic::normalize_link_direction(1, 2, &cache, 2), None);
+        assert_eq!(GraphLogic::normalize_link_direction(2, 1, &cache, 2), None);
+    }
+    #[test]
+    fn colored_link_has_no_status_override() {
+        let color = Color::from_rgb_u8(1, 2, 3);
+        let link = crate::LinkData::new(0, 1, 2, color);
+        assert_eq!(link.color, color);
+        assert_eq!(link.status, -1);
+        assert_eq!(link.line_width, 2.0);
+        assert!(!link.selected);
     }
 }

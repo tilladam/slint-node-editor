@@ -12,6 +12,11 @@
 - Make layout input ordering and disconnected-component packing deterministic.
 - Test public consumer gestures and configured marquee behavior.
 
+- Reconcile rejected and snapped drag commits to the synchronous host model.
+- Reject invalid controller viewport updates and require both normalization
+  endpoints to exist. Add LinkData::new for explicitly colored links and
+  standard Error support for ValidationError.
+
 ### Migration from earlier git snapshots
 
 `Link.path-commands` is replaced by `Link.geometry: LinkPath`, containing commands

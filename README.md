@@ -212,6 +212,25 @@ IDs are integers with these current domains:
 | Pin | Unique and positive while live; otherwise opaque to the library |
 | Link | Unique and nonnegative while live; `-1` means “no link” in picking |
 
+Host drag callbacks must project their final position synchronously before
+returning. BaseNode then discards its gesture offset and uses the model even
+when the host rejects the move or snaps one or both axes back to unchanged
+coordinates. Asynchronous hosts may apply a later model update, but the editor
+shows the current authoritative position while waiting.
+
+Coordinates and pin offsets must be finite; node dimensions and zoom must be
+positive and finite. Keep Slint viewport bindings within the configured zoom
+limits. Rust `NodeEditorController::set_viewport` ignores an invalid update
+atomically, preserving the previous transform; it does not repair invalid
+values in the host's Slint properties. Low-level geometry maps and pure helpers
+remain caller-validated APIs.
+
+`LinkData::default()` has Slint's zero-valued status (idle), which overrides its
+color. Use `LinkData::new(id, output, input, color)` for a 2px colored link with
+no status override. Link box selection uses endpoint inclusion: either endpoint
+inside or on the box selects the link; a crossing curve whose endpoints are
+both outside is omitted.
+
 When replacing the whole graph, install the new models and invoke
 `NodeEditorInternalCallbacks.reset-graph()`. When seeding geometry without live
 components, call `NodeEditor.report-node-rect` and

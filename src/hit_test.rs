@@ -278,7 +278,8 @@ where
         .collect()
 }
 
-/// Find all links that intersect with a selection box
+/// Find links with at least one endpoint inside the selection box (inclusive).
+/// A curve crossing the box with both endpoints outside is not selected.
 pub fn links_in_selection_box<L, I>(
     sel_x: f32,
     sel_y: f32,

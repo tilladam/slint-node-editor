@@ -50,7 +50,7 @@ impl ViewportState {
 
     /// Clamp zoom to a safe positive value.
     fn safe_zoom(&self) -> f32 {
-        if self.zoom > 0.0 {
+        if self.zoom.is_finite() && self.zoom > 0.0 {
             self.zoom
         } else {
             1.0
@@ -241,14 +241,20 @@ impl NodeEditorController {
         note = "Use set_viewport() which also updates pan state"
     )]
     pub fn set_zoom(&self, zoom: f32) {
-        self.state.borrow_mut().zoom = zoom;
+        if zoom.is_finite() && zoom > 0.0 {
+            self.state.borrow_mut().zoom = zoom;
+        }
     }
 
     /// Set viewport state: zoom, pan_x, pan_y.
+    /// Invalid updates (nonfinite values or nonpositive zoom) are ignored atomically.
     ///
     /// Since the cache stores world-space coordinates, changing zoom/pan
     /// requires no per-node updates.
     pub fn set_viewport(&self, zoom: f32, pan_x: f32, pan_y: f32) {
+        if !zoom.is_finite() || zoom <= 0.0 || !pan_x.is_finite() || !pan_y.is_finite() {
+            return;
+        }
         let mut s = self.state.borrow_mut();
         s.zoom = zoom;
         s.pan_x = pan_x;
@@ -908,5 +914,27 @@ mod tests {
         ctrl.handle_node_rect(1, 100.0, 200.0, 50.0, 30.0);
         let _ = ctrl.find_link_at_screen(0.0, 0.0, 10.0, 50.0, 20);
         let _ = ctrl.find_pin_at_screen(0.0, 0.0, 10.0);
+    }
+}
+
+#[cfg(test)]
+mod viewport_contract_tests {
+    use super::*;
+    #[test]
+    fn invalid_viewport_updates_preserve_the_previous_transform() {
+        let ctrl = NodeEditorController::new();
+        ctrl.set_viewport(2.0, 10.0, 20.0);
+        for (z, x, y) in [
+            (f32::INFINITY, 0.0, 0.0),
+            (f32::NAN, 0.0, 0.0),
+            (0.0, 0.0, 0.0),
+            (-1.0, 0.0, 0.0),
+            (1.0, f32::NAN, 0.0),
+            (1.0, 0.0, f32::INFINITY),
+        ] {
+            ctrl.set_viewport(z, x, y);
+            let s = ctrl.state.borrow();
+            assert_eq!((s.zoom, s.pan_x, s.pan_y), (2.0, 10.0, 20.0));
+        }
     }
 }

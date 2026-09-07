@@ -687,7 +687,7 @@ export component BaseNode inherits Rectangle {
     accessible-role: list-item;
     accessible-label: "Node " + node-id;
     accessible-description: selected ? "selected" : "";
-    // Persistent position offset (survives drag end until model updates)
+    // Temporary offset during the synchronous host commit callback.
     property <length> persistent-offset-x: 0px;
     property <length> persistent-offset-y: 0px;
     property <int> reported-node-id: 0;
@@ -919,6 +919,10 @@ export component BaseNode inherits Rectangle {
                         root.persistent-offset-y += current-drag-offset-y;
                         // End drag using the tracked offset, not recalculated from mouse position
                         NodeEditorInternalCallbacks.end-node-drag(node-id, current-drag-offset-x, current-drag-offset-y);
+                        // The host's projected model is authoritative even if it
+                        // rejected the move or snapped back to unchanged coordinates.
+                        root.persistent-offset-x = 0px;
+                        root.persistent-offset-y = 0px;
                         is-dragging = false;
                         current-drag-offset-x = 0px;
                         current-drag-offset-y = 0px;

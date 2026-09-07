@@ -29,7 +29,7 @@ Last updated: 2026-09-07 through R10.
 | R11 | P2 | In progress | 5. Scale and optional UX | `1542652` | Unselected nodes no longer subscribe to the global drag start/end toggle through their world-position bindings; frame baselines and broader update localization remain open. |
 | R12 | P1 roadmap | Open | 4. Embeddability | — | Implement structural accessibility and configurable keyboard policy. |
 | R13 | P2 roadmap | Open | 4. Embeddability | — | Introduce instance-scoped editor context. |
-| R14 | P2 | Open | 3/4 | — | Simplify ownership, typing, and the public Rust integration surface. |
+| R14 | P2 | In progress | 3/4 | This change | Reconcile rejected drag commits, guard controller viewport updates, check both normalization endpoints, add colored LinkData constructor and Error support, and clarify ID/geometry/selection contracts. Broader API consolidation remains deferred. |
 | R15 | P1 release | In progress | 3. Release hardening | This change | Release verification workflow added; actual packaging remains blocked on published Slint 1.18 library-module support. |
 | R16 | P3 | In progress | 3. Release hardening | This change | Fixed pin example sizing and target feedback, added drag regression, fmt/clippy/all-feature CI, changelog, contributor guidance and bug template. Fixture separation and broader example coverage remain. |
 
@@ -220,6 +220,20 @@ Completed in this commit.
   step compiles the generated-UI quick-start fixture.
 
 ## In-progress work
+
+### R14 — focused contract correctness
+
+- Drag commits reconcile to the synchronous host model even for rejected moves
+  or unchanged snapped axes; pointer tests cover both and the next gesture.
+- Controller viewport updates reject nonfinite or nonpositive zoom and nonfinite
+  pan atomically. Raw geometry helpers remain caller-validated, as documented.
+- Direction normalization now requires both pins to exist; ValidationError
+  implements Error. LinkData::new supplies explicit-color defaults.
+- README states ID domains, synchronous commit timing, supported numeric inputs,
+  and endpoint-only box-selection semantics.
+- Broader ownership consolidation, adapters, cache encapsulation, and typed IDs
+  remain deferred. This does not mark the whole R14 finding complete.
+
 
 ### R16 — examples and maintenance gates
 

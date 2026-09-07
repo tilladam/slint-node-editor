@@ -87,3 +87,38 @@ fn rendered_geometry_populates_screen_space_helpers() {
     let output = harness.pin_position(3).expect("rendered output pin");
     assert_eq!(output, (499.0, 313.0));
 }
+
+#[test]
+fn rejected_and_partially_snapped_commits_reconcile_geometry() {
+    use common::harness::NodeEditorInternalCallbacks;
+    for snap_x in [None, Some(110.0)] {
+        let harness = MinimalTestHarness::new();
+        harness
+            .window
+            .global::<NodeEditorInternalCallbacks>()
+            .on_end_node_drag({
+                let nodes = harness.nodes.clone();
+                move |_, _, _| {
+                    if let Some(x) = snap_x {
+                        let mut node = nodes.row_data(0).unwrap();
+                        node.x = x;
+                        nodes.set_row_data(0, node);
+                    }
+                }
+            });
+        realize(&harness);
+        let start = harness.node_center(1).unwrap();
+        harness.drag(start.0, start.1, start.0 + 40.0, start.1 + 30.0);
+        harness.pump_events();
+        let cache = harness.ctrl.cache();
+        let cache = cache.borrow();
+        let rect = cache.node_rects[&1];
+        assert_close(rect.x, snap_x.unwrap_or(100.0));
+        assert_close(rect.y, 100.0);
+        drop(cache);
+        // A second gesture must not inherit an offset from the rejected one.
+        let start = harness.node_center(1).unwrap();
+        harness.drag(start.0, start.1, start.0 + 20.0, start.1 + 20.0);
+        assert_close(harness.node_center(1).unwrap().0, start.0);
+    }
+}
