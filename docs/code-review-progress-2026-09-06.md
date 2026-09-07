@@ -25,12 +25,12 @@ Last updated: 2026-09-07 through R10.
 | R7 | P2 | Complete | 2. Interaction and public contract | `e6e9aa5` | A modifier-only editor overlay owns forced marquees across every surface; node and pin fallbacks share the configuration, and all transient interactions have cancellation paths. |
 | R8 | P2 | Complete | 1. Correctness | `b63767e` | Pin picking scans all eligible candidates for the nearest and resolves exact distance ties by lowest pin ID, independent of insertion order. |
 | R9 | P2 | Complete | 2. Interaction and public contract | `0fe0b7e` | Raw and cache layouts canonicalize unique nodes and valid edges, return node-ID order, and pack deterministically ordered components without overlap on the perpendicular axis. |
-| R10 | P1 | Complete | 2. Interaction and public contract | This commit | The external `@nodeeditor` consumer drives real drag, link creation, edge selection, and double-click gestures through standard macros at transformed coordinates; self-confirming interaction tests were removed or replaced. |
+| R10 | P1 | Complete | 2. Interaction and public contract | `f235b25` | The external `@nodeeditor` consumer drives real drag, link creation, edge selection, and double-click gestures through standard macros at transformed coordinates; self-confirming interaction tests were removed or replaced. |
 | R11 | P2 | In progress | 5. Scale and optional UX | `1542652` | Unselected nodes no longer subscribe to the global drag start/end toggle through their world-position bindings; frame baselines and broader update localization remain open. |
 | R12 | P1 roadmap | Open | 4. Embeddability | — | Implement structural accessibility and configurable keyboard policy. |
 | R13 | P2 roadmap | Open | 4. Embeddability | — | Introduce instance-scoped editor context. |
 | R14 | P2 | Open | 3/4 | — | Simplify ownership, typing, and the public Rust integration surface. |
-| R15 | P1 release | Open | 3. Release hardening | — | Complete packaging gates and document the currently usable dependency source. |
+| R15 | P1 release | In progress | 3. Release hardening | This change | Release verification workflow added; actual packaging remains blocked on published Slint 1.18 library-module support. |
 | R16 | P3 | Open | 3. Release hardening | — | Clean up examples and make maintenance checks reliable teaching material. |
 
 Overall: **10 of 16 findings complete**. Correctness batch: **5 of 5
@@ -220,6 +220,23 @@ Completed in this commit.
   step compiles the generated-UI quick-start fixture.
 
 ## In-progress work
+
+### R15 — release packaging gates
+
+- Added `release-check.yml`, runnable manually and on version tags. It requires
+  actual package verification and downstream interaction tests against the
+  extracted archive, all-feature tests on Rust 1.92, and a publication dry run.
+  It does not upload a crate.
+- Corrected packaged-smoke version lookup to select the library by name rather
+  than assuming Cargo metadata lists it first.
+- Registry verification on 2026-09-07 reports Slint 1.17.1; the 1.18.0 API
+  lookup returned 404. The git package's `version = "1.18.0"` is not evidence
+  of publication. The existing tested git dependency remains necessary.
+- `cargo package --locked` still fails because Slint has no registry version
+  requirement. Adding an unavailable version would not complete this gate.
+  R15 remains incomplete until the required crates are published, dependencies
+  and consumer are switched together, and the release workflow passes.
+
 
 ### R11 — measure the whole frame and make updates local
 

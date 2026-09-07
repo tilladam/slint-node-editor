@@ -2,9 +2,9 @@
 # Downstream smoke test: test the compiled quick-start crate outside this
 # workspace against slint-node-editor.
 #
-# This is the check `cargo publish --dry-run` cannot do. A dry-run compiles
-# only the Rust library; it never parses a single .slint file, so a broken
-# component — or a library name that silently fails to resolve — passes it.
+# Cargo's package verification runs build.rs and parses the library's Slint
+# files. This additional consumer verifies that @nodeeditor resolves across
+# the dependency boundary and that the public interaction wiring works.
 #
 #   ./smoke/run.sh            # path mode: against this checkout
 #   ./smoke/run.sh git        # exact git revisions documented in README
@@ -53,7 +53,7 @@ included)
 packaged)
     cargo package --locked --manifest-path "$root/Cargo.toml"
     version="$(cargo metadata --no-deps --format-version 1 --manifest-path "$root/Cargo.toml" \
-        | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
+        | python3 -c 'import json,sys; print(next(p["version"] for p in json.load(sys.stdin)["packages"] if p["name"] == "slint-node-editor"))')"
     rm -rf "$root/target/smoke-package"
     mkdir -p "$root/target/smoke-package"
     tar -xzf "$root/target/package/slint-node-editor-$version.crate" \

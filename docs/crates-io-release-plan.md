@@ -8,6 +8,22 @@ complete** except for one item that cannot run until the `v1.18.0` tag lands.
 Link geometry was reworked after Phase 1 closed, which changes the
 consumer-visible API — see "Breaking changes to carry into the release notes".
 
+## R15 status — 2026-09-07
+
+The registry check still reports Slint 1.17.1; the 1.18.0 API request returned
+404. The pinned git source declares 1.18.0 but is not a published registry
+release. `cargo package --locked` still rejects the missing version requirement.
+The git quick start is the current supported setup.
+
+`.github/workflows/release-check.yml` now makes the Phase 2.3 checks executable:
+manual dispatch or a version tag runs packaged downstream interactions, tests
+on Rust 1.92 with all features, and a publication dry run. Run it successfully
+on the release commit before publishing. It is expected to fail on the current
+git-only manifest. Publication remains a separate manual action.
+
+The historical status below predates the review fixes; current review progress
+is recorded in [the progress tracker](code-review-progress-2026-09-06.md).
+
 ## Executive summary
 
 Publishing this crate is **not** primarily a dependency-pinning problem. It is a

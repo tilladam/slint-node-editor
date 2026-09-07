@@ -1,0 +1,29 @@
+name: Release verification
+
+# Run before publication. Until the required Slint release is on crates.io,
+# packaging must fail rather than treating an included-files smoke as a pass.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
+      - name: Install declared minimum Rust version
+        run: rustup toolchain install 1.92 --profile minimal
+      - name: Verify package and downstream interactions
+        run: ./smoke/run.sh packaged
+      - name: Test all features on the minimum Rust version
+        run: cargo +1.92 test --workspace --all-features --locked
+      - name: Verify publication without uploading
+        run: cargo publish --dry-run --locked
