@@ -11,7 +11,7 @@ https://github.com/user-attachments/assets/f0e8d69c-19da-4acf-b3e1-ea7e6c1324d8
 - ✅ **Callback-Based Computation** - Delegates expensive operations to Rust for performance
 - ✅ **Opaque Pin IDs** - Library never prescribes pin encoding; applications choose
 - ✅ **Extensible** - Easy to customize pins, styling, node types, and behaviors
-- ✅ **Zero Dependencies** - Library has no external Rust dependencies beyond Slint
+- ✅ **Optional layout** - Core depends on Slint; the `layout` feature adds rust-sugiyama
 
 ## Architecture Overview
 
@@ -649,6 +649,13 @@ All examples are located in the `examples/` directory and can be run from the ro
   - Run: `cargo run -p pin-compatibility`
 - **zoom-stress-test:** Tests widget scaling at various zoom levels with Level of Detail (LOD) rendering. Shows how to implement LOD transitions for complex nodes.
   - Run: `cargo run -p zoom-stress-test`
+
+- **edge-fade:** Viewport edge styling. Run `cargo run -p edge-fade`.
+- **sugiyama:** Automatic graph layout. Run `cargo run -p sugiyama`.
+- **sugiyama-stress-test:** Large graph layout demonstration. Run `cargo run -p sugiyama-stress-test`.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for checks and supported configurations,
+and [CHANGELOG.md](CHANGELOG.md) for the unreleased API changes.
 
 ## License
 

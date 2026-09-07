@@ -400,13 +400,13 @@ export global LinkStatus {
 /// Colors for the built-in link statuses.
 /// Override these properties to customize status colors.
 export global LinkStatusColors {
-    /// Color for idle links (status == 1). Default: gray.
+    /// Color for idle links (status == 0). Default: gray.
     in-out property <color> idle: #888888;
-    /// Color for running links (status == 2). Default: yellow.
+    /// Color for running links (status == 1). Default: yellow.
     in-out property <color> running: #e8b830;
-    /// Color for succeeded links (status == 3). Default: green.
+    /// Color for succeeded links (status == 2). Default: green.
     in-out property <color> succeeded: #50c878;
-    /// Color for failed links (status == 4). Default: red.
+    /// Color for failed links (status == 3). Default: red.
     in-out property <color> failed: #e05050;
 }
 

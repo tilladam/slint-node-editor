@@ -31,7 +31,7 @@ Last updated: 2026-09-07 through R10.
 | R13 | P2 roadmap | Open | 4. Embeddability | — | Introduce instance-scoped editor context. |
 | R14 | P2 | Open | 3/4 | — | Simplify ownership, typing, and the public Rust integration surface. |
 | R15 | P1 release | In progress | 3. Release hardening | This change | Release verification workflow added; actual packaging remains blocked on published Slint 1.18 library-module support. |
-| R16 | P3 | Open | 3. Release hardening | — | Clean up examples and make maintenance checks reliable teaching material. |
+| R16 | P3 | In progress | 3. Release hardening | This change | Fixed pin example sizing and target feedback, added drag regression, fmt/clippy/all-feature CI, changelog, contributor guidance and bug template. Fixture separation and broader example coverage remain. |
 
 Overall: **10 of 16 findings complete**. Correctness batch: **5 of 5
 findings complete**. Interaction and public contract batch: **5 of 5 findings
@@ -220,6 +220,22 @@ Completed in this commit.
   step compiles the generated-UI quick-start fixture.
 
 ## In-progress work
+
+### R16 — examples and maintenance gates
+
+- Pin-compatibility nodes now use BaseNode dimensions; a real lower-body drag
+  regression passes. Target feedback is bound to the current connection gesture.
+- CI runs formatting, clippy with warnings denied, and all-feature workspace
+  tests. Existing Rust formatting was normalized to establish the gate.
+- Added changelog, compatibility/contributor guidance, supported-configuration
+  limitations, and a bug report template. README lists all nine examples and
+  accurately describes the optional layout dependency.
+- Corrected stale link-status comments.
+- Validation: workspace tests and 14 doctests passed; the additional lower-body
+  pointer regression passed. Fixture extraction from the library build script
+  and broader example interaction coverage remain open. The focused R14
+  contract pass has not started.
+
 
 ### R15 — release packaging gates
 
