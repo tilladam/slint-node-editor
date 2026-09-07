@@ -24,7 +24,7 @@ include = [
 ]
 
 [dependencies]
-slint = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2", default-features = false, features = ["std", "compat-1-2"] }
+slint = { git = "https://github.com/slint-ui/slint", rev = "ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0", default-features = false, features = ["std", "compat-1-2"] }
 rust-sugiyama = { version = "0.4", optional = true }
 
 [features]
@@ -37,7 +37,7 @@ all-features = true
 i-slint-backend-testing = { workspace = true }
 
 [build-dependencies]
-slint-build = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2", features = ["experimental-module-builds"] }
+slint-build = { git = "https://github.com/slint-ui/slint", rev = "ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0", features = ["experimental-module-builds"] }
 
 [workspace]
 members = [
@@ -53,7 +53,7 @@ members = [
 ]
 
 [workspace.dependencies]
-slint = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-skia"] }
-slint-build = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2" }
-i-slint-backend-testing = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2" }
+slint = { git = "https://github.com/slint-ui/slint", rev = "ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-skia"] }
+slint-build = { git = "https://github.com/slint-ui/slint", rev = "ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0" }
+i-slint-backend-testing = { git = "https://github.com/slint-ui/slint", rev = "ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0" }
 slint-node-editor = { path = "." }
