@@ -621,7 +621,7 @@ dependencies = [
 [[package]]
 name = "const-field-offset"
 version = "0.2.1"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "const-field-offset-macro",
  "field-offset",
@@ -630,7 +630,7 @@ dependencies = [
 [[package]]
 name = "const-field-offset-macro"
 version = "0.2.1"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1534,7 +1534,7 @@ checksum = "48ce8546b993eaf241d69ded33b1be6d205dd9857ec879d9d18bd05d3676e144"
 [[package]]
 name = "i-slint-backend-linuxkms"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "calloop 0.14.4",
  "cfg_aliases",
@@ -1555,7 +1555,7 @@ dependencies = [
 [[package]]
 name = "i-slint-backend-selector"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "cfg-if",
  "cfg_aliases",
@@ -1571,7 +1571,7 @@ dependencies = [
 [[package]]
 name = "i-slint-backend-testing"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "cfg_aliases",
  "i-slint-common",
@@ -1583,7 +1583,7 @@ dependencies = [
 [[package]]
 name = "i-slint-backend-winit"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "arboard",
  "block2 0.6.2",
@@ -1621,7 +1621,7 @@ dependencies = [
 [[package]]
 name = "i-slint-common"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "derive_more",
  "fontique",
@@ -1637,7 +1637,7 @@ dependencies = [
 [[package]]
 name = "i-slint-compiler"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "annotate-snippets",
  "by_address",
@@ -1670,7 +1670,7 @@ dependencies = [
 [[package]]
 name = "i-slint-core"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "bitflags 2.13.1",
  "cfg-if",
@@ -1721,7 +1721,7 @@ dependencies = [
 [[package]]
 name = "i-slint-core-macros"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "quote",
  "serde_json",
@@ -1731,7 +1731,7 @@ dependencies = [
 [[package]]
 name = "i-slint-renderer-skia"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "ash",
  "bytemuck",
@@ -1770,7 +1770,7 @@ dependencies = [
 [[package]]
 name = "i-slint-renderer-software"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "bytemuck",
  "clru",
@@ -3709,9 +3709,9 @@ checksum = "8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649"
 
 [[package]]
 name = "skia-bindings"
-version = "0.99.0"
+version = "0.153.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e2d1c3ebd697c0cbded0145e9204a38fa6b268446051b7196d0a096414ea7f3"
+checksum = "eb325787c91b3f6c34a7c6f2b8a2297b20292d733ca53a08c233e5028aec49af"
 dependencies = [
  "bindgen",
  "cc",
@@ -3726,9 +3726,9 @@ dependencies = [
 
 [[package]]
 name = "skia-safe"
-version = "0.99.0"
+version = "0.153.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f512ac418a64194842dd05566320805dad1c957c521039db2486fd6368865bc"
+checksum = "c61cb643dac43067f3eb76c866635a74377ac0abca0ff2590674e1e295514c3d"
 dependencies = [
  "bitflags 2.13.1",
  "skia-bindings",
@@ -3754,7 +3754,7 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 [[package]]
 name = "slint"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "const-field-offset",
  "i-slint-backend-linuxkms",
@@ -3775,7 +3775,7 @@ dependencies = [
 [[package]]
 name = "slint-build"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "derive_more",
  "fontique",
@@ -3787,7 +3787,7 @@ dependencies = [
 [[package]]
 name = "slint-macros"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "i-slint-compiler",
  "proc-macro2",
@@ -4492,7 +4492,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 [[package]]
 name = "vtable"
 version = "0.5.0"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "const-field-offset",
  "portable-atomic",
@@ -4503,7 +4503,7 @@ dependencies = [
 [[package]]
 name = "vtable-macro"
 version = "0.5.0"
-source = "git+https://github.com/slint-ui/slint?rev=2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2#2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2"
+source = "git+https://github.com/slint-ui/slint?rev=ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0#ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0"
 dependencies = [
  "proc-macro2",
  "quote",

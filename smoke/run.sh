@@ -77,7 +77,7 @@ python3 - "$staging/Cargo.toml" "$library" <<'PY'
 import sys
 manifest, library = sys.argv[1], sys.argv[2]
 text = open(manifest).read()
-old = 'slint-node-editor = { git = "https://github.com/tilladam/slint-node-editor", rev = "0b454a9839af39de213839c8de44793dbbd5d993" }'
+old = 'slint-node-editor = { git = "https://github.com/tilladam/slint-node-editor", rev = "56773d6010df5a91d6c2f23868755bae0aafeca3" }'
 assert old in text, "fixture manifest no longer declares the documented git dependency"
 open(manifest, 'w').write(
     text.replace(old, f'slint-node-editor = {{ path = "{library}" }}'))

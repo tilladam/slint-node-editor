@@ -70,11 +70,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-slint = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software"] }
-slint-node-editor = { git = "https://github.com/tilladam/slint-node-editor", rev = "0b454a9839af39de213839c8de44793dbbd5d993" }
+slint = { git = "https://github.com/slint-ui/slint", rev = "ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software"] }
+slint-node-editor = { git = "https://github.com/tilladam/slint-node-editor", rev = "56773d6010df5a91d6c2f23868755bae0aafeca3" }
 
 [build-dependencies]
-slint-build = { git = "https://github.com/slint-ui/slint", rev = "2bb5a20694e75d2e8d50cbea91595f8ebff0d9a2", features = ["experimental-module-builds"] }
+slint-build = { git = "https://github.com/slint-ui/slint", rev = "ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0", features = ["experimental-module-builds"] }
 ```
 
 The current dependency graph requires Rust 1.92. The standalone fixture also
