@@ -82,9 +82,15 @@ pub struct SimpleLinkGeometry {
 }
 
 impl LinkGeometry for SimpleLinkGeometry {
-    fn id(&self) -> i32 { self.id }
-    fn start(&self) -> (f32, f32) { (self.start_x, self.start_y) }
-    fn end(&self) -> (f32, f32) { (self.end_x, self.end_y) }
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn start(&self) -> (f32, f32) {
+        (self.start_x, self.start_y)
+    }
+    fn end(&self) -> (f32, f32) {
+        (self.end_x, self.end_y)
+    }
 }
 
 /// Simple implementation of PinGeometry
@@ -96,8 +102,12 @@ pub struct SimplePinGeometry {
 }
 
 impl PinGeometry for SimplePinGeometry {
-    fn id(&self) -> i32 { self.id }
-    fn position(&self) -> (f32, f32) { (self.x, self.y) }
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn position(&self) -> (f32, f32) {
+        (self.x, self.y)
+    }
 }
 
 /// Simple implementation of NodeGeometry
@@ -111,8 +121,12 @@ pub struct SimpleNodeGeometry {
 }
 
 impl NodeGeometry for SimpleNodeGeometry {
-    fn id(&self) -> i32 { self.id }
-    fn rect(&self) -> (f32, f32, f32, f32) { (self.x, self.y, self.width, self.height) }
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn rect(&self) -> (f32, f32, f32, f32) {
+        (self.x, self.y, self.width, self.height)
+    }
 }
 
 /// Find the closest resolved link route at a point.
@@ -169,8 +183,7 @@ fn distance_to_segment(point: (f32, f32), start: (f32, f32), end: (f32, f32)) ->
         return squared_distance(point, start).sqrt();
     }
     let from_start = (point.0 - start.0, point.1 - start.1);
-    let t = ((from_start.0 * segment.0 + from_start.1 * segment.1) / length_sq)
-        .clamp(0.0, 1.0);
+    let t = ((from_start.0 * segment.0 + from_start.1 * segment.1) / length_sq).clamp(0.0, 1.0);
     let closest = (start.0 + t * segment.0, start.1 + t * segment.1);
     squared_distance(point, closest).sqrt()
 }
@@ -259,10 +272,7 @@ where
         .into_iter()
         .filter(|node| {
             let (x, y, w, h) = node.rect();
-            x < sel_x + sel_width
-                && x + w > sel_x
-                && y < sel_y + sel_height
-                && y + h > sel_y
+            x < sel_x + sel_width && x + w > sel_x && y < sel_y + sel_height && y + h > sel_y
         })
         .map(|node| node.id())
         .collect()
@@ -286,11 +296,15 @@ where
             let (start_x, start_y) = link.start();
             let (end_x, end_y) = link.end();
 
-            let start_in_box = start_x >= sel_x && start_x <= sel_x + sel_width
-                && start_y >= sel_y && start_y <= sel_y + sel_height;
+            let start_in_box = start_x >= sel_x
+                && start_x <= sel_x + sel_width
+                && start_y >= sel_y
+                && start_y <= sel_y + sel_height;
 
-            let end_in_box = end_x >= sel_x && end_x <= sel_x + sel_width
-                && end_y >= sel_y && end_y <= sel_y + sel_height;
+            let end_in_box = end_x >= sel_x
+                && end_x <= sel_x + sel_width
+                && end_y >= sel_y
+                && end_y <= sel_y + sel_height;
 
             start_in_box || end_in_box
         })
@@ -309,8 +323,16 @@ mod tests {
     #[test]
     fn test_find_pin_at() {
         let pins = vec![
-            SimplePinGeometry { id: 1001, x: 10.0, y: 10.0 },
-            SimplePinGeometry { id: 2001, x: 50.0, y: 50.0 },
+            SimplePinGeometry {
+                id: 1001,
+                x: 10.0,
+                y: 10.0,
+            },
+            SimplePinGeometry {
+                id: 2001,
+                x: 50.0,
+                y: 50.0,
+            },
         ];
 
         // Pass vector (IntoIterator)
@@ -321,13 +343,21 @@ mod tests {
 
     #[test]
     fn test_find_pin_at_exact_position() {
-        let pins = vec![SimplePinGeometry { id: 1001, x: 50.0, y: 50.0 }];
+        let pins = vec![SimplePinGeometry {
+            id: 1001,
+            x: 50.0,
+            y: 50.0,
+        }];
         assert_eq!(find_pin_at(50.0, 50.0, pins, 10.0), 1001);
     }
 
     #[test]
     fn test_find_pin_at_boundary_radius() {
-        let pins = vec![SimplePinGeometry { id: 1001, x: 50.0, y: 50.0 }];
+        let pins = vec![SimplePinGeometry {
+            id: 1001,
+            x: 50.0,
+            y: 50.0,
+        }];
 
         // Exactly at radius distance
         assert_eq!(find_pin_at(60.0, 50.0, pins.clone(), 10.0), 1001);
@@ -344,8 +374,16 @@ mod tests {
 
     #[test]
     fn test_find_pin_at_picks_nearest_regardless_of_iteration_order() {
-        let farther = SimplePinGeometry { id: 1001, x: 59.0, y: 50.0 };
-        let exact = SimplePinGeometry { id: 2001, x: 50.0, y: 50.0 };
+        let farther = SimplePinGeometry {
+            id: 1001,
+            x: 59.0,
+            y: 50.0,
+        };
+        let exact = SimplePinGeometry {
+            id: 2001,
+            x: 50.0,
+            y: 50.0,
+        };
 
         assert_eq!(find_pin_at(50.0, 50.0, [farther, exact], 10.0), 2001);
         assert_eq!(find_pin_at(50.0, 50.0, [exact, farther], 10.0), 2001);
@@ -353,8 +391,16 @@ mod tests {
 
     #[test]
     fn test_find_pin_at_breaks_distance_ties_by_lowest_id() {
-        let lower_id = SimplePinGeometry { id: 1001, x: 45.0, y: 50.0 };
-        let higher_id = SimplePinGeometry { id: 2001, x: 55.0, y: 50.0 };
+        let lower_id = SimplePinGeometry {
+            id: 1001,
+            x: 45.0,
+            y: 50.0,
+        };
+        let higher_id = SimplePinGeometry {
+            id: 2001,
+            x: 55.0,
+            y: 50.0,
+        };
 
         assert_eq!(find_pin_at(50.0, 50.0, [higher_id, lower_id], 10.0), 1001);
         assert_eq!(find_pin_at(50.0, 50.0, [lower_id, higher_id], 10.0), 1001);
@@ -362,7 +408,11 @@ mod tests {
 
     #[test]
     fn test_find_pin_at_zero_radius() {
-        let pins = vec![SimplePinGeometry { id: 1001, x: 50.0, y: 50.0 }];
+        let pins = vec![SimplePinGeometry {
+            id: 1001,
+            x: 50.0,
+            y: 50.0,
+        }];
 
         // Exact match with zero radius
         assert_eq!(find_pin_at(50.0, 50.0, pins.clone(), 0.0), 1001);
@@ -600,9 +650,27 @@ mod tests {
     #[test]
     fn test_nodes_in_selection_box() {
         let nodes = vec![
-            SimpleNodeGeometry { id: 1, x: 0.0, y: 0.0, width: 100.0, height: 80.0 },
-            SimpleNodeGeometry { id: 2, x: 200.0, y: 0.0, width: 100.0, height: 80.0 },
-            SimpleNodeGeometry { id: 3, x: 50.0, y: 100.0, width: 100.0, height: 80.0 },
+            SimpleNodeGeometry {
+                id: 1,
+                x: 0.0,
+                y: 0.0,
+                width: 100.0,
+                height: 80.0,
+            },
+            SimpleNodeGeometry {
+                id: 2,
+                x: 200.0,
+                y: 0.0,
+                width: 100.0,
+                height: 80.0,
+            },
+            SimpleNodeGeometry {
+                id: 3,
+                x: 50.0,
+                y: 100.0,
+                width: 100.0,
+                height: 80.0,
+            },
         ];
 
         let selected = nodes_in_selection_box(0.0, 0.0, 150.0, 200.0, nodes);
@@ -669,9 +737,27 @@ mod tests {
     #[test]
     fn test_links_in_selection_box() {
         let links = vec![
-            SimpleLinkGeometry { id: 1, start_x: 10.0, start_y: 10.0, end_x: 200.0, end_y: 10.0 },
-            SimpleLinkGeometry { id: 2, start_x: 200.0, start_y: 10.0, end_x: 10.0, end_y: 10.0 },
-            SimpleLinkGeometry { id: 3, start_x: 200.0, start_y: 10.0, end_x: 300.0, end_y: 10.0 },
+            SimpleLinkGeometry {
+                id: 1,
+                start_x: 10.0,
+                start_y: 10.0,
+                end_x: 200.0,
+                end_y: 10.0,
+            },
+            SimpleLinkGeometry {
+                id: 2,
+                start_x: 200.0,
+                start_y: 10.0,
+                end_x: 10.0,
+                end_y: 10.0,
+            },
+            SimpleLinkGeometry {
+                id: 3,
+                start_x: 200.0,
+                start_y: 10.0,
+                end_x: 300.0,
+                end_y: 10.0,
+            },
         ];
 
         let selected = links_in_selection_box(0.0, 0.0, 100.0, 100.0, links);

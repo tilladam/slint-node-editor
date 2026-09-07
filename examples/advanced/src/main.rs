@@ -829,11 +829,10 @@ mod tests {
     /// `Text` sets `accessible-label` to its own text by default, so the label
     /// is the handle. Returns `(left, right)` in window coordinates.
     fn text_span(app: &App, label: &str) -> (f32, f32) {
-        let e = i_slint_backend_testing::ElementHandle::find_by_accessible_label(
-            &app.window, label,
-        )
-        .next()
-        .unwrap_or_else(|| panic!("no element with accessible label {label:?}"));
+        let e =
+            i_slint_backend_testing::ElementHandle::find_by_accessible_label(&app.window, label)
+                .next()
+                .unwrap_or_else(|| panic!("no element with accessible label {label:?}"));
         let x = e.absolute_position().x;
         (x, x + e.size().width)
     }
@@ -880,7 +879,8 @@ mod tests {
     fn filter_node_combobox_keeps_usable_width() {
         let app = app();
         let combo = i_slint_backend_testing::ElementHandle::find_by_element_type_name(
-            &app.window, "ComboBox",
+            &app.window,
+            "ComboBox",
         )
         .next()
         .expect("the filter node has a ComboBox");
@@ -897,7 +897,8 @@ mod tests {
     fn filter_node_width_is_unchanged() {
         let app = app();
         let node = i_slint_backend_testing::ElementHandle::find_by_element_type_name(
-            &app.window, "FilterNode",
+            &app.window,
+            "FilterNode",
         )
         .next()
         .expect("a FilterNode is instantiated");
@@ -917,7 +918,8 @@ mod tests {
     fn filter_node_content_stays_inside_the_node() {
         let app = app();
         let node = i_slint_backend_testing::ElementHandle::find_by_element_type_name(
-            &app.window, "FilterNode",
+            &app.window,
+            "FilterNode",
         )
         .next()
         .expect("a FilterNode is instantiated");

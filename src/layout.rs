@@ -162,7 +162,11 @@ pub fn sugiyama_layout(
         for &(idx, (x, y)) in layout {
             if let Some(&(node_id, (node_width, node_height))) = nodes.get(idx) {
                 let (px, py) = if horizontal { (y, x) } else { (x, y) };
-                results.push(NodePosition { id: node_id, x: px, y: py });
+                results.push(NodePosition {
+                    id: node_id,
+                    x: px,
+                    y: py,
+                });
 
                 let (perpendicular_position, perpendicular_size) = if horizontal {
                     (py, node_height)
@@ -273,7 +277,10 @@ mod tests {
         assert!(pos.contains_key(&20));
 
         // Source should be above target in top-to-bottom layout
-        assert!(pos[&10].1 < pos[&20].1, "source node should be in an earlier layer");
+        assert!(
+            pos[&10].1 < pos[&20].1,
+            "source node should be in an earlier layer"
+        );
     }
 
     #[test]
@@ -310,11 +317,7 @@ mod tests {
     #[test]
     fn test_duplicate_node_ids_first_wins() {
         let base_sizes = vec![(1, (100.0, 50.0)), (2, (60.0, 30.0))];
-        let duplicate_sizes = vec![
-            (1, (100.0, 50.0)),
-            (1, (500.0, 400.0)),
-            (2, (60.0, 30.0)),
-        ];
+        let duplicate_sizes = vec![(1, (100.0, 50.0)), (1, (500.0, 400.0)), (2, (60.0, 30.0))];
 
         assert_eq!(
             sugiyama_layout(&[], &duplicate_sizes, &SugiyamaConfig::default()),
@@ -343,11 +346,7 @@ mod tests {
 
     #[test]
     fn raw_layout_ignores_duplicate_self_and_unknown_edges() {
-        let sizes = vec![
-            (1, (80.0, 40.0)),
-            (2, (80.0, 40.0)),
-            (3, (80.0, 40.0)),
-        ];
+        let sizes = vec![(1, (80.0, 40.0)), (2, (80.0, 40.0)), (3, (80.0, 40.0))];
         let expected = sugiyama_layout(&[(1, 2)], &sizes, &SugiyamaConfig::default());
         let noisy = sugiyama_layout(
             &[(1, 2), (1, 2), (1, 1), (3, 3), (1, 999), (999, 2)],
@@ -373,13 +372,19 @@ mod tests {
         reversed_edges.reverse();
 
         for direction in [Direction::TopToBottom, Direction::LeftToRight] {
-            let config = SugiyamaConfig { direction, ..Default::default() };
+            let config = SugiyamaConfig {
+                direction,
+                ..Default::default()
+            };
             let expected = sugiyama_layout(&edges, &sizes, &config);
             let actual = sugiyama_layout(&reversed_edges, &reversed_sizes, &config);
 
             assert_eq!(actual, expected);
             assert_eq!(
-                actual.iter().map(|position| position.id).collect::<Vec<_>>(),
+                actual
+                    .iter()
+                    .map(|position| position.id)
+                    .collect::<Vec<_>>(),
                 vec![10, 20, 30, 40]
             );
         }
@@ -417,10 +422,14 @@ mod tests {
         let edges = vec![(10, 20)];
 
         let ttb = sugiyama_layout(&edges, &sizes, &SugiyamaConfig::default());
-        let ltr = sugiyama_layout(&edges, &sizes, &SugiyamaConfig {
-            direction: Direction::LeftToRight,
-            ..Default::default()
-        });
+        let ltr = sugiyama_layout(
+            &edges,
+            &sizes,
+            &SugiyamaConfig {
+                direction: Direction::LeftToRight,
+                ..Default::default()
+            },
+        );
 
         let ttb_pos = pos_map(ttb);
         let ltr_pos = pos_map(ltr);
@@ -480,22 +489,25 @@ mod tests {
 
     #[test]
     fn test_isolated_nodes_are_packed_on_the_perpendicular_axis() {
-        let sizes = vec![
-            (1, (100.0, 50.0)),
-            (2, (100.0, 50.0)),
-            (3, (100.0, 50.0)),
-        ];
+        let sizes = vec![(1, (100.0, 50.0)), (2, (100.0, 50.0)), (3, (100.0, 50.0))];
 
         let top_to_bottom = sugiyama_layout(&[], &sizes, &SugiyamaConfig::default());
-        assert!(top_to_bottom.windows(2).all(|pair| pair[0].x + 110.0 <= pair[1].x));
+        assert!(top_to_bottom
+            .windows(2)
+            .all(|pair| pair[0].x + 110.0 <= pair[1].x));
         assert!(top_to_bottom.windows(2).all(|pair| pair[0].y == pair[1].y));
 
         let left_to_right = sugiyama_layout(
             &[],
             &sizes,
-            &SugiyamaConfig { direction: Direction::LeftToRight, ..Default::default() },
+            &SugiyamaConfig {
+                direction: Direction::LeftToRight,
+                ..Default::default()
+            },
         );
-        assert!(left_to_right.windows(2).all(|pair| pair[0].y + 60.0 <= pair[1].y));
+        assert!(left_to_right
+            .windows(2)
+            .all(|pair| pair[0].y + 60.0 <= pair[1].y));
         assert!(left_to_right.windows(2).all(|pair| pair[0].x == pair[1].x));
     }
 
@@ -513,7 +525,10 @@ mod tests {
             let positions = pos_map(sugiyama_layout(
                 &edges,
                 &sizes,
-                &SugiyamaConfig { direction, ..Default::default() },
+                &SugiyamaConfig {
+                    direction,
+                    ..Default::default()
+                },
             ));
             for left_id in [1, 2] {
                 for right_id in [3, 4] {
@@ -544,11 +559,7 @@ mod tests {
     #[test]
     fn test_cycle_does_not_panic() {
         // rust-sugiyama handles cycles internally; verify we don't break
-        let sizes = vec![
-            (1, (80.0, 40.0)),
-            (2, (80.0, 40.0)),
-            (3, (80.0, 40.0)),
-        ];
+        let sizes = vec![(1, (80.0, 40.0)), (2, (80.0, 40.0)), (3, (80.0, 40.0))];
         let edges = vec![(1, 2), (2, 3), (3, 1)];
         let result = sugiyama_layout(&edges, &sizes, &SugiyamaConfig::default());
 
@@ -574,10 +585,27 @@ mod tests {
     ) -> GeometryCache<SimpleNodeGeometry> {
         let mut cache = GeometryCache::default();
         for &(id, x, y, w, h) in nodes {
-            cache.node_rects.insert(id, SimpleNodeGeometry { id, x, y, width: w, height: h });
+            cache.node_rects.insert(
+                id,
+                SimpleNodeGeometry {
+                    id,
+                    x,
+                    y,
+                    width: w,
+                    height: h,
+                },
+            );
         }
         for &(pin_id, node_id, pin_type, rel_x, rel_y) in pins {
-            cache.pin_positions.insert(pin_id, StoredPin { node_id, pin_type, rel_x, rel_y });
+            cache.pin_positions.insert(
+                pin_id,
+                StoredPin {
+                    node_id,
+                    pin_type,
+                    rel_x,
+                    rel_y,
+                },
+            );
         }
         cache
     }
@@ -634,11 +662,8 @@ mod tests {
             ],
         );
         // Two edges that both resolve to (node 1 → node 2)
-        let result = sugiyama_layout_from_cache(
-            &cache,
-            &[(10, 20), (11, 21)],
-            &SugiyamaConfig::default(),
-        );
+        let result =
+            sugiyama_layout_from_cache(&cache, &[(10, 20), (11, 21)], &SugiyamaConfig::default());
 
         // Should produce exactly 2 positioned nodes, not crash or duplicate
         assert_eq!(result.len(), 2);
@@ -649,16 +674,9 @@ mod tests {
 
     #[test]
     fn test_from_cache_skips_unknown_pins() {
-        let cache = make_cache(
-            &[(1, 0.0, 0.0, 100.0, 50.0)],
-            &[(10, 1, 2, 100.0, 25.0)],
-        );
+        let cache = make_cache(&[(1, 0.0, 0.0, 100.0, 50.0)], &[(10, 1, 2, 100.0, 25.0)]);
         // Edge references pin 999 which doesn't exist
-        let result = sugiyama_layout_from_cache(
-            &cache,
-            &[(10, 999)],
-            &SugiyamaConfig::default(),
-        );
+        let result = sugiyama_layout_from_cache(&cache, &[(10, 999)], &SugiyamaConfig::default());
 
         // Node 1 still appears (from cache), edge is just ignored
         assert_eq!(result.len(), 1);
@@ -678,12 +696,9 @@ mod tests {
         let cache = make_cache(
             &[
                 (1, 0.0, 0.0, 200.0, 30.0), // wide node
-                (2, 0.0, 0.0, 50.0, 100.0),  // tall node
+                (2, 0.0, 0.0, 50.0, 100.0), // tall node
             ],
-            &[
-                (10, 1, 2, 200.0, 15.0),
-                (20, 2, 1, 0.0, 50.0),
-            ],
+            &[(10, 1, 2, 200.0, 15.0), (20, 2, 1, 0.0, 50.0)],
         );
         let result = sugiyama_layout_from_cache(&cache, &[(10, 20)], &SugiyamaConfig::default());
         assert_eq!(result.len(), 2);
@@ -698,10 +713,7 @@ mod tests {
     fn test_from_cache_with_direction() {
         let cache = make_cache(
             &[(1, 0.0, 0.0, 100.0, 50.0), (2, 200.0, 0.0, 100.0, 50.0)],
-            &[
-                (10, 1, 2, 100.0, 25.0),
-                (20, 2, 1, 0.0, 25.0),
-            ],
+            &[(10, 1, 2, 100.0, 25.0), (20, 2, 1, 0.0, 25.0)],
         );
         let config = SugiyamaConfig {
             direction: Direction::LeftToRight,
@@ -711,7 +723,10 @@ mod tests {
         let pos = pos_map(result);
 
         // In left-to-right, source should be left of target
-        assert!(pos[&1].0 < pos[&2].0, "source should be left of target in LTR layout");
+        assert!(
+            pos[&1].0 < pos[&2].0,
+            "source should be left of target in LTR layout"
+        );
     }
 
     #[test]
@@ -743,7 +758,10 @@ mod tests {
         reversed_edges.reverse();
 
         for direction in [Direction::TopToBottom, Direction::LeftToRight] {
-            let config = SugiyamaConfig { direction, ..Default::default() };
+            let config = SugiyamaConfig {
+                direction,
+                ..Default::default()
+            };
             assert_eq!(
                 sugiyama_layout_from_cache(&reversed_cache, &reversed_edges, &config),
                 sugiyama_layout_from_cache(&cache, &edges, &config)

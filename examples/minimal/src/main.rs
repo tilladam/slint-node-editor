@@ -132,14 +132,18 @@ mod tests {
 
     fn click(app: &App, x: f32, y: f32) {
         let position = LogicalPosition::new(x, y);
-        app.window.window().dispatch_event(WindowEvent::PointerPressed {
-            position,
-            button: PointerEventButton::Left,
-        });
-        app.window.window().dispatch_event(WindowEvent::PointerReleased {
-            position,
-            button: PointerEventButton::Left,
-        });
+        app.window
+            .window()
+            .dispatch_event(WindowEvent::PointerPressed {
+                position,
+                button: PointerEventButton::Left,
+            });
+        app.window
+            .window()
+            .dispatch_event(WindowEvent::PointerReleased {
+                position,
+                button: PointerEventButton::Left,
+            });
         pump();
     }
 
@@ -192,8 +196,7 @@ mod tests {
 
         app.window
             .invoke_report_node_geometry(99, 10.0, 20.0, 80.0, 40.0);
-        app.window
-            .invoke_report_pin_geometry(990, 99, 1, 5.0, 6.0);
+        app.window.invoke_report_pin_geometry(990, 99, 1, 5.0, 6.0);
         pump();
 
         let cache = app.controller.cache();

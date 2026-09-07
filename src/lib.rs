@@ -231,9 +231,7 @@ macro_rules! wire_node_editor {
         let w = $window.as_weak();
         computations.on_request_grid_update(move || {
             if let Some(w) = w.upgrade() {
-                w.set_grid_commands(
-                    ctrl.generate_current_grid(w.get_width_(), w.get_height_()),
-                );
+                w.set_grid_commands(ctrl.generate_current_grid(w.get_width_(), w.get_height_()));
             }
         });
 

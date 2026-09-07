@@ -18,10 +18,12 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y libfontconfig1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
-    - name: Build
-      run: cargo build --verbose
+    - name: Formatting
+      run: cargo fmt --all -- --check
+    - name: Clippy
+      run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --workspace --all-features --locked
     # The check `cargo publish --dry-run` cannot do. A dry-run does now parse
     # our .slint files (build.rs ships), but it still never checks that a
     # *consumer* can resolve `@nodeeditor`. `included` builds an

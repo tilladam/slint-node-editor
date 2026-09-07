@@ -1,7 +1,6 @@
 use slint::{Color, Model, ModelRc, SharedString, VecModel};
 use slint_node_editor::{
-    find_link_route_at, wire_node_editor, LinkData, LinkPath, NodeEditorSetup,
-    PolylineLinkRoute,
+    find_link_route_at, wire_node_editor, LinkData, LinkPath, NodeEditorSetup, PolylineLinkRoute,
 };
 use std::rc::Rc;
 
@@ -15,12 +14,7 @@ slint::include_modules!();
 /// left stale by partial rendering. The staircase turns at the midpoint in x
 /// and never leaves the rectangle the two endpoints span, so that rectangle is
 /// the box.
-fn manhattan_points(
-    start_x: f32,
-    start_y: f32,
-    end_x: f32,
-    end_y: f32,
-) -> [(f32, f32); 4] {
+fn manhattan_points(start_x: f32, start_y: f32, end_x: f32, end_y: f32) -> [(f32, f32); 4] {
     let mid_x = (start_x + end_x) / 2.0;
     [
         (start_x, start_y),
@@ -145,8 +139,7 @@ fn main() {
 
                 let cache = ctrl.cache();
                 let cache = cache.borrow();
-                let Some((sx, sy, ex, ey)) =
-                    cache.resolve_link_endpoints_world(start_pin, end_pin)
+                let Some((sx, sy, ex, ey)) = cache.resolve_link_endpoints_world(start_pin, end_pin)
                 else {
                     return LinkPath::default();
                 };
@@ -178,8 +171,7 @@ fn main() {
             let Some(w) = w.upgrade() else {
                 return -1;
             };
-            let world_hover_distance =
-                ctrl.screen_distance_to_world(w.get_link_hover_distance());
+            let world_hover_distance = ctrl.screen_distance_to_world(w.get_link_hover_distance());
             let hit_samples = w.get_link_hit_samples() as usize;
             let rows = (0..links.row_count()).filter_map(|i| links.row_data(i));
             let cache = ctrl.cache();
@@ -187,10 +179,8 @@ fn main() {
 
             if w.get_link_style() == "orthogonal" {
                 let routes = rows.filter_map(|link| {
-                    let (sx, sy, ex, ey) = cache.resolve_link_endpoints_world(
-                        link.start_pin_id,
-                        link.end_pin_id,
-                    )?;
+                    let (sx, sy, ex, ey) =
+                        cache.resolve_link_endpoints_world(link.start_pin_id, link.end_pin_id)?;
                     Some(PolylineLinkRoute {
                         id: link.id,
                         points: manhattan_points(sx, sy, ex, ey),
@@ -237,12 +227,7 @@ mod tests {
                 7,
             );
             assert_eq!(
-                find_link_route_at(
-                    (40.0 + 9.0 / zoom, 170.0),
-                    [route],
-                    world_hover_distance,
-                    0,
-                ),
+                find_link_route_at((40.0 + 9.0 / zoom, 170.0), [route], world_hover_distance, 0,),
                 -1,
                 "nine-screen-pixel offset hit at zoom {zoom}",
             );

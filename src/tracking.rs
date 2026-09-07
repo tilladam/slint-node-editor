@@ -213,7 +213,9 @@ mod tests {
     #[test]
     fn test_tracker_with_existing_cache() {
         let cache = Rc::new(RefCell::new(GeometryCache::<SimpleNodeGeometry>::new()));
-        cache.borrow_mut().update_node_rect(1, 10.0, 20.0, 100.0, 50.0);
+        cache
+            .borrow_mut()
+            .update_node_rect(1, 10.0, 20.0, 100.0, 50.0);
 
         let tracker = GeometryTracker::with_cache(cache.clone());
 
@@ -278,7 +280,9 @@ mod tests {
         let cache1 = tracker.cache();
         let cache2 = tracker.cache();
 
-        cache1.borrow_mut().update_node_rect(1, 0.0, 0.0, 100.0, 50.0);
+        cache1
+            .borrow_mut()
+            .update_node_rect(1, 0.0, 0.0, 100.0, 50.0);
 
         // cache2 should see the update
         assert!(cache2.borrow().node_rects.contains_key(&1));

@@ -75,7 +75,7 @@ mod tests {
         let commands = generate_grid_commands(100.0, 100.0, 1.0, 0.0, 0.0, 50.0);
         // Should have vertical lines
         assert!(commands.contains("L 0 100")); // Vertical line to bottom
-        // Should have horizontal lines
+                                               // Should have horizontal lines
         assert!(commands.contains("L 100")); // Horizontal line to right edge
     }
 

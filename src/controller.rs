@@ -50,7 +50,11 @@ impl ViewportState {
 
     /// Clamp zoom to a safe positive value.
     fn safe_zoom(&self) -> f32 {
-        if self.zoom > 0.0 { self.zoom } else { 1.0 }
+        if self.zoom > 0.0 {
+            self.zoom
+        } else {
+            1.0
+        }
     }
 }
 
@@ -149,11 +153,10 @@ impl NodeEditorController {
         let state = self.state.clone();
         move |start_pin, end_pin, _version| {
             let s = state.borrow();
-            match cache.borrow().link_curve_world(
-                start_pin,
-                end_pin,
-                s.bezier_offset,
-            ) {
+            match cache
+                .borrow()
+                .link_curve_world(start_pin, end_pin, s.bezier_offset)
+            {
                 Some(curve) => curve.to_link_path(&make_path),
                 None => T::default(),
             }
@@ -184,7 +187,9 @@ impl NodeEditorController {
     /// internally (`center-x: (self.x + self.width / 2) / zoom`), so the
     /// values received here are already zoom-invariant.
     pub fn handle_pin_position(&self, pid: i32, nid: i32, ptype: i32, x: f32, y: f32) {
-        self.cache.borrow_mut().handle_pin_report(pid, nid, ptype, x, y);
+        self.cache
+            .borrow_mut()
+            .handle_pin_report(pid, nid, ptype, x, y);
     }
 
     /// Update cached pin geometry and its pin-picking eligibility.
@@ -231,7 +236,10 @@ impl NodeEditorController {
     }
 
     /// Set the zoom level (called from update-viewport).
-    #[deprecated(since = "0.2.0", note = "Use set_viewport() which also updates pan state")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use set_viewport() which also updates pan state"
+    )]
     pub fn set_zoom(&self, zoom: f32) {
         self.state.borrow_mut().zoom = zoom;
     }
@@ -250,7 +258,10 @@ impl NodeEditorController {
     /// Register a link for hit testing. Idempotent: re-registering the same ID
     /// updates the pin pair.
     pub fn register_link(&self, id: i32, start_pin: i32, end_pin: i32) {
-        self.state.borrow_mut().links.insert(id, (start_pin, end_pin));
+        self.state
+            .borrow_mut()
+            .links
+            .insert(id, (start_pin, end_pin));
     }
 
     /// Unregister a link by ID.
@@ -329,15 +340,8 @@ impl NodeEditorController {
     /// Generate grid commands from the controller's current viewport and spacing.
     pub fn generate_current_grid(&self, width: f32, height: f32) -> SharedString {
         let s = self.state.borrow();
-        crate::generate_grid_commands(
-            width,
-            height,
-            s.zoom,
-            s.pan_x,
-            s.pan_y,
-            s.grid_spacing,
-        )
-        .into()
+        crate::generate_grid_commands(width, height, s.zoom, s.pan_x, s.pan_y, s.grid_spacing)
+            .into()
     }
 
     /// Generate initial grid commands (zoom=1, pan=0).
@@ -437,13 +441,7 @@ impl NodeEditorController {
     /// Find all nodes whose world-space rect intersects the given screen-space selection box.
     ///
     /// Converts the selection box from screen→world and performs AABB intersection.
-    pub fn nodes_in_selection_box_screen(
-        &self,
-        sx: f32,
-        sy: f32,
-        sw: f32,
-        sh: f32,
-    ) -> Vec<i32> {
+    pub fn nodes_in_selection_box_screen(&self, sx: f32, sy: f32, sw: f32, sh: f32) -> Vec<i32> {
         let s = self.state.borrow();
         let z = s.safe_zoom();
         let world_x = (sx - s.pan_x) / z;
@@ -484,25 +482,13 @@ impl NodeEditorController {
             })
         });
 
-        crate::hit_test::links_in_selection_box(
-            world_x,
-            world_y,
-            world_w,
-            world_h,
-            link_geometries,
-        )
+        crate::hit_test::links_in_selection_box(world_x, world_y, world_w, world_h, link_geometries)
     }
 
     /// Find all links that have at least one endpoint inside the given screen-space selection box.
     ///
     /// Converts the box from screen→world and delegates to [`links_in_selection_box_world`](Self::links_in_selection_box_world).
-    pub fn links_in_selection_box_screen(
-        &self,
-        sx: f32,
-        sy: f32,
-        sw: f32,
-        sh: f32,
-    ) -> Vec<i32> {
+    pub fn links_in_selection_box_screen(&self, sx: f32, sy: f32, sw: f32, sh: f32) -> Vec<i32> {
         let s = self.state.borrow();
         let z = s.safe_zoom();
         let world_x = (sx - s.pan_x) / z;
@@ -543,10 +529,7 @@ mod tests {
         ctrl
     }
 
-    fn setup_controller_with_link(
-        start: (f32, f32),
-        end: (f32, f32),
-    ) -> NodeEditorController {
+    fn setup_controller_with_link(start: (f32, f32), end: (f32, f32)) -> NodeEditorController {
         let ctrl = NodeEditorController::new();
         ctrl.handle_node_rect(1, start.0, start.1, 1.0, 1.0);
         ctrl.handle_node_rect(2, end.0, end.1, 1.0, 1.0);
@@ -728,19 +711,11 @@ mod tests {
         ctrl.handle_pin_position(2, 2, 1, 0.0, 0.0);
         ctrl.register_link(7, 1, 2);
         ctrl.set_viewport(3.0, 17.0, -11.0);
-        let rendered = crate::path::CubicBezier::from_endpoints(
-            0.0, 0.0, 30.0, 100.0, 1.0, 50.0,
-        );
+        let rendered = crate::path::CubicBezier::from_endpoints(0.0, 0.0, 30.0, 100.0, 1.0, 50.0);
         let (world_x, world_y) = rendered.eval(0.2);
 
         assert_eq!(
-            ctrl.find_link_at_screen(
-                world_x * 3.0 + 17.0,
-                world_y * 3.0 - 11.0,
-                1.0,
-                50.0,
-                1000,
-            ),
+            ctrl.find_link_at_screen(world_x * 3.0 + 17.0, world_y * 3.0 - 11.0, 1.0, 50.0, 1000,),
             7
         );
     }
@@ -755,10 +730,7 @@ mod tests {
         ctrl.register_link(7, 1, 2);
         ctrl.set_viewport(3.0, 0.0, 0.0);
 
-        assert_eq!(
-            ctrl.find_link_at_screen(300.0, 20.0, 8.0, 50.0, 100),
-            -1
-        );
+        assert_eq!(ctrl.find_link_at_screen(300.0, 20.0, 8.0, 50.0, 100), -1);
     }
 
     #[test]
@@ -771,9 +743,8 @@ mod tests {
         ];
 
         for (start, end, shape) in edges {
-            let rendered = crate::path::CubicBezier::from_endpoints(
-                start.0, start.1, end.0, end.1, 1.0, 50.0,
-            );
+            let rendered =
+                crate::path::CubicBezier::from_endpoints(start.0, start.1, end.0, end.1, 1.0, 50.0);
             let ctrl = setup_controller_with_link(start, end);
 
             for zoom in [0.1, 0.25, 1.0, 3.0] {

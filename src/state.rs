@@ -1,7 +1,6 @@
 use crate::hit_test::{
-    find_link_at, find_link_route_at, find_pin_at, links_in_selection_box,
-    nodes_in_selection_box, BezierLinkRoute, NodeGeometry, SimpleLinkGeometry,
-    SimpleNodeGeometry, SimplePinGeometry,
+    find_link_at, find_link_route_at, find_pin_at, links_in_selection_box, nodes_in_selection_box,
+    BezierLinkRoute, NodeGeometry, SimpleLinkGeometry, SimpleNodeGeometry, SimplePinGeometry,
 };
 use crate::path::{generate_bezier_path, CubicBezier};
 use std::collections::{HashMap, HashSet};
@@ -178,20 +177,8 @@ where
     }
 
     /// Compute nodes in selection box
-    pub fn nodes_in_selection_box(
-        &self,
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
-    ) -> Vec<i32> {
-        nodes_in_selection_box(
-            x,
-            y,
-            width,
-            height,
-            self.node_rects.values().copied(),
-        )
+    pub fn nodes_in_selection_box(&self, x: f32, y: f32, width: f32, height: f32) -> Vec<i32> {
+        nodes_in_selection_box(x, y, width, height, self.node_rects.values().copied())
     }
 
     /// Compute links in selection box
@@ -206,13 +193,7 @@ where
     where
         I: Iterator<Item = (i32, i32, i32)> + 'a,
     {
-        links_in_selection_box(
-            x,
-            y,
-            width,
-            height,
-            self.get_absolute_links(links),
-        )
+        links_in_selection_box(x, y, width, height, self.get_absolute_links(links))
     }
 
     /// Resolve absolute world-space positions for a link's start and end pins.
@@ -245,7 +226,14 @@ where
         bezier_min_offset: f32,
     ) -> Option<String> {
         let (sx, sy, ex, ey) = self.resolve_link_endpoints_world(start_pin, end_pin)?;
-        Some(generate_bezier_path(sx, sy, ex, ey, zoom, bezier_min_offset))
+        Some(generate_bezier_path(
+            sx,
+            sy,
+            ex,
+            ey,
+            zoom,
+            bezier_min_offset,
+        ))
     }
 
     /// Compute bezier path in screen space from world-space cache data.
@@ -262,9 +250,12 @@ where
     ) -> Option<String> {
         let (sx, sy, ex, ey) = self.resolve_link_endpoints_world(start_pin, end_pin)?;
         Some(generate_bezier_path(
-            sx * zoom + pan_x, sy * zoom + pan_y,
-            ex * zoom + pan_x, ey * zoom + pan_y,
-            zoom, bezier_min_offset,
+            sx * zoom + pan_x,
+            sy * zoom + pan_y,
+            ex * zoom + pan_x,
+            ey * zoom + pan_y,
+            zoom,
+            bezier_min_offset,
         ))
     }
 
@@ -279,7 +270,14 @@ where
         bezier_min_offset: f32,
     ) -> Option<CubicBezier> {
         let (sx, sy, ex, ey) = self.resolve_link_endpoints_world(start_pin, end_pin)?;
-        Some(CubicBezier::from_endpoints(sx, sy, ex, ey, 1.0, bezier_min_offset))
+        Some(CubicBezier::from_endpoints(
+            sx,
+            sy,
+            ex,
+            ey,
+            1.0,
+            bezier_min_offset,
+        ))
     }
 
     /// Compute bezier path in pure world coordinates (zoom=1.0).
@@ -527,12 +525,18 @@ mod tests {
         let pins: Vec<SimplePinGeometry> = cache.get_absolute_pins().collect();
 
         // Find pin 1001: node at (0,0) + rel (100, 25) = (100, 25)
-        let pin1 = pins.iter().find(|p| p.id == 1001).expect("Pin 1001 should exist");
+        let pin1 = pins
+            .iter()
+            .find(|p| p.id == 1001)
+            .expect("Pin 1001 should exist");
         assert_eq!(pin1.x, 100.0);
         assert_eq!(pin1.y, 25.0);
 
         // Find pin 2001: node at (200, 100) + rel (0, 25) = (200, 125)
-        let pin2 = pins.iter().find(|p| p.id == 2001).expect("Pin 2001 should exist");
+        let pin2 = pins
+            .iter()
+            .find(|p| p.id == 2001)
+            .expect("Pin 2001 should exist");
         assert_eq!(pin2.x, 200.0);
         assert_eq!(pin2.y, 125.0);
     }
@@ -564,7 +568,10 @@ mod tests {
         cache.handle_pin_report(1001, 1, 2, 50.0, 25.0);
 
         let pins: Vec<SimplePinGeometry> = cache.get_absolute_pins().collect();
-        let pin = pins.iter().find(|p| p.id == 1001).expect("Pin should exist");
+        let pin = pins
+            .iter()
+            .find(|p| p.id == 1001)
+            .expect("Pin should exist");
         assert_eq!(pin.x, -50.0); // -100 + 50
         assert_eq!(pin.y, -25.0); // -50 + 25
     }
