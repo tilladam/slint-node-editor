@@ -132,10 +132,13 @@ export component App inherits Window {
     // Required by wire_selection! and the host link policy.
     callback link-requested <=> editor.link-requested;
     callback node-selected <=> editor.node-selected;
+    callback select-link <=> editor.select-link;
     callback selection-cleared <=> editor.selection-cleared;
     callback box-selection-committed <=> editor.box-selection-committed;
+    callback compute-link-at <=> editor.compute-link-at;
 
     editor := NodeEditor {
+        has-link-selection: true;
         for node in root.nodes: QuickNode {
             node-id: node.id;
             world-x: node.x * 1px;
@@ -163,7 +166,7 @@ let setup = NodeEditorSetup::new({
 });
 
 wire_node_editor!(window, setup);
-wire_selection!(window, setup, nodes);
+wire_selection!(window, setup, nodes, links);
 ```
 
 Keep `LinkPath` plus the two macros and setup types in Rust scope. The generated
@@ -172,6 +175,11 @@ Slint exports shown above. `wire_node_editor!` installs geometry,
 route, pin-picking, viewport and grid handlers. `wire_selection!` resolves each
 selection intent immediately and writes the absolute result into row
 `selected` flags before a drag continues.
+
+Interactive link selection also requires the application-owned
+`compute-link-at` callback. The complete quick start resolves the current link
+rows against the controller's geometry cache and converts the fixed screen
+tolerance to world units before calling `find_bezier_link_at_world`.
 
 Slint callbacks have one handler. Install application overrides after the
 macros; the last `on_*` handler replaces the earlier one. Replacing a

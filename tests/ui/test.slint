@@ -111,6 +111,8 @@ export component MainWindow inherits Window {
     in-out property <length> pan-x <=> editor.pan-x;
     in-out property <length> pan-y <=> editor.pan-y;
     in-out property <float> zoom <=> editor.zoom;
+    out property <length> editor-screen-x: editor.absolute-position.x;
+    out property <length> editor-screen-y: editor.absolute-position.y;
     in-out property <BoxSelectionModifier> box-selection-modifier <=> editor.box-selection-modifier;
     in-out property <bool> box-selection-on-empty <=> editor.box-selection-on-empty;
     in-out property <bool> editor-enabled <=> editor.enabled;

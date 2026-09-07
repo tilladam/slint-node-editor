@@ -4,7 +4,7 @@ This document tracks work against the findings in
 [code-review-2026-09-06.md](code-review-2026-09-06.md). Update it when a finding
 is started, completed, reopened, or intentionally deferred.
 
-Last updated: 2026-09-06 through R9.
+Last updated: 2026-09-07 through R10.
 
 ## Status
 
@@ -24,8 +24,8 @@ Last updated: 2026-09-06 through R9.
 | R6 | P2 | Complete | 1. Correctness | `28eeaa3` | Link validation now returns canonical output/input endpoints before topology rules run; the advanced and pin-compatibility examples create links from those validated endpoints. |
 | R7 | P2 | Complete | 2. Interaction and public contract | `e6e9aa5` | A modifier-only editor overlay owns forced marquees across every surface; node and pin fallbacks share the configuration, and all transient interactions have cancellation paths. |
 | R8 | P2 | Complete | 1. Correctness | `b63767e` | Pin picking scans all eligible candidates for the nearest and resolves exact distance ties by lowest pin ID, independent of insertion order. |
-| R9 | P2 | Complete | 2. Interaction and public contract | This commit | Raw and cache layouts canonicalize unique nodes and valid edges, return node-ID order, and pack deterministically ordered components without overlap on the perpendicular axis. |
-| R10 | P1 | Open | 2. Interaction and public contract | — | Replace self-confirming tests with tests through promised interfaces. |
+| R9 | P2 | Complete | 2. Interaction and public contract | `0fe0b7e` | Raw and cache layouts canonicalize unique nodes and valid edges, return node-ID order, and pack deterministically ordered components without overlap on the perpendicular axis. |
+| R10 | P1 | Complete | 2. Interaction and public contract | This commit | The external `@nodeeditor` consumer drives real drag, link creation, edge selection, and double-click gestures through standard macros at transformed coordinates; self-confirming interaction tests were removed or replaced. |
 | R11 | P2 | In progress | 5. Scale and optional UX | `1542652` | Unselected nodes no longer subscribe to the global drag start/end toggle through their world-position bindings; frame baselines and broader update localization remain open. |
 | R12 | P1 roadmap | Open | 4. Embeddability | — | Implement structural accessibility and configurable keyboard policy. |
 | R13 | P2 roadmap | Open | 4. Embeddability | — | Introduce instance-scoped editor context. |
@@ -33,9 +33,9 @@ Last updated: 2026-09-06 through R9.
 | R15 | P1 release | Open | 3. Release hardening | — | Complete packaging gates and document the currently usable dependency source. |
 | R16 | P3 | Open | 3. Release hardening | — | Clean up examples and make maintenance checks reliable teaching material. |
 
-Overall: **9 of 16 findings complete**. Correctness batch: **5 of 5
-findings complete**. Interaction and public contract batch: **4 of 5 findings
-complete**. The next item by review order is **R10**.
+Overall: **10 of 16 findings complete**. Correctness batch: **5 of 5
+findings complete**. Interaction and public contract batch: **5 of 5 findings
+complete**. The next active finding by review order is **R11**.
 
 ## Completed work
 
@@ -195,6 +195,30 @@ Completed in this commit.
   noisy edges, equivalent input permutations, cache insertion order, isolated
   nodes, and non-overlap of disconnected components in both directions.
 
+### R10 — test through the promised interfaces
+
+Completed in this commit.
+
+- The out-of-workspace quick-start fixture imports the library through
+  `@nodeeditor` and retains only `wire_node_editor!` and `wire_selection!` for
+  standard editor wiring.
+- Its testing-backend suite sends real pointer events for node dragging, pin
+  completion, edge selection, and BaseNode double-click forwarding. Drag and
+  link creation assert final host-model state at zoom 1.5, nonzero pan, and the
+  toolbar-offset editor origin.
+- The fixture enables link selection and supplies the documented host-owned
+  link picker, so the edge gesture exercises the same public callback boundary
+  as a consumer application.
+- Level 2 drag tests now render nodes and commit movement through pointer input.
+  No-op keyboard dispatch checks and tests that manually pushed values into
+  callback trackers were removed; command policy remains host-owned and is
+  tracked separately under R12.
+- Harness node and pin helpers now honor the editor origin, zoom, and pan when
+  returning the screen coordinates their API promised.
+- CI explicitly compiles and runs all executable documentation examples with
+  all features before generating documentation, while the downstream smoke
+  step compiles the generated-UI quick-start fixture.
+
 ## In-progress work
 
 ### R11 — measure the whole frame and make updates local
@@ -278,6 +302,16 @@ After R9:
 
 - `cargo test --workspace --all-features --locked`: **425 tests passed** plus
   **14 executable doctests passed**.
+- `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`:
+  passed.
+- `git diff --check`: passed.
+
+After R10:
+
+- `cargo test --workspace --all-features --locked`: **411 retained tests
+  passed** plus **14 executable doctests passed**.
+- `./smoke/run.sh included`: **2 downstream interaction tests passed** against
+  only the files Cargo would include in the package.
 - `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`:
   passed.
 - `git diff --check`: passed.

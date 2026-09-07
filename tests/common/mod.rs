@@ -36,16 +36,4 @@ impl CallbackTracker {
     pub fn new() -> Self {
         Self::default()
     }
-
-    /// Clear all recorded callbacks.
-    pub fn clear(&self) {
-        self.node_drag_started.borrow_mut().clear();
-        self.node_drag_ended.borrow_mut().clear();
-        self.link_requested.borrow_mut().clear();
-        *self.link_cancelled.borrow_mut() = 0;
-        self.node_rect_changed.borrow_mut().clear();
-        self.pin_position_changed.borrow_mut().clear();
-        self.update_viewport.borrow_mut().clear();
-        *self.context_menu_requested.borrow_mut() = 0;
-    }
 }

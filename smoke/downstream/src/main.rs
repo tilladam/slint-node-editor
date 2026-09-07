@@ -78,7 +78,26 @@ fn build_app() -> QuickStart {
     // These macros install the geometry/computation callbacks and synchronously
     // project selection gestures into the row flags rendered by the editor.
     wire_node_editor!(window, setup);
-    wire_selection!(window, setup, nodes);
+    wire_selection!(window, setup, nodes, links);
+
+    window.on_compute_link_at({
+        let controller = controller.clone();
+        let links = links.clone();
+        move |x, y| {
+            let links = (0..links.row_count()).filter_map(|index| {
+                let link = links.row_data(index)?;
+                Some((link.id, link.start_pin_id, link.end_pin_id))
+            });
+            controller.cache().borrow().find_bezier_link_at_world(
+                x,
+                y,
+                links,
+                controller.screen_distance_to_world(8.0),
+                50.0,
+                20,
+            )
+        }
+    });
 
     let next_node_id = Rc::new(Cell::new(3));
     window.on_add_node_requested({
@@ -201,52 +220,162 @@ fn main() -> Result<(), slint::PlatformError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use slint::ComponentHandle;
+    use slint::{
+        platform::{PointerEventButton, WindowEvent},
+        ComponentHandle, LogicalPosition,
+    };
 
     fn app() -> QuickStart {
-        i_slint_backend_testing::init_no_event_loop();
+        thread_local! {
+            static INITIALIZED: Cell<bool> = const { Cell::new(false) };
+        }
+        INITIALIZED.with(|initialized| {
+            if !initialized.get() {
+                i_slint_backend_testing::init_no_event_loop();
+                initialized.set(true);
+            }
+        });
         build_app()
     }
 
-    fn report_graph(app: &QuickStart) {
-        let lifecycle = app.window.global::<NodeEditorInternalCallbacks>();
-        lifecycle.invoke_report_node_rect(1, 100.0, 100.0, 180.0, 80.0);
-        lifecycle.invoke_report_node_rect(2, 420.0, 220.0, 180.0, 80.0);
-        lifecycle.invoke_report_pin_position(2, 1, 1, 0.0, 40.0, true);
-        lifecycle.invoke_report_pin_position(3, 1, 2, 180.0, 40.0, true);
-        lifecycle.invoke_report_pin_position(4, 2, 1, 0.0, 40.0, true);
-        lifecycle.invoke_report_pin_position(5, 2, 2, 180.0, 40.0, true);
+    fn pump() {
+        slint::platform::update_timers_and_animations();
+        slint::platform::update_timers_and_animations();
+    }
+
+    fn realize(app: &QuickStart) {
+        app.window.show().unwrap();
+        pump();
+    }
+
+    fn pointer(app: &QuickStart, event: WindowEvent) {
+        app.window.window().dispatch_event(event);
+        pump();
+    }
+
+    fn press(app: &QuickStart, point: (f32, f32)) {
+        pointer(
+            app,
+            WindowEvent::PointerPressed {
+                position: LogicalPosition::new(point.0, point.1),
+                button: PointerEventButton::Left,
+            },
+        );
+    }
+
+    fn move_to(app: &QuickStart, point: (f32, f32)) {
+        pointer(
+            app,
+            WindowEvent::PointerMoved {
+                position: LogicalPosition::new(point.0, point.1),
+            },
+        );
+    }
+
+    fn release(app: &QuickStart, point: (f32, f32)) {
+        pointer(
+            app,
+            WindowEvent::PointerReleased {
+                position: LogicalPosition::new(point.0, point.1),
+                button: PointerEventButton::Left,
+            },
+        );
+    }
+
+    fn click(app: &QuickStart, point: (f32, f32)) {
+        press(app, point);
+        release(app, point);
+    }
+
+    fn world_to_screen(app: &QuickStart, point: (f32, f32)) -> (f32, f32) {
+        (
+            app.window.get_editor_screen_x()
+                + point.0 * app.window.get_zoom()
+                + app.window.get_pan_x(),
+            app.window.get_editor_screen_y()
+                + point.1 * app.window.get_zoom()
+                + app.window.get_pan_y(),
+        )
+    }
+
+    fn pin_world(app: &QuickStart, pin_id: i32) -> (f32, f32) {
+        let cache = app.controller.cache();
+        let cache = cache.borrow();
+        let pin = &cache.pin_positions[&pin_id];
+        let node = &cache.node_rects[&pin.node_id];
+        (node.x + pin.rel_x, node.y + pin.rel_y)
     }
 
     #[test]
-    fn quick_start_edits_two_nodes_end_to_end() {
+    fn standard_macros_drive_drag_link_creation_and_edge_selection() {
         let app = app();
-        report_graph(&app);
-        assert_eq!(app.nodes.row_count(), 2);
+        app.window.set_zoom(1.5);
+        app.window.set_pan_x(27.0);
+        app.window.set_pan_y(-18.0);
+        realize(&app);
+        assert!(app.window.get_editor_screen_y() > 0.0);
 
-        app.window.invoke_node_selected(1, false);
-        assert!(app.nodes.row_data(0).unwrap().selected);
+        let start = world_to_screen(&app, (150.0, 120.0));
+        let end = (start.0 + 60.0, start.1 + 45.0);
+        press(&app, start);
+        move_to(&app, end);
+        release(&app, end);
 
-        app.window
-            .global::<NodeEditorInternalCallbacks>()
-            .invoke_end_node_drag(1, 25.0, 15.0);
         let moved = app.nodes.row_data(0).unwrap();
-        assert_eq!((moved.x, moved.y), (125.0, 115.0));
+        assert_eq!((moved.x, moved.y), (140.0, 130.0));
 
-        app.window.invoke_link_requested(3, 4);
+        let output = world_to_screen(&app, pin_world(&app, 3));
+        let input = world_to_screen(&app, pin_world(&app, 4));
+        press(&app, output);
+        assert!(app.window.get_is_creating_link());
+        move_to(&app, input);
+        release(&app, input);
         assert_eq!(app.links.row_count(), 1);
-        app.window.invoke_link_requested(4, 3);
-        assert_eq!(app.links.row_count(), 1);
+        let link = app.links.row_data(0).unwrap();
+        assert_eq!((link.start_pin_id, link.end_pin_id), (3, 4));
 
-        app.window.invoke_node_selected(2, true);
+        let output_world = pin_world(&app, 3);
+        let input_world = pin_world(&app, 4);
+        click(
+            &app,
+            world_to_screen(
+                &app,
+                (
+                    (output_world.0 + input_world.0) / 2.0,
+                    (output_world.1 + input_world.1) / 2.0,
+                ),
+            ),
+        );
+        assert!(app.links.row_data(0).unwrap().selected);
+
+        click(&app, world_to_screen(&app, (510.0, 260.0)));
+        assert!(app.nodes.row_data(1).unwrap().selected);
         app.window.invoke_delete_selected_requested();
-        assert_eq!(app.nodes.row_count(), 0);
+        assert_eq!(app.nodes.row_count(), 1);
         assert_eq!(app.links.row_count(), 0);
-        assert!(!app.controller.cache().borrow().node_rects.contains_key(&1));
         assert!(!app.controller.cache().borrow().node_rects.contains_key(&2));
 
         app.window.invoke_add_node_requested();
         app.window.invoke_add_node_requested();
-        assert_eq!(app.nodes.row_count(), 2);
+        assert_eq!(app.nodes.row_count(), 3);
+    }
+
+    #[test]
+    fn base_node_double_click_reaches_the_public_event_global() {
+        let app = app();
+        let observed = Rc::new(Cell::new(0));
+        app.window
+            .global::<NodeEditorEvents>()
+            .on_node_double_clicked({
+                let observed = observed.clone();
+                move |node_id| observed.set(node_id)
+            });
+        realize(&app);
+
+        let point = world_to_screen(&app, (150.0, 120.0));
+        click(&app, point);
+        click(&app, point);
+
+        assert_eq!(observed.get(), 1);
     }
 }

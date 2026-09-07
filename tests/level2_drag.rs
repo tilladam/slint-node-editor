@@ -1,248 +1,89 @@
-//! Level 2: Node Click & Drag Tests
-//!
-//! Tests node selection via click, drag operations, and position updates.
+//! Level 2: node drag tests through real pointer input.
 
 mod common;
 
 use common::harness::MinimalTestHarness;
-use slint::Model;
+use slint::{ComponentHandle, Model};
 
-/// Helper to set up geometry in the cache for testing.
-/// This simulates what happens after nodes are rendered and report their geometry.
-fn setup_test_geometry(harness: &MinimalTestHarness) {
-    let cache = harness.ctrl.cache();
-    let mut cache = cache.borrow_mut();
-
-    // Node A at (100, 100), size 150x100 (as defined in minimal.slint)
-    cache.update_node_rect(1, 100.0, 100.0, 150.0, 100.0);
-    // Node B at (400, 200), size 150x100
-    cache.update_node_rect(2, 400.0, 200.0, 150.0, 100.0);
-
-    // Input pins at left edge, center height (node_id * 2)
-    // Output pins at right edge, center height (node_id * 2 + 1)
-
-    // Node 1 pins
-    cache.handle_pin_report(2, 1, 1, 0.0, 50.0); // Input pin at left
-    cache.handle_pin_report(3, 1, 2, 150.0, 50.0); // Output pin at right
-
-    // Node 2 pins
-    cache.handle_pin_report(4, 2, 1, 0.0, 50.0); // Input pin at left
-    cache.handle_pin_report(5, 2, 2, 150.0, 50.0); // Output pin at right
+fn realize(harness: &MinimalTestHarness) {
+    harness.window.show().unwrap();
+    harness.pump_events();
+    harness.pump_events();
 }
 
-// Click-to-select lives in level4 — it is selection behavior, not drag
-// behavior, and these tests only ever exercised it.
-
-#[test]
-fn test_mouse_down_on_node_records_dragged_node() {
-    let harness = MinimalTestHarness::new();
-    setup_test_geometry(&harness);
-
-    // Simulate that drag was started for node 1
-    harness.ctrl.handle_node_drag_started(1);
-
-    // The controller should track the dragged node
-    assert_eq!(
-        harness.ctrl.dragged_node_id(),
-        1,
-        "Controller should track dragged node"
+fn assert_close(actual: f32, expected: f32) {
+    assert!(
+        (actual - expected).abs() < 0.001,
+        "expected {expected}, got {actual}"
     );
 }
 
 #[test]
-fn test_node_drag_started_callback_fires() {
+fn pointer_drag_commits_to_the_model_and_reports_the_real_gesture() {
     let harness = MinimalTestHarness::new();
-    setup_test_geometry(&harness);
+    realize(&harness);
 
-    // Simulate drag start callback
-    harness.tracker.node_drag_started.borrow_mut().push(1);
+    let start = harness.node_center(1).expect("rendered node center");
+    harness.drag(start.0, start.1, start.0 + 48.0, start.1 + 24.0);
 
-    let started = harness.tracker.node_drag_started.borrow();
-    assert_eq!(
-        started.len(),
-        1,
-        "node_drag_started should have been called"
-    );
-    assert_eq!(started[0], 1, "Should have started drag on node 1");
+    let moved = harness.node_data(1).unwrap();
+    assert_close(moved.x, 148.0);
+    assert_close(moved.y, 124.0);
+    assert_eq!(&*harness.tracker.node_drag_started.borrow(), &[1]);
+    assert_eq!(harness.tracker.node_drag_ended.borrow().len(), 1);
+    let delta = harness.tracker.node_drag_ended.borrow()[0];
+    assert_close(delta.0, 48.0);
+    assert_close(delta.1, 24.0);
+    assert_eq!(harness.ctrl.dragged_node_id(), 0);
 }
 
 #[test]
-fn test_node_drag_ended_callback_records_delta() {
+fn pointer_drag_converts_screen_delta_at_non_unit_zoom_and_pan() {
     let harness = MinimalTestHarness::new();
-    setup_test_geometry(&harness);
+    harness.window.set_zoom(1.5);
+    harness.window.set_pan_x(31.0);
+    harness.window.set_pan_y(-17.0);
+    realize(&harness);
 
-    // Simulate that a drag ended with delta (48, 24)
-    harness
-        .tracker
-        .node_drag_ended
-        .borrow_mut()
-        .push((48.0, 24.0));
+    let start = harness.node_center(1).expect("rendered node center");
+    assert_close(start.0, 293.5);
+    assert_close(start.1, 208.0);
+    harness.drag(start.0, start.1, start.0 + 60.0, start.1 + 45.0);
 
-    let ended = harness.tracker.node_drag_ended.borrow();
-    assert_eq!(ended.len(), 1, "node_drag_ended should have been called");
-    assert_eq!(ended[0], (48.0, 24.0), "Delta should be (48, 24)");
+    let moved = harness.node_data(1).unwrap();
+    assert_close(moved.x, 140.0);
+    assert_close(moved.y, 130.0);
+    let delta = harness.tracker.node_drag_ended.borrow()[0];
+    assert_close(delta.0, 40.0);
+    assert_close(delta.1, 30.0);
 }
 
 #[test]
-fn test_node_position_updates_after_drag() {
+fn negative_pointer_drag_moves_only_the_target_node() {
     let harness = MinimalTestHarness::new();
-    setup_test_geometry(&harness);
+    realize(&harness);
 
-    let original = harness.nodes.row_data(0).unwrap();
-    let original_x = original.x;
-    let original_y = original.y;
+    let node_a = harness.nodes.row_data(0).unwrap();
+    let start = harness.node_center(2).expect("rendered node center");
+    harness.drag(start.0, start.1, start.0 - 50.0, start.1 - 30.0);
 
-    // Simulate the complete drag sequence:
-    // 1. Mark which node is being dragged
-    harness.ctrl.handle_node_drag_started(1);
-
-    // 2. Simulate the drag-ended callback updating the model
-    // (This is what happens in the actual on_node_drag_ended callback)
-    let delta_x = 48.0;
-    let delta_y = 24.0;
-    let node_id = harness.ctrl.dragged_node_id();
-
-    for i in 0..harness.nodes.row_count() {
-        if let Some(mut node) = harness.nodes.row_data(i) {
-            if node.id == node_id {
-                node.x += delta_x;
-                node.y += delta_y;
-                harness.nodes.set_row_data(i, node);
-                break;
-            }
-        }
-    }
-
-    // Verify position changed
-    let updated = harness.nodes.row_data(0).unwrap();
-    assert_eq!(
-        updated.x,
-        original_x + delta_x,
-        "Node X should be updated by delta"
-    );
-    assert_eq!(
-        updated.y,
-        original_y + delta_y,
-        "Node Y should be updated by delta"
-    );
-}
-
-// Grid snapping is gone: it never ran (its only reader sat inside an
-// unreachable function), and the test that "covered" it did the arithmetic
-// itself without calling the library. Position policy is the host's, at commit.
-
-#[test]
-fn test_dragged_node_id_resets_after_drag() {
-    let harness = MinimalTestHarness::new();
-    setup_test_geometry(&harness);
-
-    // Start drag
-    harness.ctrl.handle_node_drag_started(1);
-    assert_eq!(harness.ctrl.dragged_node_id(), 1);
-
-    // After drag ends, the node ID should be reset by the Slint code
-    // In tests, we simulate this by calling handle_node_drag_started(0)
-    // or verifying the ID was set correctly
+    let unchanged = harness.nodes.row_data(0).unwrap();
+    let moved = harness.nodes.row_data(1).unwrap();
+    assert_eq!((unchanged.x, unchanged.y), (node_a.x, node_a.y));
+    assert_close(moved.x, 350.0);
+    assert_close(moved.y, 170.0);
 }
 
 #[test]
-fn test_drag_negative_delta() {
+fn rendered_geometry_populates_screen_space_helpers() {
     let harness = MinimalTestHarness::new();
-    setup_test_geometry(&harness);
+    harness.window.set_zoom(2.0);
+    harness.window.set_pan_x(11.0);
+    harness.window.set_pan_y(13.0);
+    realize(&harness);
 
-    let original = harness.nodes.row_data(0).unwrap();
-    let original_x = original.x;
-    let original_y = original.y;
-
-    harness.ctrl.handle_node_drag_started(1);
-
-    // Negative deltas (dragging up-left)
-    let delta_x = -48.0;
-    let delta_y = -24.0;
-
-    let node_id = harness.ctrl.dragged_node_id();
-    for i in 0..harness.nodes.row_count() {
-        if let Some(mut node) = harness.nodes.row_data(i) {
-            if node.id == node_id {
-                node.x += delta_x;
-                node.y += delta_y;
-                harness.nodes.set_row_data(i, node);
-                break;
-            }
-        }
-    }
-
-    let updated = harness.nodes.row_data(0).unwrap();
-    assert_eq!(updated.x, original_x + delta_x);
-    assert_eq!(updated.y, original_y + delta_y);
-}
-
-#[test]
-fn test_drag_updates_correct_node_in_model() {
-    let harness = MinimalTestHarness::new();
-    setup_test_geometry(&harness);
-
-    let node_a_original = harness.nodes.row_data(0).unwrap();
-    let node_b_original = harness.nodes.row_data(1).unwrap();
-
-    // Drag Node B (id=2)
-    harness.ctrl.handle_node_drag_started(2);
-
-    let delta_x = 50.0;
-    let delta_y = 30.0;
-
-    let node_id = harness.ctrl.dragged_node_id();
-    for i in 0..harness.nodes.row_count() {
-        if let Some(mut node) = harness.nodes.row_data(i) {
-            if node.id == node_id {
-                node.x += delta_x;
-                node.y += delta_y;
-                harness.nodes.set_row_data(i, node);
-                break;
-            }
-        }
-    }
-
-    // Node A should be unchanged
-    let node_a_after = harness.nodes.row_data(0).unwrap();
-    assert_eq!(
-        node_a_after.x, node_a_original.x,
-        "Node A x should be unchanged"
-    );
-    assert_eq!(
-        node_a_after.y, node_a_original.y,
-        "Node A y should be unchanged"
-    );
-
-    // Node B should be moved
-    let node_b_after = harness.nodes.row_data(1).unwrap();
-    assert_eq!(node_b_after.x, node_b_original.x + delta_x);
-    assert_eq!(node_b_after.y, node_b_original.y + delta_y);
-}
-
-#[test]
-fn test_geometry_cache_accessible() {
-    let harness = MinimalTestHarness::new();
-    setup_test_geometry(&harness);
-
-    let center = harness.node_center(1);
-    assert!(center.is_some(), "Node center should be available");
-
-    let (cx, cy) = center.unwrap();
-    assert_eq!(cx, 175.0); // 100 + 150/2
-    assert_eq!(cy, 150.0); // 100 + 100/2
-}
-
-#[test]
-fn test_pin_position_accessible() {
-    let harness = MinimalTestHarness::new();
-    setup_test_geometry(&harness);
-
-    // Output pin of node 1 (pin id 3)
-    let pin_pos = harness.pin_position(3);
-    assert!(pin_pos.is_some(), "Pin position should be available");
-
-    let (px, py) = pin_pos.unwrap();
-    assert_eq!(px, 250.0); // Node at 100 + pin rel_x 150
-    assert_eq!(py, 150.0); // Node at 100 + pin rel_y 50
+    let center = harness.node_center(1).expect("rendered node center");
+    assert_eq!(center, (361.0, 313.0));
+    let output = harness.pin_position(3).expect("rendered output pin");
+    assert_eq!(output, (499.0, 313.0));
 }

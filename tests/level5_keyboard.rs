@@ -1,61 +1,9 @@
-//! Level 5: Keyboard Input Tests
-//!
-//! Tests Delete/Backspace for removing selected items, Escape for canceling operations.
+//! Level 5: host-owned command policy tests.
 
 mod common;
 
 use common::harness::MinimalTestHarness;
-use slint::platform::Key;
-use slint::{ComponentHandle, Model, SharedString};
-
-/// Helper to set up geometry in the cache for testing.
-fn setup_test_geometry(harness: &MinimalTestHarness) {
-    let cache = harness.ctrl.cache();
-    let mut cache = cache.borrow_mut();
-
-    cache.update_node_rect(1, 100.0, 100.0, 150.0, 100.0);
-    cache.update_node_rect(2, 400.0, 200.0, 150.0, 100.0);
-
-    cache.handle_pin_report(2, 1, 1, 0.0, 50.0);
-    cache.handle_pin_report(3, 1, 2, 150.0, 50.0);
-    cache.handle_pin_report(4, 2, 1, 0.0, 50.0);
-    cache.handle_pin_report(5, 2, 2, 150.0, 50.0);
-}
-
-// ============================================================================
-// Delete Key Tests
-// ============================================================================
-
-// NodeEditor no longer binds Delete/Backspace/Ctrl+N itself — embedders own
-// the keymap. Tests below verify key events dispatch without panicking, and
-// that model-level delete operations work independently of any key binding.
-
-#[test]
-fn test_delete_key_sends_event() {
-    let harness = MinimalTestHarness::new();
-    setup_test_geometry(&harness);
-
-    // NodeEditor no longer binds Delete; this verifies the key event mechanism
-    // dispatches without panicking.
-    harness.key_tap(Key::Delete);
-
-    // The actual behavior depends on Slint's focus handling
-    // This test verifies the key event mechanism works
-}
-
-#[test]
-fn test_backspace_key_sends_event() {
-    let harness = MinimalTestHarness::new();
-    setup_test_geometry(&harness);
-
-    harness.key_tap(Key::Backspace);
-
-    // Similar to Delete - verifies the event dispatch mechanism
-}
-
-// ============================================================================
-// Delete Implementation Tests
-// ============================================================================
+use slint::{Model, SharedString};
 
 #[test]
 fn test_delete_removes_selected_nodes_from_model() {
@@ -214,8 +162,6 @@ fn test_deleting_node_should_also_remove_connected_links() {
         }],
     );
 
-    setup_test_geometry(&harness);
-
     // Delete Node 1 and its connected links
     let node_to_delete = 1;
 
@@ -331,53 +277,4 @@ fn test_delete_multiple_selected_nodes() {
     assert_eq!(harness.nodes.row_count(), 1, "Only node 2 should remain");
     let remaining = harness.nodes.row_data(0).unwrap();
     assert_eq!(remaining.id, 2);
-}
-
-// ============================================================================
-// Escape Key Tests
-// ============================================================================
-
-#[test]
-fn test_escape_key_sends_event() {
-    let harness = MinimalTestHarness::new();
-
-    // Just verify event can be dispatched
-    harness.key_tap(Key::Escape);
-}
-
-#[test]
-fn test_link_cancelled_callback_tracking() {
-    let harness = MinimalTestHarness::new();
-
-    assert_eq!(*harness.tracker.link_cancelled.borrow(), 0);
-
-    // Simulate escape during link creation (which should call link_cancelled)
-    *harness.tracker.link_cancelled.borrow_mut() += 1;
-
-    assert_eq!(*harness.tracker.link_cancelled.borrow(), 1);
-}
-
-// ============================================================================
-// Text Input Tests
-// ============================================================================
-
-#[test]
-fn test_text_input_dispatch() {
-    let harness = MinimalTestHarness::new();
-
-    // Test that text input can be dispatched (for potential search/rename features)
-    harness.text_input("test");
-}
-
-// ============================================================================
-// Focus Tests
-// ============================================================================
-
-#[test]
-fn test_window_can_receive_focus() {
-    let harness = MinimalTestHarness::new();
-
-    // The window should be able to receive focus for keyboard events
-    // This is a basic sanity check (testing backend doesn't have visible windows)
-    assert!(harness.window.window().size().width > 0);
 }

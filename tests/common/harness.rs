@@ -239,16 +239,14 @@ impl MinimalTestHarness {
                     let link = links.row_data(i)?;
                     Some((link.id, link.start_pin_id, link.end_pin_id))
                 });
-                ctrl.cache()
-                    .borrow()
-                    .find_bezier_link_at_world(
-                        x,
-                        y,
-                        links_iter,
-                        ctrl.screen_distance_to_world(8.0),
-                        50.0,
-                        20,
-                    )
+                ctrl.cache().borrow().find_bezier_link_at_world(
+                    x,
+                    y,
+                    links_iter,
+                    ctrl.screen_distance_to_world(8.0),
+                    50.0,
+                    20,
+                )
             }
         });
 
@@ -287,17 +285,29 @@ impl MinimalTestHarness {
         let cache = self.ctrl.cache();
         let cache = cache.borrow();
         let rect = cache.node_rects.get(&node_id)?;
-        Some((rect.x + rect.width / 2.0, rect.y + rect.height / 2.0))
+        Some(self.world_to_screen((rect.x + rect.width / 2.0, rect.y + rect.height / 2.0)))
     }
 
-    /// Get the absolute position of a pin by ID.
+    /// Get the screen position of a pin by ID.
     /// Returns None if pin not found or geometry not yet reported.
     pub fn pin_position(&self, pin_id: i32) -> Option<(f32, f32)> {
         let cache = self.ctrl.cache();
         let cache = cache.borrow();
         let pin = cache.pin_positions.get(&pin_id)?;
         let rect = cache.node_rects.get(&pin.node_id)?;
-        Some((rect.x + pin.rel_x, rect.y + pin.rel_y))
+        Some(self.world_to_screen((rect.x + pin.rel_x, rect.y + pin.rel_y)))
+    }
+
+    /// Transform a world-space point into native-window screen coordinates.
+    pub fn world_to_screen(&self, point: (f32, f32)) -> (f32, f32) {
+        (
+            self.window.get_editor_screen_x()
+                + point.0 * self.window.get_zoom()
+                + self.window.get_pan_x(),
+            self.window.get_editor_screen_y()
+                + point.1 * self.window.get_zoom()
+                + self.window.get_pan_y(),
+        )
     }
 
     /// Get node data by ID.

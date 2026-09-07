@@ -106,18 +106,3 @@ fn test_callback_tracker_starts_empty() {
     assert!(harness.tracker.link_requested.borrow().is_empty());
     assert_eq!(*harness.tracker.link_cancelled.borrow(), 0);
 }
-
-#[test]
-fn test_callback_tracker_can_be_cleared() {
-    let harness = MinimalTestHarness::new();
-
-    // Simulate some callbacks being recorded
-    harness.tracker.node_drag_started.borrow_mut().push(1);
-    *harness.tracker.link_cancelled.borrow_mut() = 5;
-
-    // Clear and verify
-    harness.tracker.clear();
-
-    assert!(harness.tracker.node_drag_started.borrow().is_empty());
-    assert_eq!(*harness.tracker.link_cancelled.borrow(), 0);
-}

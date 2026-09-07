@@ -4,6 +4,7 @@ import {
     BaseNode,
     Pin,
     PinTypes,
+    NodeEditorEvents,
     NodeEditorInternalCallbacks,
     NodeEditorComputations,
     LinkData,
@@ -20,7 +21,7 @@ export struct NodeData {
 // The setup macros refer to these generated global types. LinkData and
 // LinkPath are imported from the Rust crate because they cross the library
 // module boundary as crate-owned types.
-export { PinTypes, NodeEditorInternalCallbacks, NodeEditorComputations }
+export { PinTypes, NodeEditorEvents, NodeEditorInternalCallbacks, NodeEditorComputations }
 
 component QuickNode inherits BaseNode {
     in property <string> title;
@@ -74,13 +75,21 @@ export component App inherits Window {
     in-out property <string> grid-commands <=> editor.grid-commands;
     out property <float> width_: editor.width / 1px;
     out property <float> height_: editor.height / 1px;
+    in-out property <float> zoom <=> editor.zoom;
+    in-out property <length> pan-x <=> editor.pan-x;
+    in-out property <length> pan-y <=> editor.pan-y;
+    out property <length> editor-screen-x: editor.absolute-position.x;
+    out property <length> editor-screen-y: editor.absolute-position.y;
+    out property <bool> is-creating-link: editor.is-creating-link;
 
     callback add-node-requested();
     callback delete-selected-requested();
     callback link-requested <=> editor.link-requested;
     callback node-selected <=> editor.node-selected;
+    callback select-link <=> editor.select-link;
     callback selection-cleared <=> editor.selection-cleared;
     callback box-selection-committed <=> editor.box-selection-committed;
+    callback compute-link-at <=> editor.compute-link-at;
 
     VerticalBox {
         spacing: 8px;
@@ -93,6 +102,7 @@ export component App inherits Window {
         }
 
         editor := NodeEditor {
+            has-link-selection: true;
             for node in root.nodes: QuickNode {
                 node-id: node.id;
                 title: node.title;

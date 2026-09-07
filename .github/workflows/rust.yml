@@ -31,7 +31,9 @@ jobs:
     # Shares this job's warm target dir rather than paying for another full
     # build of the dependency graph.
     - name: Documentation
-      run: cargo doc --all-features --no-deps
+      run: |
+        cargo test --doc --all-features --locked
+        cargo doc --all-features --no-deps
       env:
         RUSTDOCFLAGS: -D warnings
 
