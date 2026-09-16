@@ -12,7 +12,7 @@ layout = ["slint-node-editor/layout"]
 
 [dependencies]
 slint = { version = "1.18.0", default-features = false, features = ["std", "compat-1-18", "backend-winit", "renderer-software"] }
-slint-node-editor = "0.1.0"
+slint-node-editor = "1.0.0"
 
 [build-dependencies]
 # Required on the consumer side too: it turns on the compiler's

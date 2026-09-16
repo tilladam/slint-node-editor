@@ -17,7 +17,7 @@ or delete nodes.
 ## 1. Add dependencies
 
 The release targets Slint 1.18.0 or newer and Rust 1.92 or newer. The manifest
-below is the registry setup for the planned 0.1.0 release. Until it is published,
+below is the registry setup for the planned 1.0.0 release. Until it is published,
 use `slint-node-editor = { path = "/path/to/slint-node-editor" }` instead.
 The software renderer avoids a native graphics SDK dependency.
 
@@ -26,12 +26,12 @@ The software renderer avoids a native graphics SDK dependency.
 
 [package]
 name = "node-editor-quick-start"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 
 [dependencies]
 slint = { version = "1.18.0", default-features = false, features = ["std", "compat-1-18", "backend-winit", "renderer-software"] }
-slint-node-editor = "0.1.0"
+slint-node-editor = "1.0.0"
 
 [build-dependencies]
 slint-build = { version = "1.18.0", features = ["experimental-module-builds"] }

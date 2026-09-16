@@ -35,10 +35,10 @@ reduced-motion controls when adopting animated-links in an application.
 
 ## Compatibility and releases
 
-Before 1.0, breaking API changes must be recorded in CHANGELOG.md and explained
-with migration instructions. Prefer deprecation when an existing API can remain
-correct. Changes to callback ownership, units, IDs, and generated Slint types
-are API changes even if their Rust signatures are unchanged.
+Starting with 1.0, breaking public API changes require a new major version and
+migration instructions in CHANGELOG.md. Prefer deprecation when an existing API
+can remain correct. Changes to callback ownership, units, IDs, and generated
+Slint types are API changes even if their Rust signatures are unchanged.
 
 Run the Release verification workflow on the intended release commit before
 publishing. It checks the real archive, downstream interaction, minimum Rust

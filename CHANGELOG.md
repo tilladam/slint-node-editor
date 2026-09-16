@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.1.0 — release candidate
+## 1.0.0 — 2026-09-16
+
+First stable release. Requires Slint 1.18.0 or newer and Rust 1.92 or newer.
 
 - Distribute Slint components through the `@nodeeditor` library module.
   Consumers enable `experimental-module-builds` on slint-build and require
@@ -11,7 +13,6 @@
   nearest eligible pin deterministically.
 - Make layout input ordering and disconnected-component packing deterministic.
 - Test public consumer gestures and configured marquee behavior.
-
 - Reconcile rejected and snapped drag commits to the synchronous host model.
 - Reject invalid controller viewport updates and require both normalization
   endpoints to exist. Add LinkData::new for explicitly colored links and
@@ -30,6 +31,5 @@ host-owned and must be projected synchronously before a drag proceeds.
 
 ### Release limitations
 
-Independent
-editors in one window, complete keyboard accessibility, and measured large-graph
-performance remain future work. See CONTRIBUTING.md for configuration coverage.
+Independent editors in one window, complete keyboard accessibility, and
+measured large-graph performance remain future work. See CONTRIBUTING.md for configuration coverage.

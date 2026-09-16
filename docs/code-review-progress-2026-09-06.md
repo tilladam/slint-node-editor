@@ -226,7 +226,7 @@ Completed in this commit.
 - Cargo successfully packages and verifies the archive. The downstream fixture
   uses the extracted archive with registry Slint dependencies and tests default
   and layout configurations. CI now requires packaged smoke.
-- README and the copyable consumer use the planned 0.1.0 registry dependency,
+- README and the copyable consumer use the planned 1.0.0 registry dependency,
   with an explicit local-path fallback until publication. Registry smoke is
   available for the post-publication check.
 - Release preparation is tested with `--allow-dirty`; repeat strict checks on

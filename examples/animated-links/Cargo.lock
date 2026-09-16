@@ -197,7 +197,7 @@ dependencies = [
 
 [[package]]
 name = "animated-links"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "slint",
  "slint-build",
@@ -4138,7 +4138,7 @@ dependencies = [
 
 [[package]]
 name = "slint-node-editor"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "slint",
  "slint-build",

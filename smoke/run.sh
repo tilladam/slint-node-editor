@@ -84,10 +84,10 @@ python3 - "$staging/Cargo.toml" "$library" <<'PY'
 import sys
 manifest, library = sys.argv[1], sys.argv[2]
 text = open(manifest).read()
-old = 'slint-node-editor = "0.1.0"'
+old = 'slint-node-editor = "1.0.0"'
 assert old in text, "fixture manifest no longer declares the documented registry dependency"
 open(manifest, 'w').write(
-    text.replace(old, f'slint-node-editor = {{ version = "0.1.0", path = "{library}" }}'))
+    text.replace(old, f'slint-node-editor = {{ version = "1.0.0", path = "{library}" }}'))
 PY
     source_description="$library"
 else

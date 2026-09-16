@@ -1,28 +1,30 @@
-# Releasing slint-node-editor 0.1.0
+# Releasing slint-node-editor 1.0.0
 
-Updated 2026-09-16. Slint 1.18.0 is published and the registry migration is
-implemented. The historical pre-release plan is available in Git history.
+Release date: 2026-09-16. Release branch: `release/1.0`. Tag: `v1.0.0`.
+Release notes: [1.0.0](releases/1.0.0.md).
 
 ## Dependency and distribution contract
 
 - Runtime, compiler, and testing dependencies use registry requirement `1.18.0`
   (Cargo's compatible range), with 1.18.0 resolved in the committed lockfile.
-- Rust 1.92 remains the declared minimum; `compat-1-18` replaces the older
-  compatibility feature and removes its implicit Linux input dependencies.
+- Rust 1.92 is the declared minimum; Slint uses `compat-1-18`.
 - The library selects no backend or renderer. Examples use Skia; the standalone
   consumer uses Winit and the software renderer.
 - Slint library modules remain experimental. Consumers enable
   `experimental-module-builds` on slint-build and import `@nodeeditor`.
 - Cargo ships both root Slint files, build.rs, Rust sources, licenses, README,
-  changelog, and contributor notes. Integration tests are a separate unpublished
-  workspace package and are excluded from the archive.
+  changelog, contributor notes, and the integration and component guides.
+  Integration tests are a separate unpublished workspace package and are
+  excluded from the archive.
 - The downstream manifest uses registry dependencies. Before first publication,
   `smoke/run.sh packaged` overrides only slint-node-editor with the extracted
   archive; all of its Slint dependencies still come from crates.io.
+- Breaking public API changes after 1.0 require a new major version and migration
+  notes. See [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-## Release preparation checks
+## Release verification
 
-Run on the candidate checkout:
+Run on the committed candidate:
 
 ```sh
 cargo fmt --all -- --check
@@ -34,32 +36,36 @@ cargo publish --dry-run --locked
 ```
 
 Packaged smoke verifies the actual archive and executes the consumer interaction
-suite with default and layout features. Ordinary CI now runs packaged smoke;
-the release workflow also checks Rust 1.92 and a publication dry run.
+suite with default and layout features. The Release verification workflow runs
+on `v*` tags or by manual dispatch; it verifies the archive, downstream consumer,
+minimum Rust version, and publication dry run without uploading the crate.
+Require a green run for the exact tagged revision before publication.
 
-During review of uncommitted changes, use `./smoke/run.sh packaged --allow-dirty`
-and `cargo publish --dry-run --locked --allow-dirty`. These validate the working
-tree, not a final release commit. Repeat the strict commands after committing.
+For uncommitted preparation only, use `./smoke/run.sh packaged --allow-dirty`
+and `cargo publish --dry-run --locked --allow-dirty`. Repeat strict checks after
+committing; a previous candidate's results do not validate the release commit.
 
-Validated on 2026-09-16: Rust 1.92 passed 416 workspace tests and 14 doctests;
-formatting, clippy, and documentation passed with warnings denied where applicable.
-Cargo verified the archive, both downstream configurations passed their two
-interaction tests, and the publication dry run succeeded. Archive and dry-run
-checks used `--allow-dirty` for this uncommitted candidate.
+## Preparation
 
-## Publication checklist
+1. Commit all 1.0.0 version references, changelog, and release notes on
+   `release/1.0` and run the strict checks above.
+2. Create an annotated `v1.0.0` tag on that commit and push the branch and tag.
+3. Create a GitHub draft release for the tag using [the release notes](releases/1.0.0.md).
+4. Confirm the Release verification workflow passes for that revision.
 
-1. Commit the reviewed candidate and verify the release workflow is green for
-   that exact revision; repeat strict packaging without `--allow-dirty`.
-2. Review CHANGELOG.md and record the release date. Keep the one-editor-per-window,
-   accessibility, and performance limitations visible. Native visual smoke on
-   the claimed platforms is separate from headless interaction tests.
-3. Confirm registry credentials and the crate name, then explicitly authorize
-   and run `cargo publish --locked`.
-4. Tag the published commit `v0.1.0`, push the tag, and create release notes from
-   CHANGELOG.md.
-5. Run `./smoke/run.sh registry` against the actual published crate and confirm
-   docs.rs succeeds. Remove README's pre-publication path fallback then.
+Preparation leaves the crate unpublished and the GitHub release in draft.
 
-No publication, tag, or registry ownership change is part of preparation.
-The permissive license applies to this library; Slint retains its own terms.
+## Publication
+
+1. From the clean tagged checkout, confirm crates.io credentials and run
+   `cargo publish --locked -p slint-node-editor` when publication is authorized.
+2. Run `./smoke/run.sh registry` against the published 1.0.0 crate and confirm
+   docs.rs builds successfully.
+3. Publish the prepared GitHub release and mark it as the latest release.
+4. Merge the release branch into `main` and remove pre-publication fallback
+   instructions there. Preserve the release tag.
+
+Keep the one-editor-per-window, accessibility, and performance limitations
+visible. Native visual smoke on claimed platforms is separate from headless
+interaction tests. The permissive license applies to this library; Slint
+retains its own terms.

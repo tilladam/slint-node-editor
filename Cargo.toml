@@ -1,6 +1,6 @@
 [package]
 name = "slint-node-editor"
-version = "0.1.0"
+version = "1.0.0"
 links = "nodeeditor"
 edition = "2021"
 authors = ["Till Adam <till.adam@kdab.com>"]
@@ -21,6 +21,8 @@ include = [
     "README.md",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
+    "docs/integration-guide.md",
+    "docs/component-reference.md",
     "LICENSE-MIT",
     "LICENSE-APACHE",
 ]

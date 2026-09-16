@@ -64,12 +64,14 @@ Start with its four files:
 - [ui/app.slint](smoke/downstream/ui/app.slint)
 - [src/main.rs](smoke/downstream/src/main.rs)
 
-Version 0.1.0 is being prepared for publication. Until it is published, replace
-`slint-node-editor = "0.1.0"` in the copied manifest with a local dependency:
+The 1.0.0 release uses the registry dependency:
 
 ```toml
-slint-node-editor = { path = "/path/to/slint-node-editor" }
+slint-node-editor = "1.0.0"
 ```
+
+To try the release before registry publication, use
+`slint-node-editor = { path = "/path/to/slint-node-editor" }` instead.
 
 The integration has three parts:
 
