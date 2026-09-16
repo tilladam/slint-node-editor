@@ -2,11 +2,13 @@
 
 A flexible, **generic** Slint component library for building visual graph editors. Supports data flow diagrams, state machines, shader graphs, and any visual node-based interface.
 
-[![Advanced example with custom nodes, embedded controls, live connections, and a minimap](docs/media/advanced.png)](docs/media/demo.mp4)
+![Advanced example with custom nodes, embedded controls, live connections, and a minimap](docs/media/advanced.png)
 
-[Watch the demo (MP4, 32 seconds)](docs/media/demo.mp4): node dragging,
-interactive connections, embedded controls, and automatic layout. Captured from
-the 0.1.0 release candidate with Slint 1.18.0; playback is edited for pacing.
+https://github.com/user-attachments/assets/0c3e6c2f-ce5d-4dfb-b2df-67c7bdc611fc
+
+[Download the demo (MP4, 33 seconds, 30 fps)](docs/media/demo.mp4): node dragging,
+interactive connections, embedded controls, animated links, and automatic layout.
+Captured in real time from the 0.1.0 release candidate with Slint 1.18.0.
 
 ## Key Features
 
