@@ -95,6 +95,13 @@ else
 fi
 
 echo "smoke: testing downstream quick start against $source_description"
+if [[ "$mode" == "packaged" ]]; then
+    # Cargo archives normalize source timestamps. Replacing an extracted archive
+    # at the same version/path can therefore leave Cargo reusing stale generated
+    # Slint code. Rebuild the library and consumer, retaining dependency caches.
+    cargo clean --manifest-path "$staging/Cargo.toml" --target-dir "$root/target/smoke-target" \
+        -p slint-node-editor -p downstream-smoke
+fi
 cargo test --manifest-path "$staging/Cargo.toml" --target-dir "$root/target/smoke-target"
 cargo test --manifest-path "$staging/Cargo.toml" --target-dir "$root/target/smoke-target" --features layout
 echo "smoke: ok ($mode mode; default and layout features)"
