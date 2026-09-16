@@ -1,6 +1,6 @@
 # Contributing
 
-Use the Slint revision pinned in Cargo.toml and Rust 1.92 or newer. Applications
+Use Slint 1.18.0 or newer and Rust 1.92 or newer. Applications
 choose their own backend and renderer; the library does not select one.
 
 Before submitting changes, run:
@@ -9,7 +9,7 @@ Before submitting changes, run:
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-features --locked
-./smoke/run.sh included
+./smoke/run.sh packaged
 ```
 
 The downstream fixture exercises the public @nodeeditor import and standard
@@ -43,4 +43,7 @@ are API changes even if their Rust signatures are unchanged.
 Run the Release verification workflow on the intended release commit before
 publishing. It checks the real archive, downstream interaction, minimum Rust
 version, and publication dry run. Included-files smoke success alone is not a
-release gate. See docs/crates-io-release-plan.md for the current upstream blocker.
+release gate. See docs/crates-io-release-plan.md for the release checklist.
+
+For uncommitted release preparation, `./smoke/run.sh packaged --allow-dirty`
+verifies the working tree. Repeat without that option on the release commit.

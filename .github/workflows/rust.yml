@@ -26,10 +26,10 @@ jobs:
       run: cargo test --workspace --all-features --locked
     # The check `cargo publish --dry-run` cannot do. A dry-run does now parse
     # our .slint files (build.rs ships), but it still never checks that a
-    # *consumer* can resolve `@nodeeditor`. `included` builds an
-    # out-of-workspace consumer against exactly the files `include` would ship.
+    # *consumer* can resolve `@nodeeditor`. `packaged` builds an
+    # out-of-workspace consumer against the verified Cargo archive.
     - name: Downstream smoke test
-      run: ./smoke/run.sh included
+      run: ./smoke/run.sh packaged
     # Shares this job's warm target dir rather than paying for another full
     # build of the dependency graph.
     - name: Documentation

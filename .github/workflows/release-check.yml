@@ -1,7 +1,6 @@
 name: Release verification
 
-# Run before publication. Until the required Slint release is on crates.io,
-# packaging must fail rather than treating an included-files smoke as a pass.
+# Run before publication; validates the archive without uploading it.
 on:
   workflow_dispatch:
   push:

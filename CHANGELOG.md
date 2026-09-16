@@ -1,10 +1,10 @@
 # Changelog
 
-## Unreleased — initial 0.1.0
+## 0.1.0 — release candidate
 
 - Distribute Slint components through the `@nodeeditor` library module.
   Consumers enable `experimental-module-builds` on slint-build and require
-  Rust 1.92. Dependencies currently use the documented git revisions.
+  Rust 1.92. Slint 1.18.0 is the minimum supported registry release.
 - Routes update after programmatic geometry changes and drag commits; removal
   retires node and pin geometry. Picking uses the rendered world-space curve.
 - Normalize connection direction before topology validation and choose the
@@ -30,7 +30,6 @@ host-owned and must be projected synchronously before a drag proceeds.
 
 ### Release limitations
 
-Publication is blocked until the required Slint library-module support is
-available from crates.io and actual archive verification succeeds. Independent
+Independent
 editors in one window, complete keyboard accessibility, and measured large-graph
 performance remain future work. See CONTRIBUTING.md for configuration coverage.

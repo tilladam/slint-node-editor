@@ -621,7 +621,8 @@ dependencies = [
 [[package]]
 name = "const-field-offset"
 version = "0.2.1"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d535c69e75b4e3c69e17205b5b37a91936c54086cecd339b70071500786acb9c"
 dependencies = [
  "const-field-offset-macro",
  "field-offset",
@@ -630,7 +631,8 @@ dependencies = [
 [[package]]
 name = "const-field-offset-macro"
 version = "0.2.1"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93d5848843a221ac268cfdd6bfd14e68d5d3dfa79d52c880aafab93f9517fb74"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1509,12 +1511,6 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "hermit-abi"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
-
-[[package]]
-name = "hermit-abi"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e17592d60ebacc7d5e169f4663c5f84f9161cc90328abcfe8456f41e4dfcb284"
@@ -1534,7 +1530,8 @@ checksum = "48ce8546b993eaf241d69ded33b1be6d205dd9857ec879d9d18bd05d3676e144"
 [[package]]
 name = "i-slint-backend-linuxkms"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4f4679cd1788d9a7004c205c16c2fd7380ae27aeeb5ccfac2fb86849be92f10"
 dependencies = [
  "calloop 0.14.4",
  "cfg_aliases",
@@ -1544,18 +1541,16 @@ dependencies = [
  "i-slint-common",
  "i-slint-core",
  "i-slint-renderer-skia",
- "input",
- "libseat",
  "memmap2",
  "nix",
  "raw-window-handle",
- "xkbcommon",
 ]
 
 [[package]]
 name = "i-slint-backend-selector"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2aae6ba886a5085f34692a7021eb6225d2786ab2800ffbc8a1d20371456e736a"
 dependencies = [
  "cfg-if",
  "cfg_aliases",
@@ -1571,7 +1566,8 @@ dependencies = [
 [[package]]
 name = "i-slint-backend-testing"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2890ef1b9bead9f327d358aa925b6136ebe6b119fe5e302f6f06ef23453fa25"
 dependencies = [
  "cfg_aliases",
  "i-slint-common",
@@ -1583,7 +1579,8 @@ dependencies = [
 [[package]]
 name = "i-slint-backend-winit"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9639d746caa964a88ad764c32b6c5163e1cefd4b7443b3269162aa65c33c81d8"
 dependencies = [
  "arboard",
  "block2 0.6.2",
@@ -1621,7 +1618,8 @@ dependencies = [
 [[package]]
 name = "i-slint-common"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "520fa2961d5c09f3630fd1bdd7e8df0250a40004e85ca3ee6202264dc412f2c5"
 dependencies = [
  "derive_more",
  "fontique",
@@ -1637,7 +1635,8 @@ dependencies = [
 [[package]]
 name = "i-slint-compiler"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2412bc535ec506ca7917fdda20a2fb0a32cb03c5f9b215566d098b949d31b720"
 dependencies = [
  "annotate-snippets",
  "by_address",
@@ -1670,7 +1669,8 @@ dependencies = [
 [[package]]
 name = "i-slint-core"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76b8b730a020446b367e0033e6a1e17719df6b35fd4a65f723e86a7147fbc983"
 dependencies = [
  "bitflags 2.13.1",
  "cfg-if",
@@ -1721,7 +1721,8 @@ dependencies = [
 [[package]]
 name = "i-slint-core-macros"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0cd88de59a6d5178643dc3a18e8b92f09c118d2c642cad7b8b16342b0d133a85"
 dependencies = [
  "quote",
  "serde_json",
@@ -1731,7 +1732,8 @@ dependencies = [
 [[package]]
 name = "i-slint-renderer-skia"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "815501a47406f473af92b2666d79b4b15af28a3e9f22020e5a6da16331482ab8"
 dependencies = [
  "bytemuck",
  "cfg-if",
@@ -1769,7 +1771,8 @@ dependencies = [
 [[package]]
 name = "i-slint-renderer-software"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eeaa80487398676502661f4bfb4f665d53be0433b0ad83445ca3cca43ddc51b9"
 dependencies = [
  "bytemuck",
  "clru",
@@ -2041,36 +2044,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "input"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9793345a65d71317763a33066b5d8351f8760dde8d4930fe9e39b5f14a7959d"
-dependencies = [
- "bitflags 2.13.1",
- "input-sys",
- "libc",
- "log",
- "udev",
-]
-
-[[package]]
-name = "input-sys"
-version = "1.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36eee07d8e02bd95bf52b2e642cf13d33701b94c6e4b04fbf1d1fb07e9cb19e7"
-
-[[package]]
-name = "io-lifetimes"
-version = "1.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eae7b9aee968036d54dce06cebaefd919e4472e753296daccd6d344e3e2df0c2"
-dependencies = [
- "hermit-abi 0.3.9",
- "libc",
- "windows-sys 0.48.0",
-]
-
-[[package]]
 name = "itertools"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2240,36 +2213,6 @@ dependencies = [
  "libc",
  "plain",
  "redox_syscall 0.9.3",
-]
-
-[[package]]
-name = "libseat"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6656c69b6e0366ffb83faa232f3e4fda5fc91161722d140f2c95ce2e90b1ef31"
-dependencies = [
- "errno",
- "libseat-sys",
- "log",
-]
-
-[[package]]
-name = "libseat-sys"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8a484fa48be5f62a8d3ffed767779d0ab808cfead91de98ef4362d469097dfb"
-dependencies = [
- "pkg-config",
-]
-
-[[package]]
-name = "libudev-sys"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c8469b4a23b962c1396b9b451dda50ef5b283e8dd309d69033475fa9b334324"
-dependencies = [
- "libc",
- "pkg-config",
 ]
 
 [[package]]
@@ -3159,7 +3102,7 @@ checksum = "5d0e4f59085d47d8241c88ead0f274e8a0cb551f3625263c05eb8dd897c34218"
 dependencies = [
  "cfg-if",
  "concurrent-queue",
- "hermit-abi 0.5.3",
+ "hermit-abi",
  "pin-project-lite",
  "rustix 1.1.4",
  "windows-sys 0.61.2",
@@ -3753,10 +3696,10 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 [[package]]
 name = "slint"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "460524eed7afee6000683eccb97df58198265384099c76dade430cdae08b9b94"
 dependencies = [
  "const-field-offset",
- "i-slint-backend-linuxkms",
  "i-slint-backend-selector",
  "i-slint-common",
  "i-slint-core",
@@ -3774,7 +3717,8 @@ dependencies = [
 [[package]]
 name = "slint-build"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6cfc9bb0dd48d01508f9e21511d0215e78e8e3be032bacd6be61744abe03c83"
 dependencies = [
  "derive_more",
  "fontique",
@@ -3786,7 +3730,8 @@ dependencies = [
 [[package]]
 name = "slint-macros"
 version = "1.18.0"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a4d3e807d538d047a4b6b6c54586569d350dd795ce52b33c4992507de467104"
 dependencies = [
  "i-slint-compiler",
  "proc-macro2",
@@ -4343,18 +4288,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "udev"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af4e37e9ea4401fc841ff54b9ddfc9be1079b1e89434c1a6a865dd68980f7e9f"
-dependencies = [
- "io-lifetimes",
- "libc",
- "libudev-sys",
- "pkg-config",
-]
-
-[[package]]
 name = "uds_windows"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4491,7 +4424,8 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 [[package]]
 name = "vtable"
 version = "0.5.0"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "515a4b5b1399cc46fb0dc4081436cb40a3852a2d3e94fd1fa50bb68a334896eb"
 dependencies = [
  "const-field-offset",
  "portable-atomic",
@@ -4502,7 +4436,8 @@ dependencies = [
 [[package]]
 name = "vtable-macro"
 version = "0.5.0"
-source = "git+https://github.com/slint-ui/slint?rev=dccd890191a56377d8e87dd8b9da06a20c235d7f#dccd890191a56377d8e87dd8b9da06a20c235d7f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8191d73ececf73fc94e65809bf0e667525a0bcff9aeeb8d042a4173a508332a1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4992,15 +4927,6 @@ dependencies = [
 
 [[package]]
 name = "windows-sys"
-version = "0.48.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "677d2418bec65e3338edb076e806bc1ec15693c5d0104683f2efe857f61056a9"
-dependencies = [
- "windows-targets 0.48.5",
-]
-
-[[package]]
-name = "windows-sys"
 version = "0.52.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
@@ -5033,21 +4959,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
 dependencies = [
  "windows-link",
-]
-
-[[package]]
-name = "windows-targets"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a2fa6e2155d7247be68c096456083145c183cbbbc2764150dda45a87197940c"
-dependencies = [
- "windows_aarch64_gnullvm 0.48.5",
- "windows_aarch64_msvc 0.48.5",
- "windows_i686_gnu 0.48.5",
- "windows_i686_msvc 0.48.5",
- "windows_x86_64_gnu 0.48.5",
- "windows_x86_64_gnullvm 0.48.5",
- "windows_x86_64_msvc 0.48.5",
 ]
 
 [[package]]
@@ -5094,12 +5005,6 @@ dependencies = [
 
 [[package]]
 name = "windows_aarch64_gnullvm"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b38e32f0abccf9987a4e3079dfb67dcd799fb61361e53e2882c3cbaf0d905d8"
-
-[[package]]
-name = "windows_aarch64_gnullvm"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a4622180e7a0ec044bb555404c800bc9fd9ec262ec147edd5989ccd0c02cd3"
@@ -5112,12 +5017,6 @@ checksum = "a9d8416fa8b42f5c947f8482c43e7d89e73a173cead56d044f6a56104a6d1b53"
 
 [[package]]
 name = "windows_aarch64_msvc"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc35310971f3b2dbbf3f0690a219f40e2d9afcf64f9ab7cc1be722937c26b4bc"
-
-[[package]]
-name = "windows_aarch64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09ec2a7bb152e2252b53fa7803150007879548bc709c039df7627cabbd05d469"
@@ -5127,12 +5026,6 @@ name = "windows_aarch64_msvc"
 version = "0.53.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9d782e804c2f632e395708e99a94275910eb9100b2114651e04744e9b125006"
-
-[[package]]
-name = "windows_i686_gnu"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a75915e7def60c94dcef72200b9a8e58e5091744960da64ec734a6c6e9b3743e"
 
 [[package]]
 name = "windows_i686_gnu"
@@ -5160,12 +5053,6 @@ checksum = "fa7359d10048f68ab8b09fa71c3daccfb0e9b559aed648a8f95469c27057180c"
 
 [[package]]
 name = "windows_i686_msvc"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f55c233f70c4b27f66c523580f78f1004e8b5a8b659e05a4eb49d4166cca406"
-
-[[package]]
-name = "windows_i686_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "240948bc05c5e7c6dabba28bf89d89ffce3e303022809e73deaefe4f6ec56c66"
@@ -5175,12 +5062,6 @@ name = "windows_i686_msvc"
 version = "0.53.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e7ac75179f18232fe9c285163565a57ef8d3c89254a30685b57d83a38d326c2"
-
-[[package]]
-name = "windows_x86_64_gnu"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53d40abd2583d23e4718fddf1ebec84dbff8381c07cae67ff7768bbf19c6718e"
 
 [[package]]
 name = "windows_x86_64_gnu"
@@ -5196,12 +5077,6 @@ checksum = "9c3842cdd74a865a8066ab39c8a7a473c0778a3f29370b5fd6b4b9aa7df4a499"
 
 [[package]]
 name = "windows_x86_64_gnullvm"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b7b52767868a23d5bab768e390dc5f5c55825b6d30b86c844ff2dc7414044cc"
-
-[[package]]
-name = "windows_x86_64_gnullvm"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24d5b23dc417412679681396f2b49f3de8c1473deb516bd34410872eff51ed0d"
@@ -5211,12 +5086,6 @@ name = "windows_x86_64_gnullvm"
 version = "0.53.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ffa179e2d07eee8ad8f57493436566c7cc30ac536a3379fdf008f47f6bb7ae1"
-
-[[package]]
-name = "windows_x86_64_msvc"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed94fce61571a4006852b7389a063ab983c02eb1bb37b47f8272ce92d06d9538"
 
 [[package]]
 name = "windows_x86_64_msvc"
@@ -5381,17 +5250,6 @@ name = "xcursor"
 version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "163b33ed8786455e2fa5d72f554057ce3f3182425434f756cd39c99839d88e23"
-
-[[package]]
-name = "xkbcommon"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7a974f48060a14e95705c01f24ad9c3345022f4d97441b8a36beb7ed5c4a02d"
-dependencies = [
- "libc",
- "memmap2",
- "xkeysym",
-]
 
 [[package]]
 name = "xkbcommon-dl"

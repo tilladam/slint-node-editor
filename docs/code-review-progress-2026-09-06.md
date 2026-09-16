@@ -4,7 +4,7 @@ This document tracks work against the findings in
 [code-review-2026-09-06.md](code-review-2026-09-06.md). Update it when a finding
 is started, completed, reopened, or intentionally deferred.
 
-Last updated: 2026-09-07 through R10.
+Last updated: 2026-09-16, Slint 1.18 registry release preparation.
 
 ## Status
 
@@ -30,10 +30,10 @@ Last updated: 2026-09-07 through R10.
 | R12 | P1 roadmap | Open | 4. Embeddability | — | Implement structural accessibility and configurable keyboard policy. |
 | R13 | P2 roadmap | Open | 4. Embeddability | — | Introduce instance-scoped editor context. |
 | R14 | P2 | In progress | 3/4 | This change | Reconcile rejected drag commits, guard controller viewport updates, check both normalization endpoints, add colored LinkData constructor and Error support, and clarify ID/geometry/selection contracts. Broader API consolidation remains deferred. |
-| R15 | P1 release | In progress | 3. Release hardening | This change | Release verification workflow added; actual packaging remains blocked on published Slint 1.18 library-module support. |
+| R15 | P1 release | Complete | 3. Release hardening | This change | Registry Slint 1.18 minimum, real archive verification, downstream consumer, and release gates implemented. Publication remains a separate action. |
 | R16 | P3 | In progress | 3. Release hardening | This change | Fixed pin example sizing and target feedback, added drag regression, fmt/clippy/all-feature CI, changelog, contributor guidance and bug template. Fixture separated into its own consumer package; broader example coverage remains. |
 
-Overall: **10 of 16 findings complete**. Correctness batch: **5 of 5
+Overall: **11 of 16 findings complete**. Correctness batch: **5 of 5
 findings complete**. Interaction and public contract batch: **5 of 5 findings
 complete**. The next active finding by review order is **R11**.
 
@@ -219,6 +219,20 @@ Completed in this commit.
   all features before generating documentation, while the downstream smoke
   step compiles the generated-UI quick-start fixture.
 
+### R15 — release packaging gates
+
+- Slint 1.18.0 runtime, compiler, and testing dependencies now come from crates.io;
+  `compat-1-18` replaces the old compatibility baseline. Rust remains 1.92.
+- Cargo successfully packages and verifies the archive. The downstream fixture
+  uses the extracted archive with registry Slint dependencies and tests default
+  and layout configurations. CI now requires packaged smoke.
+- README and the copyable consumer use the planned 0.1.0 registry dependency,
+  with an explicit local-path fallback until publication. Registry smoke is
+  available for the post-publication check.
+- Release preparation is tested with `--allow-dirty`; repeat strict checks on
+  the committed candidate before publishing. No crate has been published by
+  this work. See the release plan for the remaining publication actions.
+
 ## In-progress work
 
 ### R14 — focused contract correctness
@@ -244,8 +258,8 @@ Completed in this commit.
 - Extraction verification: stable and Rust 1.92 each pass 416 workspace tests
   and 14 doctests. The included-files downstream consumer passes both pointer
   interaction tests on macOS. This is headless runtime coverage, not a visual
-  Windows/Linux platform check. Actual archive verification and final registry
-  dependency resolution remain blocked under R15.
+  Windows/Linux platform check. Actual archive verification and registry dependency resolution were
+  subsequently completed under R15.
 
 - Pin-compatibility nodes now use BaseNode dimensions; a real lower-body drag
   regression passes. Target feedback is bound to the current connection gesture.
@@ -257,24 +271,7 @@ Completed in this commit.
 - Corrected stale link-status comments.
 - Validation: workspace tests and 14 doctests passed; the additional lower-body
   pointer regression passed. Broader example interaction coverage remains open. The focused R14
-  contract pass has not started.
-
-
-### R15 — release packaging gates
-
-- Added `release-check.yml`, runnable manually and on version tags. It requires
-  actual package verification and downstream interaction tests against the
-  extracted archive, all-feature tests on Rust 1.92, and a publication dry run.
-  It does not upload a crate.
-- Corrected packaged-smoke version lookup to select the library by name rather
-  than assuming Cargo metadata lists it first.
-- Registry verification on 2026-09-07 reports Slint 1.17.1; the 1.18.0 API
-  lookup returned 404. The git package's `version = "1.18.0"` is not evidence
-  of publication. The existing tested git dependency remains necessary.
-- `cargo package --locked` still fails because Slint has no registry version
-  requirement. Adding an unavailable version would not complete this gate.
-  R15 remains incomplete until the required crates are published, dependencies
-  and consumer are switched together, and the release workflow passes.
+  contract pass is recorded above.
 
 
 ### R11 — measure the whole frame and make updates local

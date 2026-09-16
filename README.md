@@ -44,7 +44,7 @@ https://github.com/user-attachments/assets/f0e8d69c-19da-4acf-b3e1-ea7e6c1324d8
 ## Quick Start
 
 The quick start is a complete downstream crate, compiled outside this workspace
-by [`smoke/run.sh git`](smoke/run.sh). Copy its four application files:
+by [`smoke/run.sh packaged`](smoke/run.sh). Copy its four application files:
 
 - [`Cargo.toml`](smoke/downstream/Cargo.toml)
 - [`build.rs`](smoke/downstream/build.rs)
@@ -57,9 +57,10 @@ or delete nodes.
 
 ### 1. Declare the current dependency source
 
-The crate is not yet available from crates.io. Use the tested git revision
-below. Slint is pinned to the same revision used by the library; the software
-renderer keeps this setup portable and avoids a native graphics SDK dependency.
+The release targets Slint 1.18.0 or newer and Rust 1.92 or newer. The manifest
+below is the registry setup for the planned 0.1.0 release. Until it is published,
+use `slint-node-editor = { path = "/path/to/slint-node-editor" }` instead.
+The software renderer avoids a native graphics SDK dependency.
 
 ```toml
 [workspace]
@@ -70,11 +71,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-slint = { git = "https://github.com/slint-ui/slint", rev = "ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software"] }
-slint-node-editor = { git = "https://github.com/tilladam/slint-node-editor", rev = "56773d6010df5a91d6c2f23868755bae0aafeca3" }
+slint = { version = "1.18.0", default-features = false, features = ["std", "compat-1-18", "backend-winit", "renderer-software"] }
+slint-node-editor = "0.1.0"
 
 [build-dependencies]
-slint-build = { git = "https://github.com/slint-ui/slint", rev = "ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0", features = ["experimental-module-builds"] }
+slint-build = { version = "1.18.0", features = ["experimental-module-builds"] }
 ```
 
 The current dependency graph requires Rust 1.92. The standalone fixture also

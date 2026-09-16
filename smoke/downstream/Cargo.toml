@@ -7,14 +7,17 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
+[features]
+layout = ["slint-node-editor/layout"]
+
 [dependencies]
-slint = { git = "https://github.com/slint-ui/slint", rev = "ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software"] }
-slint-node-editor = { git = "https://github.com/tilladam/slint-node-editor", rev = "56773d6010df5a91d6c2f23868755bae0aafeca3" }
+slint = { version = "1.18.0", default-features = false, features = ["std", "compat-1-18", "backend-winit", "renderer-software"] }
+slint-node-editor = "0.1.0"
 
 [build-dependencies]
 # Required on the consumer side too: it turns on the compiler's
 # `experimental-library-module` support, which resolves `@nodeeditor`.
-slint-build = { git = "https://github.com/slint-ui/slint", rev = "ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0", features = ["experimental-module-builds"] }
+slint-build = { version = "1.18.0", features = ["experimental-module-builds"] }
 
 [dev-dependencies]
-i-slint-backend-testing = { git = "https://github.com/slint-ui/slint", rev = "ed76c13aac19c3febdc545af7f9c0fc6ae9ae1f0" }
+i-slint-backend-testing = { version = "1.18.0" }
