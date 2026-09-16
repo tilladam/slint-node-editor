@@ -2,7 +2,11 @@
 
 A flexible, **generic** Slint component library for building visual graph editors. Supports data flow diagrams, state machines, shader graphs, and any visual node-based interface.
 
-https://github.com/user-attachments/assets/f0e8d69c-19da-4acf-b3e1-ea7e6c1324d8
+[![Advanced example with custom nodes, embedded controls, live connections, and a minimap](docs/media/advanced.png)](docs/media/demo.mp4)
+
+[Watch the demo (MP4, 32 seconds)](docs/media/demo.mp4): node dragging,
+interactive connections, embedded controls, and automatic layout. Captured from
+the 0.1.0 release candidate with Slint 1.18.0; playback is edited for pacing.
 
 ## Key Features
 
@@ -654,6 +658,11 @@ components are ordered by their lowest node ID and packed along the axis
 perpendicular to the layout direction without overlap.
 
 ## Examples
+
+![Sugiyama example arranging an eight-node graph from input to output](docs/media/automatic-layout.png)
+
+The `sugiyama` example demonstrates the optional `layout` feature. Use **Scramble**
+to rearrange the nodes and **Auto Layout** to restore a layered graph.
 
 All examples are located in the `examples/` directory and can be run from the root using `cargo run -p <name>`:
 
