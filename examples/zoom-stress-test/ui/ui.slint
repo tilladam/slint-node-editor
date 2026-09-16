@@ -23,6 +23,11 @@ import { Button } from "std-widgets.slint";
 export { InputNodeData, ControlNodeData, DisplayNodeData, LinkData, NodeEditorComputations, NodeEditorInternalCallbacks }
 
 export component MainWindow inherits Window {
+    // Called synchronously by wire_node_editor! when an editor surface is pressed.
+    public function focus-editor() {
+        editor.focus();
+    }
+
     title: "Zoom Stress Test - Widget Scaling";
     width: 1200px;
     height: 800px;

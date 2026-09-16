@@ -156,6 +156,11 @@ component SimpleNode inherits BaseNode {
 }
 
 export component MainWindow inherits Window {
+    // Called synchronously by wire_node_editor! when an editor surface is pressed.
+    public function focus-editor() {
+        editor.focus();
+    }
+
     title: "Animated Link Creation";
     width: 1000px;
     height: 600px;

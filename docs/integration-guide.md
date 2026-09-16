@@ -89,6 +89,11 @@ export component App inherits Window {
     out property <float> width_: editor.width / 1px;
     out property <float> height_: editor.height / 1px;
 
+    // Required by wire_node_editor! for synchronous focus on pointer presses.
+    public function focus-editor() {
+        editor.focus();
+    }
+
     // Required by wire_selection! and the host link policy.
     callback link-requested <=> editor.link-requested;
     callback node-selected <=> editor.node-selected;
@@ -132,8 +137,8 @@ wire_selection!(window, setup, nodes, links);
 Keep `LinkPath` plus the two macros and setup types in Rust scope. The generated
 `NodeEditorInternalCallbacks` and `NodeEditorComputations` types come from the
 Slint exports shown above. `wire_node_editor!` installs geometry,
-route, pin-picking, viewport and grid handlers. `wire_selection!` resolves each
-selection intent immediately and writes the absolute result into row
+route, pin-picking, viewport, grid, and press-focus handlers. `wire_selection!`
+resolves each selection intent immediately and writes the absolute result into row
 `selected` flags before a drag continues.
 
 Interactive link selection also requires the application-owned
@@ -145,6 +150,13 @@ Slint callbacks have one handler. Install application overrides after the
 macros; the last `on_*` handler replaces the earlier one. Replacing a
 computation or lifecycle handler also takes responsibility for the behavior the
 macro supplied.
+
+The window's `focus-editor()` function must call `editor.focus()` synchronously.
+Presses on the canvas, nodes, pins, minimap, and reserved box-selection overlay
+give the editor keyboard focus. Embedded text fields keep focus when they accept
+the press. A host callback may move focus elsewhere in response to that press;
+the editor does not take it back afterward. Manual integrations must connect
+`NodeEditorInternalCallbacks.take-editor-focus` to the same function.
 
 The host handles `link-requested`: validate and normalize the two pins, then add
 a `LinkData` row. The fixture rejects same-node, same-type and duplicate links.

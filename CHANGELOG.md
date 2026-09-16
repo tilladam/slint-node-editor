@@ -13,12 +13,20 @@ First stable release. Requires Slint 1.18.0 or newer and Rust 1.92 or newer.
   nearest eligible pin deterministically.
 - Make layout input ordering and disconnected-component packing deterministic.
 - Test public consumer gestures and configured marquee behavior.
+- Focus the editor on canvas, node, pin, minimap, and reserved marquee presses,
+  while preserving embedded text input and application-directed focus changes.
+  Adapted from Olivier de Gaalon's focus fix.
 - Reconcile rejected and snapped drag commits to the synchronous host model.
 - Reject invalid controller viewport updates and require both normalization
   endpoints to exist. Add LinkData::new for explicitly colored links and
   standard Error support for ValidationError.
 
 ### Migration from earlier git snapshots
+
+Windows using `wire_node_editor!` must expose
+`public function focus-editor() { editor.focus(); }`. Manual integrations must
+connect `NodeEditorInternalCallbacks.take-editor-focus` synchronously to that
+function. See the integration guide for the complete window interface.
 
 `Link.path-commands` is replaced by `Link.geometry: LinkPath`, containing commands
 relative to its bounding box. Custom routes must supply that box.

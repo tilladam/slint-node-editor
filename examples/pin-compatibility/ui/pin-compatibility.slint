@@ -381,6 +381,11 @@ component SinkNode inherits BaseNode {
 }
 
 export component MainWindow inherits Window {
+    // Called synchronously by wire_node_editor! when an editor surface is pressed.
+    public function focus-editor() {
+        editor.focus();
+    }
+
     title: "Pin Compatibility Demo";
     width: 900px;
     height: 600px;

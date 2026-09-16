@@ -66,6 +66,11 @@ component QuickNode inherits BaseNode {
 }
 
 export component App inherits Window {
+    // Called synchronously by wire_node_editor! when an editor surface is pressed.
+    public function focus-editor() {
+        editor.focus();
+    }
+
     title: "Node editor quick start";
     width: 800px;
     height: 520px;

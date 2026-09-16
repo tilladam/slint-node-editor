@@ -166,6 +166,12 @@ export struct LinkPath {
 }
 
 export global NodeEditorInternalCallbacks {
+    /// Give the editor keyboard focus inside a pointer press. TouchAreas accept
+    /// presses before the ancestor FocusScope can apply focus-on-click.
+    /// This must be synchronous: a deferred changed watcher could steal focus
+    /// from a control focused by the press's own callbacks.
+    /// wire_node_editor! forwards this to the window's focus-editor() function.
+    callback take-editor-focus();
     /// Report node rectangle (world coordinates)
     callback report-node-rect(/* id */ int, /* x */ length, /* y */ length, /* width */ length, /* height */ length);
     /// Report pin position relative to node
@@ -573,6 +579,9 @@ export component Minimap inherits Rectangle {
         mouse-cursor: root.internal-is-panning ? MouseCursor.grabbing : MouseCursor.grab;
 
         pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                NodeEditorInternalCallbacks.take-editor-focus();
+            }
             if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                 // Store initial state
                 root.pan-start-mouse-x = self.mouse-x;
@@ -868,6 +877,9 @@ export component BaseNode inherits Rectangle {
         }
 
         pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                NodeEditorInternalCallbacks.take-editor-focus();
+            }
             if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                 // Always initialize tracking state — even for inert presses —
                 // so `moved` and `up` never observe stale values.
@@ -1103,6 +1115,9 @@ export component Pin inherits Rectangle {
             }
         }
         pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                NodeEditorInternalCallbacks.take-editor-focus();
+            }
             if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                 forwarding-box-selection = NodeEditorGestureConfig.forces-box-selection(
                     event.modifiers.control,

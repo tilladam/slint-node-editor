@@ -8,6 +8,24 @@ Components: [NodeEditor](#nodeeditor), [BaseNode](#basenode), [Pin](#pin),
 
 ## NodeEditor
 
+`NodeEditor` inherits `FocusScope`; call `editor.focus()` to focus it
+programmatically. For press focus, expose this function on the window:
+
+```slint
+public function focus-editor() {
+    editor.focus();
+}
+```
+
+`wire_node_editor!` connects `NodeEditorInternalCallbacks.take-editor-focus`
+to that function. Manual integrations must install the same synchronous
+callback. Canvas, node, pin, minimap, and reserved marquee presses focus the
+editor; embedded controls that accept the press retain their own focus.
+Application callbacks may then move focus elsewhere. Do not defer this callback:
+a delayed focus request can steal focus from a newly opened control.
+
+Key bindings remain application-owned. Handle them in a parent `FocusScope`.
+
 **Properties:**
 ```slint
 in-out property <length> pan-x;          // Pan offset (x)
@@ -367,4 +385,3 @@ and duplicate edges, self-loops, and edges with missing endpoints are ignored.
 Nodes with non-finite or non-positive dimensions are omitted. Disconnected
 components are ordered by their lowest node ID and packed along the axis
 perpendicular to the layout direction without overlap.
-

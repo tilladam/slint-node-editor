@@ -66,8 +66,12 @@ export { PinTypes, ViewportState, DragState, GeometryVersion, NodeEditorInternal
 /// Computation-heavy operations are delegated to the application via callbacks.
 ///
 /// NodeEditor inherits FocusScope so it is the keyboard focus surface.
-/// Embedders call `editor.focus()` to focus programmatically; `focus-on-click`
-/// activates on click. **No key bindings are defined** — embedders own the
+/// Embedders call `editor.focus()` to focus programmatically. Presses on the
+/// canvas, nodes, pins, minimap, and box-selection overlay take focus through
+/// NodeEditorInternalCallbacks.take-editor-focus. wire_node_editor! forwards
+/// this to the window's public focus-editor() function, which calls editor.focus().
+/// Embedded focusable controls that accept the press keep their own focus.
+/// **No key bindings are defined** — embedders own the
 /// keymap by wrapping the editor in a parent FocusScope that handles keys.
 /// State like `is-creating-link` and operations like `cancel-link-creation()`
 /// are exposed for embedders to bind as needed.
@@ -698,6 +702,7 @@ export component NodeEditor inherits FocusScope {
 
             pointer-event(event) => {
                 if event.kind == PointerEventKind.down {
+                    NodeEditorInternalCallbacks.take-editor-focus();
                     if event.button == PointerEventButton.middle {
                         // Start pan
                         root.internal-is-panning = true;
@@ -917,6 +922,7 @@ export component NodeEditor inherits FocusScope {
 
         pointer-event(event) => {
             if event.kind == PointerEventKind.down {
+                NodeEditorInternalCallbacks.take-editor-focus();
                 if event.button == PointerEventButton.left {
                     root.begin-box-selection(
                         self.mouse-x,

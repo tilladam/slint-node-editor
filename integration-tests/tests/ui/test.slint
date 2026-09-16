@@ -21,6 +21,12 @@ import {
     LinkPath,
 } from "@nodeeditor";
 
+// Access the field inside the repeated node without exposing library internals.
+global NodeField {
+    in-out property <int> focus-version: 0;
+    in-out property <bool> has-focus: false;
+}
+
 export struct NodeData {
     id: int,
     title: string,
@@ -34,6 +40,7 @@ export struct NodeData {
 export { BoxSelectionModifier, LinkData, GeometryVersion, DragState, HoverState, LinkCreation, LinkCreationState, NodeEditorInternalCallbacks, NodeEditorComputations }
 
 component SimpleNode inherits BaseNode {
+    in property <bool> focus-test-enabled: false;
     callback embedded-control-clicked();
     in property <string> title: "Node";
     in property <length> configured-width: 150px;
@@ -92,6 +99,25 @@ component SimpleNode inherits BaseNode {
         height: 28px;
         text: "Action";
         clicked => { root.embedded-control-clicked(); }
+    }
+
+    field := TextInput {
+        visible: root.focus-test-enabled;
+        x: 20px;
+        y: 70px;
+        width: 60px;
+        height: 20px;
+        changed has-focus => {
+            if root.node-id == 1 {
+                NodeField.has-focus = self.has-focus;
+            }
+        }
+    }
+    property <int> field-focus-version: NodeField.focus-version;
+    changed field-focus-version => {
+        if root.node-id == 1 {
+            field.focus();
+        }
     }
 }
 
@@ -161,12 +187,25 @@ export component MainWindow inherits Window {
         editor.clear-focus();
     }
 
+    in property <bool> focus-controls-enabled: false;
+    out property <bool> probe-has-focus: probe.has-focus;
+    out property <bool> node-field-has-focus: NodeField.has-focus;
+    out property <bool> editor-has-focus: editor.has-focus;
+    public function focus-probe() {
+        probe.focus();
+    }
+    public function focus-node-field() {
+        NodeField.focus-version += 1;
+    }
+
     editor := NodeEditor {
         width: 100%;
         height: 100%;
         has-link-selection: true;
+        minimap-enabled: root.focus-controls-enabled;
 
         for data in root.nodes: SimpleNode {
+            focus-test-enabled: root.focus-controls-enabled;
             node-id: data.id;
             title: data.title;
             world-x: data.x * 1px;
@@ -185,5 +224,13 @@ export component MainWindow inherits Window {
                 }
             }
         }
+    }
+
+    probe := TextInput {
+        visible: root.focus-controls-enabled;
+        x: 700px;
+        y: 0px;
+        width: 100px;
+        height: 20px;
     }
 }
