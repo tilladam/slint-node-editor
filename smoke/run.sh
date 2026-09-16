@@ -25,7 +25,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 mode="${1:-path}"
-package_args=()
+package_args=(--locked)
 # Explicit opt-in for reviewing uncommitted release preparation. CI stays strict.
 if [[ "${2:-}" == "--allow-dirty" ]]; then
     package_args+=(--allow-dirty)
@@ -58,7 +58,7 @@ included)
     library="$staged_library"
     ;;
 packaged)
-    cargo package --locked "${package_args[@]}" --manifest-path "$root/Cargo.toml"
+    cargo package "${package_args[@]}" --manifest-path "$root/Cargo.toml"
     version="$(cargo metadata --no-deps --format-version 1 --manifest-path "$root/Cargo.toml" \
         | python3 -c 'import json,sys; print(next(p["version"] for p in json.load(sys.stdin)["packages"] if p["name"] == "slint-node-editor"))')"
     rm -rf "$root/target/smoke-package"
