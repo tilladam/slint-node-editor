@@ -67,11 +67,11 @@ Captions sit below the application image. The animated-links and layout scenes
 are letterboxed to match the advanced window's aspect ratio. The still images
 retain their original full resolution.
 
-The main README embeds the video through this GitHub attachment URL:
+The main README links its screenshot and demo text to the versioned release asset:
 
-https://github.com/user-attachments/assets/0c3e6c2f-ce5d-4dfb-b2df-67c7bdc611fc
+https://github.com/tilladam/slint-node-editor/releases/download/v1.0.0/demo.mp4
 
-GitHub's Markdown preview was checked for the inline video player. The repository
-MP4 remains available as a download. When replacing the video, upload the new
-`demo.mp4` through GitHub's Markdown attachment control and update the bare URL
-in the main README as well as this record. No issue or comment needs to be posted.
+The release asset was downloaded without authentication and its SHA-256 matched
+the repository MP4. The repository copy remains available as well. When replacing
+the video, upload it to the corresponding GitHub release and update both links
+in the main README and this record. Verify the public download after uploading.

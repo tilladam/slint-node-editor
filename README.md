@@ -4,11 +4,9 @@ A Rust and Slint component library for visual graph editors, such as data flow
 diagrams, state machines, and shader graphs. Build nodes from Slint components
 and connect them with interactive links.
 
-![Advanced example with custom nodes, embedded controls, live connections, and a minimap](docs/media/advanced.png)
+[![Advanced example with custom nodes, embedded controls, live connections, and a minimap](docs/media/advanced.png)](https://github.com/tilladam/slint-node-editor/releases/download/v1.0.0/demo.mp4)
 
-https://github.com/user-attachments/assets/0c3e6c2f-ce5d-4dfb-b2df-67c7bdc611fc
-
-[Download the demo (MP4, 33 seconds, 30 fps)](docs/media/demo.mp4): dragging,
+[Watch or download the demo (MP4, 33 seconds, 30 fps)](https://github.com/tilladam/slint-node-editor/releases/download/v1.0.0/demo.mp4): dragging,
 connections, embedded controls, animated links, and automatic layout.
 
 ## Features
