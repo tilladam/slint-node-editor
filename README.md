@@ -70,9 +70,6 @@ The 1.0.0 release uses the registry dependency:
 slint-node-editor = "1.0.0"
 ```
 
-To try the release before registry publication, use
-`slint-node-editor = { path = "/path/to/slint-node-editor" }` instead.
-
 The integration has three parts:
 
 1. Import components from `@nodeeditor` and build your nodes with `BaseNode` and `Pin`.

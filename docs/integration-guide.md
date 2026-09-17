@@ -16,9 +16,8 @@ or delete nodes.
 
 ## 1. Add dependencies
 
-The release targets Slint 1.18.0 or newer and Rust 1.92 or newer. The manifest
-below is the registry setup for the planned 1.0.0 release. Until it is published,
-use `slint-node-editor = { path = "/path/to/slint-node-editor" }` instead.
+Slint Node Editor 1.0.0 requires Slint 1.18.0 or newer and Rust 1.92 or newer.
+The manifest below uses the published crates.io package.
 The software renderer avoids a native graphics SDK dependency.
 
 ```toml
