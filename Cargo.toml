@@ -1,6 +1,6 @@
 [package]
 name = "slint-node-editor"
-version = "1.0.0"
+version = "1.0.1"
 links = "nodeeditor"
 edition = "2021"
 authors = ["Till Adam <till.adam@kdab.com>"]

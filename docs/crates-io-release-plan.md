@@ -1,7 +1,7 @@
-# Releasing slint-node-editor 1.0.0
+# Releasing slint-node-editor 1.0.1
 
-Release date: 2026-09-16. Release branch: `release/1.0`. Tag: `v1.0.0`.
-Release notes: [1.0.0](releases/1.0.0.md).
+Release date: 2026-09-17. Release branch: `release/1.0.1`. Tag: `v1.0.1`.
+Release notes: [1.0.1](releases/1.0.1.md).
 
 ## Dependency and distribution contract
 
@@ -16,7 +16,7 @@ Release notes: [1.0.0](releases/1.0.0.md).
   changelog, contributor notes, and the integration and component guides.
   Integration tests are a separate unpublished workspace package and are
   excluded from the archive.
-- The downstream manifest uses registry dependencies. Before first publication,
+- The downstream manifest uses registry dependencies. Before publication,
   `smoke/run.sh packaged` overrides only slint-node-editor with the extracted
   archive; all of its Slint dependencies still come from crates.io.
 - Breaking public API changes after 1.0 require a new major version and migration
@@ -47,10 +47,10 @@ committing; a previous candidate's results do not validate the release commit.
 
 ## Preparation
 
-1. Commit all 1.0.0 version references, changelog, and release notes on
-   `release/1.0` and run the strict checks above.
-2. Create an annotated `v1.0.0` tag on that commit and push the branch and tag.
-3. Create a GitHub draft release for the tag using [the release notes](releases/1.0.0.md).
+1. Commit all 1.0.1 version references, changelog, and release notes on
+   `release/1.0.1` and run the strict checks above.
+2. Create an annotated `v1.0.1` tag on that commit and push the branch and tag.
+3. Create a GitHub draft release for the tag using [the release notes](releases/1.0.1.md).
 4. Confirm the Release verification workflow passes for that revision.
 
 Preparation leaves the crate unpublished and the GitHub release in draft.
@@ -59,8 +59,9 @@ Preparation leaves the crate unpublished and the GitHub release in draft.
 
 1. From the clean tagged checkout, confirm crates.io credentials and run
    `cargo publish --locked -p slint-node-editor` when publication is authorized.
-2. Run `./smoke/run.sh registry` against the published 1.0.0 crate and confirm
-   docs.rs builds successfully.
+2. Run `./smoke/run.sh registry` against the published 1.0.1 crate and confirm
+   docs.rs builds successfully. Verify that the README served by crates.io
+   contains the intended media URLs and that those URLs download successfully.
 3. Publish the prepared GitHub release and mark it as the latest release.
 4. Merge the release branch into `main` and remove pre-publication fallback
    instructions there. Preserve the release tag.

@@ -4,7 +4,7 @@ A Rust and Slint component library for visual graph editors, such as data flow
 diagrams, state machines, and shader graphs. Build nodes from Slint components
 and connect them with interactive links.
 
-[![Advanced example with custom nodes, embedded controls, live connections, and a minimap](docs/media/advanced.png)](https://github.com/tilladam/slint-node-editor/releases/download/v1.0.0/demo.mp4)
+[![Advanced example with custom nodes, embedded controls, live connections, and a minimap](https://raw.githubusercontent.com/tilladam/slint-node-editor/v1.0.0/docs/media/advanced.png)](https://github.com/tilladam/slint-node-editor/releases/download/v1.0.0/demo.mp4)
 
 [Watch or download the demo (MP4, 33 seconds, 30 fps)](https://github.com/tilladam/slint-node-editor/releases/download/v1.0.0/demo.mp4): dragging,
 connections, embedded controls, animated links, and automatic layout.
@@ -62,10 +62,10 @@ Start with its four files:
 - [ui/app.slint](smoke/downstream/ui/app.slint)
 - [src/main.rs](smoke/downstream/src/main.rs)
 
-The 1.0.0 release uses the registry dependency:
+The 1.0.1 release uses the registry dependency:
 
 ```toml
-slint-node-editor = "1.0.0"
+slint-node-editor = "1.0.1"
 ```
 
 The integration has three parts:
@@ -94,7 +94,7 @@ Run any example with `cargo run -p <name>` from the repository root.
 | [sugiyama](examples/sugiyama) | Automatic graph layout |
 | [sugiyama-stress-test](examples/sugiyama-stress-test) | Layout with larger graphs |
 
-![Sugiyama example arranging an eight-node graph from input to output](docs/media/automatic-layout.png)
+![Sugiyama example arranging an eight-node graph from input to output](https://raw.githubusercontent.com/tilladam/slint-node-editor/v1.0.0/docs/media/automatic-layout.png)
 
 In `sugiyama`, use **Scramble** to rearrange the nodes and **Auto Layout** to
 restore a layered graph.

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1 — 2026-09-17
+
+Documentation-only patch. The library API and implementation are unchanged.
+
+- Replace the broken README demo attachment with the verified GitHub release
+  video and use explicit, versioned screenshot URLs on crates.io and docs.rs.
+- Remove pre-publication setup instructions from the published README and guide.
+
 ## 1.0.0 — 2026-09-16
 
 First stable release. Requires Slint 1.18.0 or newer and Rust 1.92 or newer.

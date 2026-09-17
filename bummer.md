@@ -23,3 +23,4 @@ Next time: Verify media URLs without authentication before publication. A versio
 Revisit when: A replacement attachment is publicly accessible and its persistence has been verified independently of an editor preview.
 Cost: User correction and post-release documentation repair; the published 1.0.0 crate still contains the original README.
 Scope: project     Status: active
+recurred: 2026-09-17 The user reported the crates.io link was still broken after the repository README fix. The crates.io 1.0.0 README endpoint confirmed the original attachment URL remained embedded. Repairing main alone was insufficient; publish a documentation patch and verify the README served by crates.io.

@@ -16,7 +16,7 @@ or delete nodes.
 
 ## 1. Add dependencies
 
-Slint Node Editor 1.0.0 requires Slint 1.18.0 or newer and Rust 1.92 or newer.
+Slint Node Editor 1.0.1 requires Slint 1.18.0 or newer and Rust 1.92 or newer.
 The manifest below uses the published crates.io package.
 The software renderer avoids a native graphics SDK dependency.
 
@@ -30,7 +30,7 @@ edition = "2021"
 
 [dependencies]
 slint = { version = "1.18.0", default-features = false, features = ["std", "compat-1-18", "backend-winit", "renderer-software"] }
-slint-node-editor = "1.0.0"
+slint-node-editor = "1.0.1"
 
 [build-dependencies]
 slint-build = { version = "1.18.0", features = ["experimental-module-builds"] }
