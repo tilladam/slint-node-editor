@@ -24,3 +24,13 @@ Revisit when: A replacement attachment is publicly accessible and its persistenc
 Cost: User correction and post-release documentation repair; the published 1.0.0 crate still contains the original README.
 Scope: project     Status: active
 recurred: 2026-09-17 The user reported the crates.io link was still broken after the repository README fix. The crates.io 1.0.0 README endpoint confirmed the original attachment URL remained embedded. Repairing main alone was insufficient; publish a documentation patch and verify the README served by crates.io.
+
+## 2026-09-18 · Fixed window dimensions invalidate native resize probes · #integration-tests #slint #viewport
+Situation: Reproducing issue #6 with Slint 1.18.0 and the headless integration-test window.
+Tried: Dispatched a native resize event and then used Window::set_size while the fixture declared width: 800px and height: 600px.
+Outcome: The editor stayed 800 by 600 and no resize notification fired. Generated bindings for the window's exposed dimensions and editor size were constants, so the test was not exercising a resizable viewport.
+Evidence: The failing viewport_resize test printed unchanged window/editor sizes; generated test.rs initialized those properties with literal 800 and 600 values.
+Next time: Verified alternative: use preferred-width/preferred-height in a resizable fixture, resize through Window::set_size, and assert the actual dimensions before checking the callback result.
+Revisit when: Testing a deliberately fixed-size window or a Slint version with different sizing semantics.
+Cost: Two additional failing test runs and generated-code inspection.
+Scope: project     Status: active

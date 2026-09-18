@@ -123,8 +123,8 @@ component SimpleNode inherits BaseNode {
 
 export component MainWindow inherits Window {
     title: "Test Node Editor";
-    width: 800px;
-    height: 600px;
+    preferred-width: 800px;
+    preferred-height: 600px;
 
     in property <[NodeData]> nodes;
     in property <[LinkData]> links <=> editor.links;
@@ -133,6 +133,8 @@ export component MainWindow inherits Window {
     // Size for grid generation
     out property <float> width_: self.width / 1px;
     out property <float> height_: self.height / 1px;
+    in property <length> editor-width: root.width;
+    in property <length> editor-height: root.height;
 
     in-out property <length> pan-x <=> editor.pan-x;
     in-out property <length> pan-y <=> editor.pan-y;
@@ -199,8 +201,8 @@ export component MainWindow inherits Window {
     }
 
     editor := NodeEditor {
-        width: 100%;
-        height: 100%;
+        width: root.editor-width;
+        height: root.editor-height;
         has-link-selection: true;
         minimap-enabled: root.focus-controls-enabled;
 

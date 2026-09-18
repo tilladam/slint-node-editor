@@ -276,6 +276,9 @@ export global NodeEditorComputations {
         /* pan-x */ float,
         /* pan-y */ float);
 
+    /// Editor size changed, in logical pixels, independently of grid rendering.
+    callback viewport-resized(/* width */ float, /* height */ float);
+
     /// Compute pin ID at world coordinates with a world-space hit radius.
     pure callback compute-pin-at(
         /* x */ float,

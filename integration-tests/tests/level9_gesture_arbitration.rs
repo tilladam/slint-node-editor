@@ -4,6 +4,7 @@ mod common;
 
 use common::harness::{
     BoxSelectionModifier, DragState, LinkCreation, LinkCreationState, MinimalTestHarness,
+    NodeEditorInternalCallbacks,
 };
 use slint::{platform::Key, ComponentHandle, Model};
 
@@ -329,4 +330,68 @@ fn hiding_or_disabling_the_editor_cancels_active_input() {
     disabled.window.set_editor_enabled(false);
     disabled.pump_events();
     assert_idle(&disabled);
+}
+
+#[test]
+fn global_remove_node_cancels_the_consumers_drag_before_release() {
+    let harness = MinimalTestHarness::new();
+    realize(&harness);
+    start_node_drag(&harness);
+
+    // Keep the component alive to check the public hook itself, rather than
+    // letting destruction of the model delegate hide a stale local drag.
+    harness
+        .window
+        .global::<NodeEditorInternalCallbacks>()
+        .invoke_remove_node(1);
+    harness.pump_events();
+    assert_idle(&harness);
+
+    harness.mouse_move(500.0, 400.0);
+    harness.mouse_up(500.0, 400.0);
+    assert_idle(&harness);
+    assert!(harness.tracker.node_drag_ended.borrow().is_empty());
+    assert_eq!(harness.node_data(1).unwrap().x, 100.0);
+    assert_eq!(harness.node_data(1).unwrap().y, 100.0);
+}
+
+#[test]
+fn global_reset_graph_cancels_the_consumers_marquee_drag_and_link() {
+    for start in [start_marquee, start_node_drag, start_link] {
+        let harness = MinimalTestHarness::new();
+        realize(&harness);
+        start(&harness);
+        harness
+            .window
+            .global::<NodeEditorInternalCallbacks>()
+            .invoke_reset_graph();
+        harness.pump_events();
+        assert_idle(&harness);
+
+        harness.mouse_move(500.0, 400.0);
+        harness.mouse_up(500.0, 400.0);
+        assert_idle(&harness);
+        assert!(harness.tracker.node_drag_ended.borrow().is_empty());
+        assert!(harness.tracker.link_requested.borrow().is_empty());
+        assert_eq!(harness.node_data(1).unwrap().x, 100.0);
+    }
+}
+
+#[test]
+fn global_remove_pin_cancels_the_consumers_link_before_release() {
+    let harness = MinimalTestHarness::new();
+    realize(&harness);
+    start_link(&harness);
+    harness
+        .window
+        .global::<NodeEditorInternalCallbacks>()
+        .invoke_remove_pin(3);
+    harness.pump_events();
+    assert_idle(&harness);
+    let target = harness.pin_position(4).unwrap();
+    harness.mouse_move(target.0, target.1);
+    harness.mouse_up(target.0, target.1);
+    assert_idle(&harness);
+    assert!(harness.tracker.link_requested.borrow().is_empty());
+    assert_eq!(*harness.tracker.link_cancelled.borrow(), 1);
 }

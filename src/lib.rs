@@ -107,7 +107,8 @@ pub mod tracking;
 // forwards those only into its private inner module), so without this a
 // consumer building a `LinkData` has no name to reach for.
 pub use nodeeditor::{
-    BoxSelectionModifier, LinkCreationState, LinkData, LinkPath, MinimapNode, MinimapPosition,
+    BoxSelectionGestureState, BoxSelectionModifier, LinkCreationState, LinkData, LinkPath,
+    MinimapNode, MinimapPosition,
 };
 
 // Re-export traits and functions
@@ -233,7 +234,8 @@ macro_rules! wire_node_editor {
 
         // Viewport state and grid generation are separate public contracts:
         // viewport changes update coordinates, while request-grid-update also
-        // covers resize and spacing changes.
+        // covers resize and spacing changes. viewport-resized is left available
+        // for hosts that track the editor's dimensions independently of the grid.
         let ctrl = $setup.controller().clone();
         computations.on_viewport_changed(move |zoom, pan_x, pan_y| {
             ctrl.set_viewport(zoom, pan_x, pan_y);

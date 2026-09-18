@@ -208,6 +208,34 @@ atomically, preserving the previous transform; it does not repair invalid
 values in the host's Slint properties. Low-level geometry maps and pure helpers
 remain caller-validated APIs.
 
+### Viewport size and transform
+
+`NodeEditorComputations.viewport-changed(zoom, pan-x, pan-y)` reports pan and
+zoom changes. `NodeEditorComputations.viewport-resized(width, height)` reports
+changes to the editor's own dimensions in logical pixels. Listen to both when
+tracking the visible world rectangle; `request-grid-update` is only a request
+to regenerate the grid and is unnecessary for a host without one.
+
+`wire_node_editor!` leaves the resize callback available for application code:
+
+```rust
+window.global::<NodeEditorComputations>().on_viewport_resized({
+    let window = window.as_weak();
+    move |width, height| {
+        if let Some(window) = window.upgrade() {
+            let center_x = (width / 2.0 - window.get_pan_x()) / window.get_zoom();
+            let center_y = (height / 2.0 - window.get_pan_y()) / window.get_zoom();
+            // Update the application's visible centre or culling bounds here.
+        }
+    }
+});
+```
+
+Expose the editor's `pan-x`, `pan-y`, and `zoom` on the window when using this
+snippet. Resize notifications do not replace the macro's transform handler.
+If overriding `viewport-changed` to track pan and zoom as well, preserve its
+call to `setup.controller().set_viewport(zoom, pan_x, pan_y)`.
+
 ### Link defaults and selection
 
 `LinkData::default()` has Slint's zero-valued status (idle), which overrides its

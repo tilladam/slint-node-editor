@@ -378,4 +378,33 @@ mod tests {
 
         assert_eq!(observed.get(), 1);
     }
+
+    #[test]
+    fn library_lifecycle_hooks_cancel_the_consumers_pending_drag() {
+        for reset_graph in [false, true] {
+            let app = app();
+            realize(&app);
+            let original = app.nodes.row_data(0).unwrap();
+            let start = world_to_screen(&app, (150.0, 120.0));
+            let end = (start.0 + 60.0, start.1 + 45.0);
+            press(&app, start);
+            move_to(&app, end);
+            assert_eq!(app.controller.dragged_node_id(), original.id);
+
+            let lifecycle = app.window.global::<NodeEditorInternalCallbacks>();
+            if reset_graph {
+                lifecycle.invoke_reset_graph();
+            } else {
+                lifecycle.invoke_remove_node(original.id);
+            }
+            pump();
+            assert_eq!(app.controller.dragged_node_id(), 0);
+
+            // Retain the delegate so destruction cannot conceal a stale drag.
+            move_to(&app, (end.0 + 20.0, end.1 + 20.0));
+            release(&app, (end.0 + 20.0, end.1 + 20.0));
+            let after = app.nodes.row_data(0).unwrap();
+            assert_eq!((after.x, after.y), (original.x, original.y));
+        }
+    }
 }
