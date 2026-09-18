@@ -555,12 +555,21 @@ export component NodeEditor inherits FocusScope {
         NodeEditorComputations.request-grid-update();
     }
     // DragState is synced by BaseNode directly (it initiates drags)
+    // Report both dimensions once after the current batch of size changes.
+    viewport-resize-timer := Timer {
+        interval: 0ms;
+        running: false;
+        triggered => {
+            self.stop();
+            NodeEditorComputations.viewport-resized(root.width / 1px, root.height / 1px);
+        }
+    }
     changed width => {
-        NodeEditorComputations.viewport-resized(root.width / 1px, root.height / 1px);
+        viewport-resize-timer.start();
         NodeEditorComputations.request-grid-update();
     }
     changed height => {
-        NodeEditorComputations.viewport-resized(root.width / 1px, root.height / 1px);
+        viewport-resize-timer.start();
         NodeEditorComputations.request-grid-update();
     }
     changed grid-spacing => {

@@ -216,6 +216,13 @@ changes to the editor's own dimensions in logical pixels. Listen to both when
 tracking the visible world rectangle; `request-grid-update` is only a request
 to regenerate the grid and is unnecessary for a host without one.
 
+Width and height changes in the same batch are coalesced into one deferred
+notification with the final dimensions. This callback reports changes; it does
+not replay the current size when a handler is installed. Seed the initial size
+after showing the window, or immediately when attaching to an already-visible
+editor. Use the editor's dimensions, not the enclosing window's: the quick
+start exposes them as `width_` and `height_`.
+
 `wire_node_editor!` leaves the resize callback available for application code:
 
 ```rust
@@ -229,6 +236,12 @@ window.global::<NodeEditorComputations>().on_viewport_resized({
         }
     }
 });
+
+window.show()?;
+window.global::<NodeEditorComputations>().invoke_viewport_resized(
+    window.get_width_(),
+    window.get_height_(),
+);
 ```
 
 Expose the editor's `pan-x`, `pan-y`, and `zoom` on the window when using this

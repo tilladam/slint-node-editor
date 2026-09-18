@@ -34,3 +34,13 @@ Next time: Verified alternative: use preferred-width/preferred-height in a resiz
 Revisit when: Testing a deliberately fixed-size window or a Slint version with different sizing semantics.
 Cost: Two additional failing test runs and generated-code inspection.
 Scope: project     Status: active
+
+## 2026-09-18 · Checking only the last callback misses notification semantics · #viewport #integration-tests #api
+Situation: PR #8 introduced viewport-resized for hosts maintaining their visible bounds.
+Tried: Asserted the last callback dimensions after resizing and documented connecting a handler, without checking the number of notifications or initial state.
+Outcome: The Claude review and a runtime probe found two identical callbacks for a combined width/height resize and no initial notification, including for a handler connected before show().
+Evidence: The probe recorded [(1000.0, 700.0), (1000.0, 700.0)] for one resize and [] on initial subscription.
+Next time: Verify the full event sequence for batched changes and explicitly test/document how a new subscriber obtains its initial state. The fix coalesces size changes and documents host seeding.
+Revisit when: An API explicitly requires per-property events or provides a replaying subscription mechanism.
+Cost: Adversarial-review follow-up and additional regression coverage.
+Scope: project     Status: active

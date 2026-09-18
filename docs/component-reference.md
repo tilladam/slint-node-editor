@@ -107,12 +107,15 @@ last installed handler wins.
 | Viewport notification | When it fires | Arguments |
 |---|---|---|
 | `viewport-changed(zoom, pan-x, pan-y)` | Zoom or pan changes | Scale and logical-pixel pan offsets |
-| `viewport-resized(width, height)` | Editor width or height changes | Editor dimensions in logical pixels, before dividing by zoom |
+| `viewport-resized(width, height)` | Once after a batch of editor size changes | Final editor dimensions in logical pixels, before dividing by zoom |
 | `request-grid-update()` | Viewport, size, or grid-spacing changes | None; requests grid regeneration |
 
 Connect `NodeEditorComputations.viewport-resized` to track the visible area even
 when no grid is drawn. The dimensions are those of the editor, which may occupy
 only part of its window. `wire_node_editor!` leaves this handler to the host.
+Notifications are deferred and are not replayed when a handler is connected.
+Seed the host's initial size from the laid-out editor, as shown in the
+[integration guide](integration-guide.md#viewport-size-and-transform).
 
 ```slint
 NodeEditorComputations.compute-pin-at(world-x, world-y, world-radius);
@@ -356,8 +359,13 @@ lifecycle.invoke_reset_graph();
 These functions also clear editor interactions that refer to retired objects.
 The module exports `InteractionCancellation`, `BoxSelectionGesture`, and
 `NodeEditorGestureConfig` so library functions and consumer components share
-their state. Hosts should use the lifecycle functions above and the editor's
-gesture properties rather than modifying these internal globals directly.
+their state. `BoxSelectionGestureState` is exported by the Slint module as the
+type of its internal marquee state. Hosts should use the lifecycle functions
+above and the editor's gesture properties rather than modifying these internal
+globals directly.
+Retiring a pin or node also cancels an active forwarded marquee, since its
+pointer grab may belong to the retired component; forwarded gestures do not
+track their source ID.
 Call the controller's `remove_pin`, `remove_node`, or `reset_graph` methods when
 there is no Slint component instance. A hidden or disabled `Pin` remains
 available to route existing links, but it is excluded from pin hit testing

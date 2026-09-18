@@ -107,8 +107,7 @@ pub mod tracking;
 // forwards those only into its private inner module), so without this a
 // consumer building a `LinkData` has no name to reach for.
 pub use nodeeditor::{
-    BoxSelectionGestureState, BoxSelectionModifier, LinkCreationState, LinkData, LinkPath,
-    MinimapNode, MinimapPosition,
+    BoxSelectionModifier, LinkCreationState, LinkData, LinkPath, MinimapNode, MinimapPosition,
 };
 
 // Re-export traits and functions

@@ -395,3 +395,42 @@ fn global_remove_pin_cancels_the_consumers_link_before_release() {
     assert!(harness.tracker.link_requested.borrow().is_empty());
     assert_eq!(*harness.tracker.link_cancelled.borrow(), 1);
 }
+
+#[test]
+fn retiring_a_pin_or_its_node_cancels_a_forwarded_marquee() {
+    for remove_node in [false, true] {
+        let harness = MinimalTestHarness::new();
+        realize(&harness);
+        harness.window.invoke_clear_editor_focus();
+        harness.key_press(Key::Control);
+        let point = surface_point(&harness, Surface::Pin);
+        harness.mouse_down(point.0, point.1);
+        harness.mouse_move(650.0, 450.0);
+        assert!(harness.window.get_is_selecting());
+
+        let commits = std::rc::Rc::new(std::cell::Cell::new(0));
+        harness.window.on_box_selection_committed({
+            let commits = commits.clone();
+            move |_, _, _, _, _| commits.set(commits.get() + 1)
+        });
+        let lifecycle = harness.window.global::<NodeEditorInternalCallbacks>();
+        // Leave the delegate alive so the lifecycle hook must clear its grab state.
+        if remove_node {
+            lifecycle.invoke_remove_node(1);
+        } else {
+            lifecycle.invoke_remove_pin(3);
+        }
+        harness.pump_events();
+        assert_idle(&harness);
+        harness.mouse_move(660.0, 460.0);
+        harness.mouse_up(660.0, 460.0);
+        harness.key_release(Key::Control);
+        assert_idle(&harness);
+        assert_eq!(
+            commits.get(),
+            0,
+            "a retired gesture must not commit on release"
+        );
+        assert!(harness.tracker.link_requested.borrow().is_empty());
+    }
+}

@@ -4,9 +4,12 @@
 
 - Add `NodeEditorComputations.viewport-resized(width, height)` so hosts can
   track editor dimensions independently of grid updates, preserving the
-  existing `viewport-changed` signature (#6).
+  existing `viewport-changed` signature. Batched changes emit one deferred
+  notification; hosts explicitly seed their initial size (#6).
 - Share cancellation and gesture globals across the `@nodeeditor` module
   boundary so public removal and reset hooks cancel consumer interactions (#7).
+- Cancel active forwarded marquees when retiring a pin or node, preventing a
+  stale pointer release from committing the selection.
 
 ## 1.0.1 — 2026-09-17
 
