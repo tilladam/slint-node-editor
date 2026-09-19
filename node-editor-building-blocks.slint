@@ -198,12 +198,16 @@ export global NodeEditorInternalCallbacks {
         if HoverState.hovered-node-id == node-id {
             HoverState.hovered-node-id = 0;
         }
+        // Forwarded marquees may hold a grab on this node or one of its pins.
+        // Their source is not tracked, so retire the active forwarded gesture.
+        if DragState.dragged-node-id == node-id || BoxSelectionGesture.state != BoxSelectionGestureState.idle {
+            InteractionCancellation.version += 1;
+        }
         if DragState.dragged-node-id == node-id {
             DragState.is-dragging = false;
             DragState.dragged-node-id = 0;
             DragState.drag-offset-x = 0px;
             DragState.drag-offset-y = 0px;
-            InteractionCancellation.version += 1;
         }
         if LinkCreation.state != LinkCreationState.idle {
             LinkCreation.state = LinkCreationState.idle;
@@ -217,6 +221,9 @@ export global NodeEditorInternalCallbacks {
     /// Remove one pin from the geometry projection. Existing logical links are
     /// application data and remain the host's responsibility.
     public function remove-pin(pin-id: int) {
+        if BoxSelectionGesture.state != BoxSelectionGestureState.idle {
+            InteractionCancellation.version += 1;
+        }
         if LinkCreation.start-pin-id == pin-id {
             if LinkCreation.state != LinkCreationState.idle {
                 LinkCreation.state = LinkCreationState.idle;
@@ -275,6 +282,11 @@ export global NodeEditorComputations {
         /* zoom */ float,
         /* pan-x */ float,
         /* pan-y */ float);
+
+    /// Editor size changed, in logical pixels, independently of grid rendering.
+    /// Batched dimension changes produce one deferred call with the final size.
+    /// Changes are not replayed for a new handler; the host seeds its initial size.
+    callback viewport-resized(/* width */ float, /* height */ float);
 
     /// Compute pin ID at world coordinates with a world-space hit radius.
     pure callback compute-pin-at(

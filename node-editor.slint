@@ -54,7 +54,10 @@ import {
     BaseNode,
     Pin,
 } from "node-editor-building-blocks.slint";
-export { PinTypes, ViewportState, DragState, GeometryVersion, NodeEditorInternalCallbacks, LinkCreationState, LinkCreation, SelectionRequest, HoverState, NodeEditorEvents, NodeEditorComputations, NodeStyleDefaults, BoxSelectionModifier, MinimapNode, MinimapPosition, LinkData, LinkPath, LinkStatus, LinkStatusColors, Minimap, Link, BaseNode, Pin }
+// Globals used by both compiled library functions and consumer-instantiated
+// components must be exported by the module. Otherwise Slint gives the consumer
+// a separate instance and lifecycle notifications never reach its components.
+export { PinTypes, ViewportState, DragState, GeometryVersion, NodeEditorInternalCallbacks, LinkCreationState, LinkCreation, SelectionRequest, HoverState, NodeEditorEvents, NodeEditorComputations, NodeEditorGestureConfig, BoxSelectionGestureState, BoxSelectionGesture, InteractionCancellation, NodeStyleDefaults, BoxSelectionModifier, MinimapNode, MinimapPosition, LinkData, LinkPath, LinkStatus, LinkStatusColors, Minimap, Link, BaseNode, Pin }
 
 /// Pure Slint node editor composite component.
 ///
@@ -552,10 +555,21 @@ export component NodeEditor inherits FocusScope {
         NodeEditorComputations.request-grid-update();
     }
     // DragState is synced by BaseNode directly (it initiates drags)
+    // Report both dimensions once after the current batch of size changes.
+    viewport-resize-timer := Timer {
+        interval: 0ms;
+        running: false;
+        triggered => {
+            self.stop();
+            NodeEditorComputations.viewport-resized(root.width / 1px, root.height / 1px);
+        }
+    }
     changed width => {
+        viewport-resize-timer.start();
         NodeEditorComputations.request-grid-update();
     }
     changed height => {
+        viewport-resize-timer.start();
         NodeEditorComputations.request-grid-update();
     }
     changed grid-spacing => {
